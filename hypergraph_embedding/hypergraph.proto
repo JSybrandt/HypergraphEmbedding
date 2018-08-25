@@ -1,0 +1,25 @@
+syntax = "proto2";
+
+package hypergraph_embedding;
+
+// Note, all id's must be unique
+
+message Node {
+  optional string id = 1;
+  repeated string edge_id = 2;
+}
+
+message Edge {
+  optional string id = 1;
+  repeated string node_id = 2;
+}
+
+message Hypergraph {
+  // Name id for debug purposes
+  optional string id = 1;
+  // Map from node id to Node message
+  map<string, Node> nodes = 2;
+  // Map from edge id to Edge message
+  map<string, Edge> edges = 3;
+}
+
