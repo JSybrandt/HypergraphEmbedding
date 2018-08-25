@@ -19,29 +19,22 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='hypergraph_embedding',
   syntax='proto2',
   serialized_options=None,
-  serialized_pb=_b('\n%hypergraph_embedding/hypergraph.proto\x12\x14hypergraph_embedding\"#\n\x04Node\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07\x65\x64ge_id\x18\x02 \x03(\t\"#\n\x04\x45\x64ge\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07node_id\x18\x02 \x03(\t\"\xa4\x02\n\nHypergraph\x12\n\n\x02id\x18\x01 \x01(\t\x12:\n\x05nodes\x18\x02 \x03(\x0b\x32+.hypergraph_embedding.Hypergraph.NodesEntry\x12:\n\x05\x65\x64ges\x18\x03 \x03(\x0b\x32+.hypergraph_embedding.Hypergraph.EdgesEntry\x1aH\n\nNodesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12)\n\x05value\x18\x02 \x01(\x0b\x32\x1a.hypergraph_embedding.Node:\x02\x38\x01\x1aH\n\nEdgesEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12)\n\x05value\x18\x02 \x01(\x0b\x32\x1a.hypergraph_embedding.Edge:\x02\x38\x01')
+  serialized_pb=_b('\n%hypergraph_embedding/hypergraph.proto\x12\x14hypergraph_embedding\"\x16\n\x05\x45\x64ges\x12\r\n\x05\x65\x64ges\x18\x01 \x03(\x05\"\x16\n\x05Nodes\x12\r\n\x05nodes\x18\x01 \x03(\x05\"\x94\x02\n\nHypergraph\x12\x38\n\x04node\x18\x01 \x03(\x0b\x32*.hypergraph_embedding.Hypergraph.NodeEntry\x12\x38\n\x04\x65\x64ge\x18\x02 \x03(\x0b\x32*.hypergraph_embedding.Hypergraph.EdgeEntry\x1aH\n\tNodeEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.hypergraph_embedding.Edges:\x02\x38\x01\x1aH\n\tEdgeEntry\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12*\n\x05value\x18\x02 \x01(\x0b\x32\x1b.hypergraph_embedding.Nodes:\x02\x38\x01')
 )
 
 
 
 
-_NODE = _descriptor.Descriptor(
-  name='Node',
-  full_name='hypergraph_embedding.Node',
+_EDGES = _descriptor.Descriptor(
+  name='Edges',
+  full_name='hypergraph_embedding.Edges',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='id', full_name='hypergraph_embedding.Node.id', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='edge_id', full_name='hypergraph_embedding.Node.edge_id', index=1,
-      number=2, type=9, cpp_type=9, label=3,
+      name='edges', full_name='hypergraph_embedding.Edges.edges', index=0,
+      number=1, type=5, cpp_type=1, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -59,27 +52,20 @@ _NODE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=63,
-  serialized_end=98,
+  serialized_end=85,
 )
 
 
-_EDGE = _descriptor.Descriptor(
-  name='Edge',
-  full_name='hypergraph_embedding.Edge',
+_NODES = _descriptor.Descriptor(
+  name='Nodes',
+  full_name='hypergraph_embedding.Nodes',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='id', full_name='hypergraph_embedding.Edge.id', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='node_id', full_name='hypergraph_embedding.Edge.node_id', index=1,
-      number=2, type=9, cpp_type=9, label=3,
+      name='nodes', full_name='hypergraph_embedding.Nodes.nodes', index=0,
+      number=1, type=5, cpp_type=1, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -96,27 +82,27 @@ _EDGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=100,
-  serialized_end=135,
+  serialized_start=87,
+  serialized_end=109,
 )
 
 
-_HYPERGRAPH_NODESENTRY = _descriptor.Descriptor(
-  name='NodesEntry',
-  full_name='hypergraph_embedding.Hypergraph.NodesEntry',
+_HYPERGRAPH_NODEENTRY = _descriptor.Descriptor(
+  name='NodeEntry',
+  full_name='hypergraph_embedding.Hypergraph.NodeEntry',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='key', full_name='hypergraph_embedding.Hypergraph.NodesEntry.key', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
+      name='key', full_name='hypergraph_embedding.Hypergraph.NodeEntry.key', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='value', full_name='hypergraph_embedding.Hypergraph.NodesEntry.value', index=1,
+      name='value', full_name='hypergraph_embedding.Hypergraph.NodeEntry.value', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -134,26 +120,26 @@ _HYPERGRAPH_NODESENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=284,
-  serialized_end=356,
+  serialized_start=242,
+  serialized_end=314,
 )
 
-_HYPERGRAPH_EDGESENTRY = _descriptor.Descriptor(
-  name='EdgesEntry',
-  full_name='hypergraph_embedding.Hypergraph.EdgesEntry',
+_HYPERGRAPH_EDGEENTRY = _descriptor.Descriptor(
+  name='EdgeEntry',
+  full_name='hypergraph_embedding.Hypergraph.EdgeEntry',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='key', full_name='hypergraph_embedding.Hypergraph.EdgesEntry.key', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
+      name='key', full_name='hypergraph_embedding.Hypergraph.EdgeEntry.key', index=0,
+      number=1, type=5, cpp_type=1, label=1,
+      has_default_value=False, default_value=0,
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='value', full_name='hypergraph_embedding.Hypergraph.EdgesEntry.value', index=1,
+      name='value', full_name='hypergraph_embedding.Hypergraph.EdgeEntry.value', index=1,
       number=2, type=11, cpp_type=10, label=1,
       has_default_value=False, default_value=None,
       message_type=None, enum_type=None, containing_type=None,
@@ -171,8 +157,8 @@ _HYPERGRAPH_EDGESENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=358,
-  serialized_end=430,
+  serialized_start=316,
+  serialized_end=388,
 )
 
 _HYPERGRAPH = _descriptor.Descriptor(
@@ -183,22 +169,15 @@ _HYPERGRAPH = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='id', full_name='hypergraph_embedding.Hypergraph.id', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=_b("").decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
-    _descriptor.FieldDescriptor(
-      name='nodes', full_name='hypergraph_embedding.Hypergraph.nodes', index=1,
-      number=2, type=11, cpp_type=10, label=3,
+      name='node', full_name='hypergraph_embedding.Hypergraph.node', index=0,
+      number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='edges', full_name='hypergraph_embedding.Hypergraph.edges', index=2,
-      number=3, type=11, cpp_type=10, label=3,
+      name='edge', full_name='hypergraph_embedding.Hypergraph.edge', index=1,
+      number=2, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -206,7 +185,7 @@ _HYPERGRAPH = _descriptor.Descriptor(
   ],
   extensions=[
   ],
-  nested_types=[_HYPERGRAPH_NODESENTRY, _HYPERGRAPH_EDGESENTRY, ],
+  nested_types=[_HYPERGRAPH_NODEENTRY, _HYPERGRAPH_EDGEENTRY, ],
   enum_types=[
   ],
   serialized_options=None,
@@ -215,48 +194,48 @@ _HYPERGRAPH = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=138,
-  serialized_end=430,
+  serialized_start=112,
+  serialized_end=388,
 )
 
-_HYPERGRAPH_NODESENTRY.fields_by_name['value'].message_type = _NODE
-_HYPERGRAPH_NODESENTRY.containing_type = _HYPERGRAPH
-_HYPERGRAPH_EDGESENTRY.fields_by_name['value'].message_type = _EDGE
-_HYPERGRAPH_EDGESENTRY.containing_type = _HYPERGRAPH
-_HYPERGRAPH.fields_by_name['nodes'].message_type = _HYPERGRAPH_NODESENTRY
-_HYPERGRAPH.fields_by_name['edges'].message_type = _HYPERGRAPH_EDGESENTRY
-DESCRIPTOR.message_types_by_name['Node'] = _NODE
-DESCRIPTOR.message_types_by_name['Edge'] = _EDGE
+_HYPERGRAPH_NODEENTRY.fields_by_name['value'].message_type = _EDGES
+_HYPERGRAPH_NODEENTRY.containing_type = _HYPERGRAPH
+_HYPERGRAPH_EDGEENTRY.fields_by_name['value'].message_type = _NODES
+_HYPERGRAPH_EDGEENTRY.containing_type = _HYPERGRAPH
+_HYPERGRAPH.fields_by_name['node'].message_type = _HYPERGRAPH_NODEENTRY
+_HYPERGRAPH.fields_by_name['edge'].message_type = _HYPERGRAPH_EDGEENTRY
+DESCRIPTOR.message_types_by_name['Edges'] = _EDGES
+DESCRIPTOR.message_types_by_name['Nodes'] = _NODES
 DESCRIPTOR.message_types_by_name['Hypergraph'] = _HYPERGRAPH
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
-Node = _reflection.GeneratedProtocolMessageType('Node', (_message.Message,), dict(
-  DESCRIPTOR = _NODE,
+Edges = _reflection.GeneratedProtocolMessageType('Edges', (_message.Message,), dict(
+  DESCRIPTOR = _EDGES,
   __module__ = 'hypergraph_embedding.hypergraph_pb2'
-  # @@protoc_insertion_point(class_scope:hypergraph_embedding.Node)
+  # @@protoc_insertion_point(class_scope:hypergraph_embedding.Edges)
   ))
-_sym_db.RegisterMessage(Node)
+_sym_db.RegisterMessage(Edges)
 
-Edge = _reflection.GeneratedProtocolMessageType('Edge', (_message.Message,), dict(
-  DESCRIPTOR = _EDGE,
+Nodes = _reflection.GeneratedProtocolMessageType('Nodes', (_message.Message,), dict(
+  DESCRIPTOR = _NODES,
   __module__ = 'hypergraph_embedding.hypergraph_pb2'
-  # @@protoc_insertion_point(class_scope:hypergraph_embedding.Edge)
+  # @@protoc_insertion_point(class_scope:hypergraph_embedding.Nodes)
   ))
-_sym_db.RegisterMessage(Edge)
+_sym_db.RegisterMessage(Nodes)
 
 Hypergraph = _reflection.GeneratedProtocolMessageType('Hypergraph', (_message.Message,), dict(
 
-  NodesEntry = _reflection.GeneratedProtocolMessageType('NodesEntry', (_message.Message,), dict(
-    DESCRIPTOR = _HYPERGRAPH_NODESENTRY,
+  NodeEntry = _reflection.GeneratedProtocolMessageType('NodeEntry', (_message.Message,), dict(
+    DESCRIPTOR = _HYPERGRAPH_NODEENTRY,
     __module__ = 'hypergraph_embedding.hypergraph_pb2'
-    # @@protoc_insertion_point(class_scope:hypergraph_embedding.Hypergraph.NodesEntry)
+    # @@protoc_insertion_point(class_scope:hypergraph_embedding.Hypergraph.NodeEntry)
     ))
   ,
 
-  EdgesEntry = _reflection.GeneratedProtocolMessageType('EdgesEntry', (_message.Message,), dict(
-    DESCRIPTOR = _HYPERGRAPH_EDGESENTRY,
+  EdgeEntry = _reflection.GeneratedProtocolMessageType('EdgeEntry', (_message.Message,), dict(
+    DESCRIPTOR = _HYPERGRAPH_EDGEENTRY,
     __module__ = 'hypergraph_embedding.hypergraph_pb2'
-    # @@protoc_insertion_point(class_scope:hypergraph_embedding.Hypergraph.EdgesEntry)
+    # @@protoc_insertion_point(class_scope:hypergraph_embedding.Hypergraph.EdgeEntry)
     ))
   ,
   DESCRIPTOR = _HYPERGRAPH,
@@ -264,10 +243,10 @@ Hypergraph = _reflection.GeneratedProtocolMessageType('Hypergraph', (_message.Me
   # @@protoc_insertion_point(class_scope:hypergraph_embedding.Hypergraph)
   ))
 _sym_db.RegisterMessage(Hypergraph)
-_sym_db.RegisterMessage(Hypergraph.NodesEntry)
-_sym_db.RegisterMessage(Hypergraph.EdgesEntry)
+_sym_db.RegisterMessage(Hypergraph.NodeEntry)
+_sym_db.RegisterMessage(Hypergraph.EdgeEntry)
 
 
-_HYPERGRAPH_NODESENTRY._options = None
-_HYPERGRAPH_EDGESENTRY._options = None
+_HYPERGRAPH_NODEENTRY._options = None
+_HYPERGRAPH_EDGEENTRY._options = None
 # @@protoc_insertion_point(module_scope)
