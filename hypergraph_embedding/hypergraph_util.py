@@ -1,4 +1,5 @@
-# This file contains functions for generating and manipulating the Hypergraph proto message.
+# This file contains functions for generating and manipulating the Hypergraph
+# proto message.
 
 from . import hypergraph_pb2 as pb
 import numpy as np
@@ -12,6 +13,8 @@ def AddNodeToEdge(hypergraph, node_id, edge_id):
     """
     Modifies hypergraph by setting a connection from given node to given edge.
     """
+    assert node_id >= 0
+    assert edge_id >= 0
     if edge_id not in hypergraph.node[node_id].edges:
         hypergraph.node[node_id].edges.append(edge_id)
     if node_id not in hypergraph.edge[edge_id].nodes:
@@ -21,7 +24,8 @@ def AddNodeToEdge(hypergraph, node_id, edge_id):
 
 def CreateRandomHyperGraph(num_nodes, num_edges, probability):
     """
-    Creates a graph of `num_nodes` and `num_edges` where `probability` is the chance that node i belongs to edge j.
+    Creates a graph of `num_nodes` and `num_edges` where `probability` is the
+    chance that node i belongs to edge j.
     """
     assert probability <= 1
     assert probability >= 0
@@ -37,7 +41,9 @@ def CreateRandomHyperGraph(num_nodes, num_edges, probability):
 
 def FromCsrMatrix(csr_matrix):
     """
-    Creates a hypergraph object from the provided sparse matrix. Each row represents a node, each column represents an edge. A 1 in row i and column j represents that node i belongs to edge j.
+    Creates a hypergraph object from the provided sparse matrix. Each row
+    represents a node, each column represents an edge. A 1 in row i and
+    column j represents that node i belongs to edge j.
     """
     res = pb.Hypergraph()
     rows, cols = csr_matrix.nonzero()
@@ -53,7 +59,10 @@ def IsEmpty(hypergraph):
 
 def ToCsrMatrix(hypergraph):
     """
-    ToSparseMatrix accepts a hypergraph proto message and converts it to a Compressed Sparse Row matrix via scipy. Each row represents a node, each column represents an edge. A 1 in row i and column j represents that node i belongs to edge j.
+    ToSparseMatrix accepts a hypergraph proto message and converts it to a
+    Compressed Sparse Row matrix via scipy. Each row represents a node, each
+    column represents an edge. A 1 in row i and column j represents that node i
+    belongs to edge j.
     """
     if IsEmpty(hypergraph):
         # if the hypergraph is empty, return empty matrix
@@ -72,8 +81,8 @@ def ToCsrMatrix(hypergraph):
 def ToBipartideNxGraph(hypergraph):
     """
     Converts the hypergraph into a networkx graph via the bipartide method.
-    Each edge from the original hypergraph becomes a node (indexed starting at # nodes).
-    Edges in the new graph represent community membership.
+    Each edge from the original hypergraph becomes a node (indexed starting at
+    # nodes). Edges in the new graph represent community membership.
     """
     if IsEmpty(hypergraph):
         return nx.Graph()
@@ -94,7 +103,8 @@ def ToBipartideNxGraph(hypergraph):
 def ToCliqueNxGraph(hypergraph):
     """
     Converts the hyperfraph into a networkx graph via the clique method.
-    Communities from the original graph are replaced with fully connected cliques in the result graph.
+    Communities from the original graph are replaced with fully connected
+    cliques in the result graph.
     """
     if IsEmpty(hypergraph):
         return nx.Graph()
