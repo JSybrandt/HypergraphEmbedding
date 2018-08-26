@@ -75,7 +75,7 @@ def ToCsrMatrix(hypergraph):
             vals.append(1)
             rows.append(node_idx)
             cols.append(edge_idx)
-    return sp.sparse.csr_matrix((vals, (rows, cols)))
+    return sp.sparse.csr_matrix((vals, (rows, cols)), dtype=np.float32)
 
 
 def ToBipartideNxGraph(hypergraph):
