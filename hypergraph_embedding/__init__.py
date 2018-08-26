@@ -9,5 +9,5 @@ from hypergraph_embedding.hypergraph_pb2 import *
 from hypergraph_embedding.hypergraph_util import *
 
 __all__ = [
-  "Hypergraph",
+    "Hypergraph",
 ]

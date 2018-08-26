@@ -7,6 +7,7 @@ import networkx as nx
 from random import random
 import itertools
 
+
 def AddNodeToEdge(hypergraph, node_id, edge_id):
     """
     Modifies hypergraph by setting a connection from given node to given edge.
@@ -16,6 +17,7 @@ def AddNodeToEdge(hypergraph, node_id, edge_id):
     if node_id not in hypergraph.edge[edge_id].nodes:
         hypergraph.edge[edge_id].nodes.append(node_id)
     return hypergraph
+
 
 def CreateRandomHyperGraph(num_nodes, num_edges, probability):
     """
@@ -32,6 +34,7 @@ def CreateRandomHyperGraph(num_nodes, num_edges, probability):
                 AddNodeToEdge(result, i, j)
     return result
 
+
 def FromCsrMatrix(csr_matrix):
     """
     Creates a hypergraph object from the provided sparse matrix. Each row represents a node, each column represents an edge. A 1 in row i and column j represents that node i belongs to edge j.
@@ -41,6 +44,7 @@ def FromCsrMatrix(csr_matrix):
     for r, c in zip(rows, cols):
         AddNodeToEdge(res, r, c)
     return res
+
 
 def IsEmpty(hypergraph):
     "Returns true if there are no nodes or edges"
@@ -64,6 +68,7 @@ def ToCsrMatrix(hypergraph):
             cols.append(edge_idx)
     return sp.sparse.csr_matrix((vals, (rows, cols)))
 
+
 def ToBipartideNxGraph(hypergraph):
     """
     Converts the hypergraph into a networkx graph via the bipartide method.
@@ -74,6 +79,7 @@ def ToBipartideNxGraph(hypergraph):
         return nx.Graph()
 
     max_node_id = max([i for i, _ in hypergraph.node.items()])
+
     def hyperedge_graph_id(edge_num):
         "edges indexed 0 to #edges-1, becomes new ids after # nodes"
         return max_node_id + 1 + edge_num
@@ -83,6 +89,7 @@ def ToBipartideNxGraph(hypergraph):
         for edge_idx in node.edges:
             result.add_edge(node_idx, hyperedge_graph_id(edge_idx))
     return result
+
 
 def ToCliqueNxGraph(hypergraph):
     """

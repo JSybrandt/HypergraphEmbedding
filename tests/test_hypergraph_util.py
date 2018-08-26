@@ -8,15 +8,19 @@ import networkx as nx
 from random import random
 from random import randint
 
+
 def EmptyHypergraph():
     return Hypergraph()
+
 
 def TypicalHypergraph():
     h = Hypergraph()
 
+
 def SparseArrayEquals(test, actual, expected):
-   test.assertEqual(actual.shape, expected.shape)
-   test.assertEqual((actual != expected).nnz, 0)
+    test.assertEqual(actual.shape, expected.shape)
+    test.assertEqual((actual != expected).nnz, 0)
+
 
 class HypergraphUtilFunctions(unittest.TestCase):
     def test_AddNodeToEdge_typical(self):
@@ -39,7 +43,7 @@ class HypergraphUtilFunctions(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def test_CreateRandomHyperGraph_k10(self):
-        "Creates a 10x10 fully connected hypergraph" 
+        "Creates a 10x10 fully connected hypergraph"
         actual = CreateRandomHyperGraph(10, 10, 1)
         self.assertEqual(len(actual.node), 10)
         self.assertEqual(len(actual.edge), 10)
@@ -57,13 +61,13 @@ class HypergraphUtilFunctions(unittest.TestCase):
     def test_FromCsrMatrix_typical(self):
         "Nonzero in row i and col j means node i belong to edge j"
         _input = csr_matrix([
-            [1, 0], # node 0 in edge 0
-            [1, 0], # node 1 in edge 0
-            [0, 1], # node 2 in edge 1
+            [1, 0],  # node 0 in edge 0
+            [1, 0],  # node 1 in edge 0
+            [0, 1],  # node 2 in edge 1
             [1, 1]  # node 3 in edge 0 and 1
         ])
-        actual = FromCsrMatrix(_input);
-        expected = Hypergraph();
+        actual = FromCsrMatrix(_input)
+        expected = Hypergraph()
         expected.node[0].edges.append(0)
         expected.node[1].edges.append(0)
         expected.node[2].edges.append(1)
@@ -88,8 +92,8 @@ class HypergraphUtilFunctions(unittest.TestCase):
         AddNodeToEdge(_input, 1, 2)
         actual = ToCsrMatrix(_input)
         expected = csr_matrix([
-          [0, 0, 0], # node 0 not listed
-          [0, 0, 1]  # node 1 in edge 2
+            [0, 0, 0],  # node 0 not listed
+            [0, 0, 1]  # node 1 in edge 2
         ])
         SparseArrayEquals(self, actual, expected)
 
@@ -101,9 +105,9 @@ class HypergraphUtilFunctions(unittest.TestCase):
         AddNodeToEdge(_input, 2, 0)
         actual = ToCsrMatrix(_input)
         expected = csr_matrix([
-          [0, 0, 0], # node 0 not listed
-          [0, 1, 1],  # node 1 in edge 1 & 2
-          [1, 0, 0]  # node 2 in edge 0
+            [0, 0, 0],  # node 0 not listed
+            [0, 1, 1],  # node 1 in edge 1 & 2
+            [1, 0, 0]  # node 2 in edge 0
         ])
         SparseArrayEquals(self, actual, expected)
 
@@ -121,7 +125,8 @@ class HypergraphUtilFunctions(unittest.TestCase):
             num_edges = randint(0, 10)
             prob = random()
             hypergraph = CreateRandomHyperGraph(num_nodes, num_edges, prob)
-            self.assertEqual(hypergraph, FromCsrMatrix(ToCsrMatrix(hypergraph)))
+            self.assertEqual(hypergraph, FromCsrMatrix(
+                ToCsrMatrix(hypergraph)))
 
     def test_ToFromCsr_large_empty_graph(self):
         hypergraph = CreateRandomHyperGraph(100, 100, 0)
@@ -137,7 +142,7 @@ class HypergraphUtilFunctions(unittest.TestCase):
 
         actual = ToBipartideNxGraph(_input)
         expected = nx.Graph()
-        expected.add_edge(0, 3) # community 0 from hypergraph becomes node 3
+        expected.add_edge(0, 3)  # community 0 from hypergraph becomes node 3
         expected.add_edge(1, 3)
         expected.add_edge(1, 4)
         expected.add_edge(2, 4)
@@ -189,6 +194,7 @@ class HypergraphUtilFunctions(unittest.TestCase):
         expected.add_edge(2, 3)
 
         self.assertTrue(nx.is_isomorphic(actual, expected))
+
 
 if __name__ == "__main__":
     unittest.main()
