@@ -4,6 +4,7 @@ from hypergraph_embedding.hypergraph_util import *
 import scipy as sp
 import numpy as np
 from scipy.sparse import csr_matrix
+import networkx as nx
 from random import random
 from random import randint
 
@@ -125,6 +126,69 @@ class HypergraphUtilFunctions(unittest.TestCase):
     def test_ToFromCsr_large_empty_graph(self):
         hypergraph = CreateRandomHyperGraph(100, 100, 0)
         self.assertEqual(hypergraph, FromCsrMatrix(ToCsrMatrix(hypergraph)))
+
+    def test_ToBipartideNxGraph_typical(self):
+        "ToBipartideNxGraph should handle a typical example. Edges become nodes"
+        _input = Hypergraph()
+        AddNodeToEdge(_input, 0, 0)
+        AddNodeToEdge(_input, 1, 0)
+        AddNodeToEdge(_input, 1, 1)
+        AddNodeToEdge(_input, 2, 1)
+
+        actual = ToBipartideNxGraph(_input)
+        expected = nx.Graph()
+        expected.add_edge(0, 3) # community 0 from hypergraph becomes node 3
+        expected.add_edge(1, 3)
+        expected.add_edge(1, 4)
+        expected.add_edge(2, 4)
+
+        self.assertTrue(nx.is_isomorphic(actual, expected))
+
+    def test_ToBipartideNxGraph_empty(self):
+        "ToBipartideNxGraph should handle an empty example"
+        actual = ToBipartideNxGraph(Hypergraph())
+        expected = nx.Graph()
+        self.assertTrue(nx.is_isomorphic(actual, expected))
+
+    def test_ToCliqueNxGraph_empty(self):
+        "ToCliqueNxGraph should handle an empty example"
+        actual = ToCliqueNxGraph(Hypergraph())
+        expected = nx.Graph()
+        self.assertTrue(nx.is_isomorphic(actual, expected))
+
+    def test_ToCliqueNxGraph_typical(self):
+        "ToCliqueNxGraph should handle a small typical example"
+        _input = Hypergraph()
+        AddNodeToEdge(_input, 0, 0)
+        AddNodeToEdge(_input, 1, 0)
+        AddNodeToEdge(_input, 1, 1)
+        AddNodeToEdge(_input, 2, 1)
+        actual = ToCliqueNxGraph(_input)
+
+        expected = nx.Graph()
+        expected.add_edge(0, 1)
+        expected.add_edge(1, 2)
+
+        self.assertTrue(nx.is_isomorphic(actual, expected))
+
+    def test_ToCliqueNxGraph_k4(self):
+        "ToCliqueNxGraph should connect larger communities"
+        _input = Hypergraph()
+        AddNodeToEdge(_input, 0, 0)
+        AddNodeToEdge(_input, 1, 0)
+        AddNodeToEdge(_input, 2, 0)
+        AddNodeToEdge(_input, 3, 0)
+        actual = ToCliqueNxGraph(_input)
+
+        expected = nx.Graph()
+        expected.add_edge(0, 1)
+        expected.add_edge(0, 2)
+        expected.add_edge(0, 3)
+        expected.add_edge(1, 2)
+        expected.add_edge(1, 3)
+        expected.add_edge(2, 3)
+
+        self.assertTrue(nx.is_isomorphic(actual, expected))
 
 if __name__ == "__main__":
     unittest.main()

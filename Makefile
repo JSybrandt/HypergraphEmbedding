@@ -10,6 +10,7 @@ pip:
 	pip3 install --user numpy
 	pip3 install --user scipy
 	pip3 install --user protobuf
+	pip3 install --user networkx
 
 test:
 	python3 -m unittest discover -v 

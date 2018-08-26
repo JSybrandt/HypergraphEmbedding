@@ -3,7 +3,9 @@
 from . import hypergraph_pb2 as pb
 import numpy as np
 import scipy as sp
+import networkx as nx
 from random import random
+import itertools
 
 def AddNodeToEdge(hypergraph, node_id, edge_id):
     """
@@ -40,11 +42,16 @@ def FromCsrMatrix(csr_matrix):
         AddNodeToEdge(res, r, c)
     return res
 
+def IsEmpty(hypergraph):
+    "Returns true if there are no nodes or edges"
+    return len(hypergraph.node) == 0 or len(hypergraph.edge) == 0
+
+
 def ToCsrMatrix(hypergraph):
     """
     ToSparseMatrix accepts a hypergraph proto message and converts it to a Compressed Sparse Row matrix via scipy. Each row represents a node, each column represents an edge. A 1 in row i and column j represents that node i belongs to edge j.
     """
-    if len(hypergraph.node) == 0 or len(hypergraph.edge) == 0:
+    if IsEmpty(hypergraph):
         # if the hypergraph is empty, return empty matrix
         return sp.sparse.csr_matrix([])
     vals = []
@@ -56,3 +63,38 @@ def ToCsrMatrix(hypergraph):
             rows.append(node_idx)
             cols.append(edge_idx)
     return sp.sparse.csr_matrix((vals, (rows, cols)))
+
+def ToBipartideNxGraph(hypergraph):
+    """
+    Converts the hypergraph into a networkx graph via the bipartide method.
+    Each edge from the original hypergraph becomes a node (indexed starting at # nodes).
+    Edges in the new graph represent community membership.
+    """
+    if IsEmpty(hypergraph):
+        return nx.Graph()
+
+    max_node_id = max([i for i, _ in hypergraph.node.items()])
+    def hyperedge_graph_id(edge_num):
+        "edges indexed 0 to #edges-1, becomes new ids after # nodes"
+        return max_node_id + 1 + edge_num
+
+    result = nx.Graph()
+    for node_idx, node in hypergraph.node.items():
+        for edge_idx in node.edges:
+            result.add_edge(node_idx, hyperedge_graph_id(edge_idx))
+    return result
+
+def ToCliqueNxGraph(hypergraph):
+    """
+    Converts the hyperfraph into a networkx graph via the clique method.
+    Communities from the original graph are replaced with fully connected cliques in the result graph.
+    """
+    if IsEmpty(hypergraph):
+        return nx.Graph()
+
+    result = nx.Graph()
+    for _, edge in hypergraph.edge.items():
+        # iterate all pairs within hyperedge
+        for i, j in itertools.combinations(edge.nodes, 2):
+            result.add_edge(i, j)
+    return result
