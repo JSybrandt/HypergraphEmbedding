@@ -30,15 +30,29 @@ def CreateRandomHyperGraph(num_nodes, num_edges, probability):
                 AddNodeToEdge(result, i, j)
     return result
 
-def FromSparseMatrix(csr_matrix):
+def FromCsrMatrix(csr_matrix):
     """
     Creates a hypergraph object from the provided sparse matrix. Each row represents a node, each column represents an edge. A 1 in row i and column j represents that node i belongs to edge j.
     """
+    res = pb.Hypergraph()
+    rows, cols = csr_matrix.nonzero()
+    for r, c in zip(rows, cols):
+        AddNodeToEdge(res, r, c)
+    return res
 
-def ToSparseMatrix(hypergraph):
+def ToCsrMatrix(hypergraph):
     """
     ToSparseMatrix accepts a hypergraph proto message and converts it to a Compressed Sparse Row matrix via scipy. Each row represents a node, each column represents an edge. A 1 in row i and column j represents that node i belongs to edge j.
     """
-    return 1
-
-
+    if len(hypergraph.node) == 0 or len(hypergraph.edge) == 0:
+        # if the hypergraph is empty, return empty matrix
+        return sp.sparse.csr_matrix([])
+    vals = []
+    rows = []
+    cols = []
+    for node_idx, node in hypergraph.node.items():
+        for edge_idx in node.edges:
+            vals.append(1)
+            rows.append(node_idx)
+            cols.append(edge_idx)
+    return sp.sparse.csr_matrix((vals, (rows, cols)))
