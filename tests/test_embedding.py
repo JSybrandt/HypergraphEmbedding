@@ -24,8 +24,7 @@ class SvdEmbeddingTest(unittest.TestCase):
       embedding,
       expected_idx,
       expected_len,
-      expected_distinct=True
-  ):
+      expected_distinct=True):
     "Helper function to check that embedding is reasonable"
     "embedding - embedding object"
     "expected_idx - array of indices"
