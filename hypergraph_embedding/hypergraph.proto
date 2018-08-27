@@ -4,10 +4,12 @@ package hypergraph_embedding;
 
 message Edges {
   repeated int32 edges = 1;
+  optional string name = 2;
 }
 
 message Nodes {
   repeated int32 nodes = 1;
+  optional string name = 2;
 }
 
 message Hypergraph {
