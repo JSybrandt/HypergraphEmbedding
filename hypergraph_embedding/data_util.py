@@ -3,6 +3,9 @@ from . import Hypergraph
 from .hypergraph_util import *
 from lxml import etree
 from collections import namedtuple
+import logging
+
+log = logging.getLogger()
 
 # Used to store paper data
 Paper = namedtuple("Paper", ['title', 'authors'])
@@ -19,6 +22,7 @@ def ParseAMiner(aminer_source):
     Output: (yield)
       - a list of Papers (named tuple)
    """
+  log.info("Parsing AMiner data")
   last_seen_title = None
   for line in aminer_source:
     if line.startswith("#*"):  # paper title line
@@ -36,6 +40,7 @@ def PapersToHypergraph(parser):
     Output:
       - A hypergraph
     """
+  log.info("Converting papers to hypergraph")
   title2idx = {}
   author2idx = {}
   result = Hypergraph()
