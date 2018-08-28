@@ -22,7 +22,7 @@ def SparseArrayEquals(test, actual, expected):
   test.assertEqual((actual != expected).nnz, 0)
 
 
-class HypergraphUtilFunctions(unittest.TestCase):
+class HypergraphUtilTest(unittest.TestCase):
 
   def test_AddNodeToEdge_typical(self):
     "Adds both the node and the edge reference"

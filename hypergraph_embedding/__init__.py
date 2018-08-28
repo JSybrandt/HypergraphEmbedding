@@ -13,4 +13,6 @@ __all__ = [
     "Hypergraph",
     "ParseAMiner",
     "PapersToHypergraph",
+    "EmbedSvd",
+    "HypergraphEmbedding"
 ]

@@ -2,20 +2,31 @@ syntax = "proto2";
 
 package hypergraph_embedding;
 
-message NodeData {
-  repeated int32 edges = 1;
-  optional string name = 2;
-}
-
-message EdgeData {
-  repeated int32 nodes = 1;
-  optional string name = 2;
-}
 
 message Hypergraph {
+  message NodeData {
+    repeated int32 edges = 1;
+    optional string name = 2;
+  }
+  message EdgeData {
+    repeated int32 nodes = 1;
+    optional string name = 2;
+  }
+
   // Map from node id to list of edges
   map<int32, NodeData> node = 1;
   // Map from edge id to list of nodes
   map<int32, EdgeData> edge = 2;
 }
 
+
+message HypergraphEmbedding {
+  message Embedding {
+  	repeated float values = 1;
+  }
+
+	map<int32, Embedding> node = 1;
+	map<int32, Embedding> edge = 2;
+	optional int32 dim = 3;
+	optional string method_name = 4;
+}

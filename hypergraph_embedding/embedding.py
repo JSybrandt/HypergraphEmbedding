@@ -1,50 +1,42 @@
 # This file contains embedding objects to project hypergraph nodes and/or edges
 # into a dense vector space.
 
-import scipy as sp
 from . import ToCsrMatrix
+from . import HypergraphEmbedding
+import scipy as sp
 from collections.abc import Mapping
+from random import random
 
 
-class Embedding(Mapping):
-  "The Embedding ABC describes the embedding interface"
+def EmbedSvd(hypergraph, dimension):
+  assert dimension < len(hypergraph.node)
+  assert dimension < len(hypergraph.edge)
+  assert dimension > 0
 
-  def __init__(self, dim):
-    "Initializes an embedding object that projects a hypergraph into "
-    "`dim` dimensional space."
-    self._dim = dim
-    self._embedding_dict = {}
+  embedding = HypergraphEmbedding()
+  embedding.dim = dimension
+  embedding.method_name = "SVD"
 
-  def embed(self, hypergraph):
-    pass
+  matrix = ToCsrMatrix(hypergraph)
+  U, _, V = embedding_data = sp.sparse.linalg.svds(matrix, dimension)
+  for node_idx in hypergraph.node:
+    embedding.node[node_idx].values.extend(U[node_idx, :])
+  for edge_idx in hypergraph.edge:
+    embedding.edge[edge_idx].values.extend(V[:, edge_idx])
 
-  def __getitem__(self, key):
-    "Returns an embedding. Embeddings are read-only"
-    assert key in self._embedding_dict
-    return self._embedding_dict[key]
-
-  def __len__(self):
-    return len(self._embedding_dict)
-
-  def __iter__(self):
-    return iter(self._embedding_dict)
-
-  def items(self):
-    return self._embedding_dict.items()
+  return embedding
 
 
-class SvdEmbedding(Embedding):
+def EmbedRandom(hypergraph, dimension):
+  assert dimension > 0
 
-  def __init__(self, dim):
-    super(SvdEmbedding, self).__init__(dim)
+  embedding = HypergraphEmbedding()
+  embedding.dim = dimension
+  embedding.method_name = "Random"
 
-  def embed(self, hypergraph):
-    # SVD cannot embed a to a higher dimension than matrix order
-    assert self._dim < len(hypergraph.node)
-    assert self._dim < len(hypergraph.edge)
+  for node_idx in hypergraph.node:
+    embedding.node[node_idx].values.extend([random() for _ in range(dimension)])
+  for edge_idx in hypergraph.edge:
+    embedding.edge[edge_idx].values.extend([random() for _ in range(dimension)])
 
-    matrix = ToCsrMatrix(hypergraph)
-    U, _, _ = embedding_data = sp.sparse.linalg.svds(
-        matrix, self._dim, return_singular_vectors='u')
-    for node_idx in hypergraph.node:
-      self._embedding_dict[node_idx] = U[node_idx, :]
+  return embedding
