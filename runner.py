@@ -10,53 +10,70 @@ from hypergraph_embedding import *
 
 log = logging.getLogger()
 
-EMBEDDING_OPTIONS = {"SVD": EmbedSvd, "Random": EmbedRandom}
+EMBEDDING_OPTIONS = {"SVD": EmbedSvd, "RANDOM": EmbedRandom}
+
+PARSING_OPTIONS = {
+    "AMINER": AMinerToHypergraph,
+    "SNAP": SnapCommunityToHypergraph
+}
 
 
 def ParseArgs():
   parser = argparse.ArgumentParser(
       description="Process hypergraph and run experiments")
-  parser.add_argument(
-      "--aminer-data",
-      type=str,
-      help="Text file from AMiner Academic Social Network.",
-      default="")
+
+  # Logging
   parser.add_argument(
       "--log-level",
       type=str,
       help=(
-          "Specifies level of logging verbosity."
-          " Options: CRITICAL, ERROR, WARNING, INFO, DEBUG, NONE"),
+          "Specifies level of logging verbosity. "
+          "Options: CRITICAL, ERROR, WARNING, INFO, DEBUG, NONE"),
       default="INFO")
+
+  # Raw data options (convert to hypergraph)
   parser.add_argument(
-      "--log-to-stderr",
-      action="store_true",
-      help="If set, also print logs to stdout")
+      "--raw-data",
+      type=str,
+      help="Raw data to be converted to a hypergraph before processing.",
+      default="")
+  parser.add_argument(
+      "--raw-data-format",
+      type=str,
+      help=(
+          "Specifies how to parse the input file. "
+          "Options: " + " ".join([o for o in PARSING_OPTIONS])),
+      default="")
+
+  # Embedding options (convert hypergraph to embedding)
+  parser.add_argument(
+      "--embedding",
+      type=str,
+      help=(
+          "Path to store resulting embedding."
+          "Result is an embedding proto."))
   parser.add_argument(
       "--embedding-method",
       type=str,
       help=(
           "Specifies the manner in which the provided hypergraph should be "
-          "embedded. Options: " + " ".join([o for o in EMBEDDING_OPTIONS])),
-      default="SVD")
+          "embedded. Options: " + " ".join([o for o in EMBEDDING_OPTIONS])))
+  parser.add_argument(
+      "--dimension",
+      type=int,
+      help=(
+          "Dimensonality of output embeddings. "
+          "Should be positive and less than #nodes and #edges."))
+
+  # Required hypergraph argument
   parser.add_argument(
       "hypergraph",
       type=str,
       help=(
           "Path to stored hypergraph proto. "
-          "Used as output file if aminer-data is supplied."))
-  parser.add_argument(
-      "dimension",
-      type=int,
-      help=(
-          "Dimensonality of output embeddings. "
-          "Should be positive and less than #nodes and #edges."))
-  parser.add_argument(
-      "embedding",
-      type=str,
-      help=(
-          "Path to store resulting embedding."
-          "Result is an embedding proto."))
+          "If raw-data is supplied, this program will write a hypergraph "
+          "proto here. If embedding is specified, this program will read from "
+          "here. Both may be specified for full pipeline."))
   return parser.parse_args()
 
 
@@ -76,82 +93,76 @@ def ConfigureLogger(args):
 
   formatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
 
-  if args.log_to_stderr:
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    log.addHandler(handler)
-
-
-def ConvertAMinerToHypergraph(input_path, output_path):
-  "Reads text from input_path and writes serialized proto to output_path"
-  with input_path.open('r') as aminer, output_path.open('wb') as proto:
-    hypergraph = PapersToHypergraph(ParseAMiner(aminer))
-    log.info("Writing Hypergraph")
-    proto.write(hypergraph.SerializeToString())
-
-
-def LoadHypergraph(input_path):
-  "Loads serialized proto from input_path"
-  with input_path.open('rb') as proto:
-    result = Hypergraph()
-    result.ParseFromString(proto.read())
-    return result
+  # log to stderr
+  handler = logging.StreamHandler()
+  handler.setFormatter(formatter)
+  log.addHandler(handler)
 
 
 if __name__ == "__main__":
   args = ParseArgs()
   ConfigureLogger(args)
 
-  log.info("Starting")
-
-  assert args.dimension > 0
-  assert args.hypergraph  # must be non-empty and non-None
+  log.info("Validating input arguments")
   hypergraph_path = Path(args.hypergraph)
 
-  assert args.embedding
-  embedding_path = Path(args.embedding)
-
-  log.info("Checking that %s does not already exist", args.embedding)
-  assert not embedding_path.exists()
-
-  log.info("Checking that provided embedding option is supported.")
-  assert args.embedding_method in EMBEDDING_OPTIONS
-
-  if args.aminer_data:
-    log.info("Reading aminer co-authorship data from %s", args.aminer_data)
-    aminer_data_path = Path(args.aminer_data)
-    # must have supplied a real path
-    assert aminer_data_path.is_file()
-    # must have NOT given me a real hypergraph path
-    # Note, run again without --aminer-data to use the previously converted hypergraph
-    log.info("Checking that %s does not already exist", hypergraph_path)
+  if args.raw_data:
+    log.info("Checking for valid raw-data-format")
+    assert args.raw_data_format in PARSING_OPTIONS
+    raw_data_path = Path(args.raw_data)
+    log.info("Checking raw-data exists")
+    assert raw_data_path.exists()
+    log.info("Checking its safe to write hypergraph")
     assert not hypergraph_path.exists()
-    log.info(
-        "Writing AMiner data from %s to %s",
-        aminer_data_path,
-        hypergraph_path)
-    ConvertAMinerToHypergraph(aminer_data_path, hypergraph_path)
+    assert hypergraph_path.parent.is_dir()
 
-  log.info("Checking that %s exists", hypergraph_path)
-  assert hypergraph_path.exists()
+  if args.embedding:
+    embedding_path = Path(args.embedding)
+    log.info("Checking for valid embedding-method")
+    assert args.embedding_method in EMBEDDING_OPTIONS
+    log.info("Checking for positive dimension")
+    assert args.dimension > 0
+    if not args.raw_data:  # if we are converting also, we don't check hg here
+      log.info("Checking hypergraph exists")
+      assert hypergraph_path.exists()
+    log.info("Checking its safe to write embedding")
+    assert not embedding_path.exists()
+    assert embedding_path.parent.is_dir()
 
-  log.info("Reading data from %s", hypergraph_path)
-  hypergraph = LoadHypergraph(hypergraph_path)
+  log.info("Finished checking, lgtm")
+
+  # do conversion
+  if args.raw_data:
+    log.info("Parsing %s with %s method", raw_data_path, args.raw_data_format)
+    with raw_data_path.open('r') as raw_file:
+      hypergraph = PARSING_OPTIONS[args.raw_data_format](raw_data)
+    log.info("Writing hypergraph proto to %s", hypergraph_path)
+    with hypergraph_path.open('wb') as proto_file:
+      proto_file.write(hypergraph.SerializeToString())
+    log.info("Checking write went well")
+    assert hypergraph_path.exists()
+  else:
+    log.info("Reading hypergraph from %s", hypergraph_path)
+    with hypergraph_path.open('rb') as proto_file:
+      hypergraph = Hypergraph()
+      hypergraph.ParseFromString(proto_file.read())
 
   log.info(
       "Hypergraph contains %i nodes and %i edges",
       len(hypergraph.node),
       len(hypergraph.edge))
-  log.info("Checking valid dimensionality")
-  assert min(len(hypergraph.node), len(hypergraph.edge)) > args.dimension
 
-  log.info("Embedding using method %s", args.embedding_method)
-  embedding = EMBEDDING_OPTIONS[args.embedding_method](
-      hypergraph,
-      args.dimension)
+  if args.embedding:
+    log.info("Checking embedding dimensionality is smaller than # nodes/edges")
+    assert min(len(hypergraph.node), len(hypergraph.edge)) > args.dimension
 
-  log.info("Writing embedding")
-  with embedding_path.open('wb') as proto:
-    proto.write(embedding.SerializeToString())
+    log.info("Embedding using method %s", args.embedding_method)
+    embedding = EMBEDDING_OPTIONS[args.embedding_method](
+        hypergraph,
+        args.dimension)
+
+    log.info("Writing embedding")
+    with embedding_path.open('wb') as proto:
+      proto.write(embedding.SerializeToString())
 
   log.info("Done!")

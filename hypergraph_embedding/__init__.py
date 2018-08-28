@@ -11,10 +11,15 @@ from hypergraph_embedding.data_util import *
 from hypergraph_embedding.embedding import *
 
 __all__ = [
+    # proto
     "Hypergraph",
-    "ParseAMiner",
-    "PapersToHypergraph",
+    "HypergraphEmbedding",
+
+    # Parsing
+    "AMinerToHypergraph",
+    "SnapCommunityToHypergraph",
+
+    # Embedding
     "EmbedSvd",
     "EmbedRandom",
-    "HypergraphEmbedding"
 ]

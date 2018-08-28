@@ -76,3 +76,37 @@ class TestPapersToHypergraph(unittest.TestCase):
     AddNodeToEdge(expected, 0, 1, "A", "Y")
     AddNodeToEdge(expected, 2, 1, "C", "Y")
     self.assertEqual(actual, expected)
+
+
+class TestSnapCommunityToHypergraph(unittest.TestCase):
+
+  def test_small(self):
+    "Should parse each line as a community."
+    actual = SnapCommunityToHypergraph(StringIO("1 2"))
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 1, 0)
+    AddNodeToEdge(expected, 2, 0)
+    self.assertEqual(actual, expected)
+
+  def test_multi_line(self):
+    actual = SnapCommunityToHypergraph(StringIO("1 2\n1 2 3"))
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 1, 0)
+    AddNodeToEdge(expected, 2, 0)
+    AddNodeToEdge(expected, 1, 1)
+    AddNodeToEdge(expected, 2, 1)
+    AddNodeToEdge(expected, 3, 1)
+    self.assertEqual(actual, expected)
+
+  def test_file(self):
+    "Parsing should accept a file description without error"
+    with open("test_data/snap_example.cmty.txt") as ifile:
+      actual = SnapCommunityToHypergraph(ifile)
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 1, 0)
+    AddNodeToEdge(expected, 3, 0)
+    AddNodeToEdge(expected, 5, 0)
+    AddNodeToEdge(expected, 3, 1)
+    AddNodeToEdge(expected, 5, 1)
+    AddNodeToEdge(expected, 7, 1)
+    self.assertEqual(actual, expected)

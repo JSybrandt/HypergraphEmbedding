@@ -11,6 +11,18 @@ log = logging.getLogger()
 Paper = namedtuple("Paper", ['title', 'authors'])
 
 
+def SnapCommunityToHypergraph(snap_source):
+  hypergraph = Hypergraph()
+  for edge_idx, node_str in enumerate(snap_source):
+    for node_idx in node_str.split():
+      AddNodeToEdge(hypergraph, int(node_idx), edge_idx)
+  return hypergraph
+
+
+def AMinerToHypergraph(aminer_source):
+  return PapersToHypergraph(ParseAMiner(aminer_source))
+
+
 def ParseAMiner(aminer_source):
   """
     Parses data in AMiner's format.
