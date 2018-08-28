@@ -31,13 +31,13 @@ class SvdEmbeddingTest(unittest.TestCase):
     "expected_len - int"
     "expected_distinct - if true, check that all vectors are different"
 
-    self.assertEquals(len(embedding), len(expected_idx))
+    self.assertEqual(len(embedding), len(expected_idx))
     for _, vec in embedding.items():
-      self.assertEquals(len(vec), expected_len)
+      self.assertEqual(len(vec), expected_len)
 
     if expected_distinct:
       for i, j in itertools.combinations(expected_idx, 2):
-        self.assertNotEquals(list(embedding[i]), list(embedding[j]))
+        self.assertNotEqual(list(embedding[i]), list(embedding[j]))
 
   def test_typical(self):
     "SvdEmbedding for test graph should create 3 distinct 2d vectors"

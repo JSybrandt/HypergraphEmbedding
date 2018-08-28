@@ -1,13 +1,12 @@
 import unittest
 from hypergraph_embedding import Hypergraph
 from hypergraph_embedding.data_util import *
-from textwrap import dedent
+from io import StringIO
 
 XML_FORMAT = (
-    '<?xml version="1.0" encoding="ISO-8859-1"?>'
+    '<?xml version="1.0" ?>'
     '<!DOCTYPE dblp SYSTEM "dblp.dtd">'
-    '<dblp>{}</dblp>'
-    '</xml>')
+    '<dblp>{}</dblp>')
 
 
 def make_article(paper_name, authors, tag):
@@ -71,3 +70,21 @@ class TestHarnessTest(unittest.TestCase):
         },
                  "tag"),
         expected)
+
+
+class TestDataUtil(unittest.TestCase):
+
+  def test_ParseDblpXml_one_paper(self):
+    _input = make_xml({"T": ["A", "B"]})
+    actual = ParseDblpXml(StringIO(_input))
+
+    expected = Hypergraph()
+    expected.node[0].name = "A"
+    expected.node[0].edges.append(0)
+    expected.node[1].name = "B"
+    expected.node[1].edges.append(0)
+    expected.edge[0].name = "T"
+    expected.edge[0].nodes.append(0)
+    expected.edge[0].nodes.append(1)
+
+    self.assertEqual(actual, expected)

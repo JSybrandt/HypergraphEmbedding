@@ -1,19 +1,18 @@
 CC=protoc
 MODULE=hypergraph_embedding
+PIP=pip3
+PYTHON=python3
 
 init: proto pip
 
-proto: pip
+proto:
 	protoc --python_out=. $(MODULE)/hypergraph.proto
 
 pip:
-	pip3 install --user numpy
-	pip3 install --user scipy
-	pip3 install --user protobuf
-	pip3 install --user networkx
+	$(PIP) install --user -r requirements.txt
 
 test:
-	python3 -m unittest discover -v 
+	$(PYTHON) -m unittest discover -v
 
 clean:
 	rm -f $(MODULE)/hypergraph_pb2.py
