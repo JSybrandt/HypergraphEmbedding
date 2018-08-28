@@ -45,12 +45,18 @@ def ParseArgs():
       help=(
           "Path to stored hypergraph proto. "
           "Used as output file if aminer-data is supplied."))
-  # parser.add_argument(
-  # "embedding",
-  # type=str,
-  # help=(
-  # "Path to store resulting embedding."
-  # "Result is an embedding proto."))
+  parser.add_argument(
+      "dimension",
+      type=int,
+      help=(
+          "Dimensonality of output embeddings. "
+          "Should be positive and less than #nodes and #edges."))
+  parser.add_argument(
+      "embedding",
+      type=str,
+      help=(
+          "Path to store resulting embedding."
+          "Result is an embedding proto."))
   return parser.parse_args()
 
 
@@ -68,8 +74,7 @@ def ConfigureLogger(args):
   elif args.log_level == "NONE":
     log.setLevel(logging.NONE)
 
-  formatter = logging.Formatter(
-      "%(asctime)s [%(threadName)-12.12s] [%(levelname)-5.5s]  %(message)s")
+  formatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
 
   if args.log_to_stderr:
     handler = logging.StreamHandler()
@@ -99,8 +104,15 @@ if __name__ == "__main__":
 
   log.info("Starting")
 
+  assert args.dimension > 0
   assert args.hypergraph  # must be non-empty and non-None
   hypergraph_path = Path(args.hypergraph)
+
+  assert args.embedding
+  embedding_path = Path(args.embedding)
+
+  log.info("Checking that %s does not already exist", args.embedding)
+  assert not embedding_path.exists()
 
   log.info("Checking that provided embedding option is supported.")
   assert args.embedding_method in EMBEDDING_OPTIONS
@@ -125,5 +137,21 @@ if __name__ == "__main__":
 
   log.info("Reading data from %s", hypergraph_path)
   hypergraph = LoadHypergraph(hypergraph_path)
+
+  log.info(
+      "Hypergraph contains %i nodes and %i edges",
+      len(hypergraph.node),
+      len(hypergraph.edge))
+  log.info("Checking valid dimensionality")
+  assert min(len(hypergraph.node), len(hypergraph.edge)) > args.dimension
+
+  log.info("Embedding using method %s", args.embedding_method)
+  embedding = EMBEDDING_OPTIONS[args.embedding_method](
+      hypergraph,
+      args.dimension)
+
+  log.info("Writing embedding")
+  with embedding_path.open('wb') as proto:
+    proto.write(embedding.SerializeToString())
 
   log.info("Done!")
