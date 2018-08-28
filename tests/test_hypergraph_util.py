@@ -43,6 +43,35 @@ class HypergraphUtilFunctions(unittest.TestCase):
     expected.edge[2].nodes.append(1)
     self.assertEqual(actual, expected)
 
+  def test_AddNodeToEdge_names(self):
+    "Filling in name parameters should set hypergraph data names."
+    actual = Hypergraph()
+    AddNodeToEdge(actual, 0, 0, "A", "X")
+    AddNodeToEdge(actual, 1, 0, node_name="B")
+    AddNodeToEdge(actual, 1, 1, edge_name="Y")
+
+    expected = Hypergraph()
+    node_a = expected.node[0]
+    node_b = expected.node[1]
+    edge_x = expected.edge[0]
+    edge_y = expected.edge[1]
+
+    node_a.edges.append(0)
+    node_a.name = "A"
+
+    node_b.edges.append(0)
+    node_b.edges.append(1)
+    node_b.name = "B"
+
+    edge_x.nodes.append(0)
+    edge_x.nodes.append(1)
+    edge_x.name = "X"
+
+    edge_y.nodes.append(1)
+    edge_y.name = "Y"
+
+    self.assertEqual(actual, expected)
+
   def test_CreateRandomHyperGraph_k10(self):
     "Creates a 10x10 fully connected hypergraph"
     actual = CreateRandomHyperGraph(10, 10, 1)

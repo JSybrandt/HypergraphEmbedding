@@ -7,18 +7,40 @@ import scipy as sp
 import networkx as nx
 from random import random
 import itertools
+import logging
 
 
-def AddNodeToEdge(hypergraph, node_id, edge_id):
+def AddNodeToEdge(hypergraph, node_id, edge_id, node_name=None, edge_name=None):
   """
     Modifies hypergraph by setting a connection from given node to given edge.
+    If node/edge name are supplied.
     """
   assert node_id >= 0
   assert edge_id >= 0
-  if edge_id not in hypergraph.node[node_id].edges:
-    hypergraph.node[node_id].edges.append(edge_id)
-  if node_id not in hypergraph.edge[edge_id].nodes:
-    hypergraph.edge[edge_id].nodes.append(node_id)
+
+  node = hypergraph.node[node_id]
+  edge = hypergraph.edge[edge_id]
+
+  if edge_id not in node.edges:
+    node.edges.append(edge_id)
+  if node_id not in edge.nodes:
+    edge.nodes.append(node_id)
+  if node_name is not None:
+    if node.HasField("name") and node.name != node_name:
+      logging.getLogger().warning(
+          "Overwriting Node #{} name from {} to {}".format(
+              node_id,
+              node.name,
+              node_name))
+    node.name = node_name
+  if edge_name is not None:
+    if edge.HasField("name") and edge.name != edge_name:
+      logging.getLogger().warning(
+          "Overwriting Edge #{} name from {} to {}".format(
+              edge_id,
+              edge.name,
+              edge_name))
+    edge.name = edge_name
   return hypergraph
 
 

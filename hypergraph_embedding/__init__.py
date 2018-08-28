@@ -11,4 +11,6 @@ from hypergraph_embedding.data_util import *
 
 __all__ = [
     "Hypergraph",
+    "ParseAMiner",
+    "PapersToHypergraph",
 ]

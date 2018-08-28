@@ -16,3 +16,7 @@ test:
 
 clean:
 	rm -f $(MODULE)/hypergraph_pb2.py
+
+format:
+	find . -iname "*.py" -exec yapf --style=.style.yapf -i -r {} \;
+
