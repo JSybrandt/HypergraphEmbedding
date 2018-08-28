@@ -89,7 +89,7 @@ def ConfigureLogger(args):
   elif args.log_level == "DEBUG":
     log.setLevel(logging.DEBUG)
   elif args.log_level == "NONE":
-    log.setLevel(logging.NONE)
+    log.propogate = False
 
   formatter = logging.Formatter("%(asctime)s [%(levelname)-5.5s]  %(message)s")
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
   if args.raw_data:
     log.info("Parsing %s with %s method", raw_data_path, args.raw_data_format)
     with raw_data_path.open('r') as raw_file:
-      hypergraph = PARSING_OPTIONS[args.raw_data_format](raw_data)
+      hypergraph = PARSING_OPTIONS[args.raw_data_format](raw_file)
     log.info("Writing hypergraph proto to %s", hypergraph_path)
     with hypergraph_path.open('wb') as proto_file:
       proto_file.write(hypergraph.SerializeToString())

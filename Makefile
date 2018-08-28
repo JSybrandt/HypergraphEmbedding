@@ -13,6 +13,7 @@ pip:
 
 test:
 	$(PYTHON) -m unittest discover -v
+	./tests/test_runner.sh
 
 clean:
 	rm -f $(MODULE)/hypergraph_pb2.py
