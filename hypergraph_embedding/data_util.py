@@ -1,7 +1,6 @@
 # This file is responsible for preparing experimental data
 from . import Hypergraph
 from .hypergraph_util import *
-from lxml import etree
 from collections import namedtuple
 import logging
 
