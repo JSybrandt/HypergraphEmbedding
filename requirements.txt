@@ -1,0 +1,5 @@
+numpy
+scipy
+protobuf
+networkx
+lxml
