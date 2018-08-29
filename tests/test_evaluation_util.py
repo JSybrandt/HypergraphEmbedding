@@ -100,8 +100,8 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding = HypergraphEmbedding()
     embedding.dim = 2
     embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([0, 0])
-    embedding.node[2].values.extend([0, 0.5])
+    embedding.node[1].values.extend([1, 0])
+    embedding.node[2].values.extend([0.5, 0.5])
 
     # default is cosine
     actual = CommunityPrediction(hypergraph, embedding)
@@ -120,7 +120,10 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[2].values.extend([1, -1])
     embedding.node[3].values.extend([0, 0])
 
-    actual = CommunityPrediction(hypergraph, embedding, distance.euclidean)
+    actual = CommunityPrediction(
+        hypergraph,
+        embedding,
+        distance_function=distance.euclidean)
     # expect that node 3 is inside the triangle
     self.assertEqual(set(actual), set([(3, 0)]))
 
@@ -134,8 +137,8 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding = HypergraphEmbedding()
     embedding.dim = 2
     embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([0, 0])
-    embedding.node[2].values.extend([0, 0.5])
+    embedding.node[1].values.extend([1, 0])
+    embedding.node[2].values.extend([0.5, 0.5])
 
     actual = CommunityPrediction(hypergraph, embedding)
     self.assertEqual(set(actual), set([(2, 0), (2, 1)]))
@@ -149,11 +152,52 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding = HypergraphEmbedding()
     embedding.dim = 2
     embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([0, 0])
-    embedding.node[2].values.extend([0, 0.5])
+    embedding.node[1].values.extend([1, 0])
+    embedding.node[2].values.extend([0.5, 0.5])
 
     actual = CommunityPrediction(hypergraph, embedding)
     self.assertEqual(set(actual), set([(2, 0)]))
+
+  def test_only_missing_links(self):
+    "Given the optional parameter for missing links, don't test everything"
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 0)
+    AddNodeToEdge(hypergraph, 1, 0)
+
+    embedding = HypergraphEmbedding()
+    embedding.dim = 2
+    embedding.node[0].values.extend([0, 1])
+    embedding.node[1].values.extend([1, 0])
+    embedding.node[2].values.extend([0.5, 0.5])  # detect
+    embedding.node[3].values.extend([0.5, 0.5])  # skip
+
+    missing_links = [(2, 0)]
+
+    actual = CommunityPrediction(
+        hypergraph,
+        embedding,
+        missing_links=missing_links)
+    self.assertEqual(set(actual), set([(2, 0)]))
+
+  def test_missing_edge_removed(self):
+    "Tests the case wherein a listed missing edge doesn't appear"
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 0)
+    AddNodeToEdge(hypergraph, 1, 0)
+
+    embedding = HypergraphEmbedding()
+    embedding.dim = 2
+    embedding.node[0].values.extend([0, 1])
+    embedding.node[1].values.extend([1, 0])
+
+    # Test each case, none should fail
+    missing_links = [(2, 0), (0, 1), (1, 1)]
+
+    actual = CommunityPrediction(
+        hypergraph,
+        embedding,
+        missing_links=missing_links)
+    self.assertEqual(set(actual), set())
 
 
 class TestCalculateCommunityPredictionMetrics(unittest.TestCase):

@@ -12,7 +12,7 @@ tmp_metrics_path=$(mktemp -u)
 	--raw-data-format SNAP \
 	--embedding $tmp_embedding_path \
 	--embedding-method SVD \
-	--dimension 2 \
+	--embedding-dimension 2 \
 	$tmp_hypergraph_path
 
 if [ $? -eq 0 ]; then
@@ -30,7 +30,7 @@ echo "Testing runner premade hypergraph"
 	--log-level NONE \
 	--embedding $tmp_embedding_path \
 	--embedding-method RANDOM \
-	--dimension 2 \
+	--embedding-dimension 2 \
 	$tmp_hypergraph_path
 
 if [ $? -eq 0 ]; then

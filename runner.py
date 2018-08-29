@@ -17,7 +17,10 @@ PARSING_OPTIONS = {
     "SNAP": SnapCommunityToHypergraph
 }
 
-EXPERIMENT_OPTIONS = {"LINK_PREDICTION": RunLinkPrediction}
+EXPERIMENT_OPTIONS = {
+    "LINK_PREDICTION": RunLinkPrediction,
+    "LINK_RECALL": RunLinkPrediction
+}
 
 
 def ParseArgs():
@@ -67,7 +70,7 @@ def ParseArgs():
           "Specifies the manner in which the provided hypergraph should be "
           "embedded. Options: " + " ".join([o for o in EMBEDDING_OPTIONS])))
   parser.add_argument(
-      "--dimension",
+      "--embedding-dimension",
       type=int,
       help=(
           "Dimensonality of output embeddings. "
@@ -156,7 +159,7 @@ if __name__ == "__main__":
     log.info("Checking for valid embedding-method")
     assert args.embedding_method in EMBEDDING_OPTIONS
     log.info("Checking for positive dimension")
-    assert args.dimension > 0
+    assert args.embedding_dimension > 0
     log.info("Checking its safe to write embedding")
     assert not embedding_path.exists()
     assert embedding_path.parent.is_dir()
@@ -165,7 +168,7 @@ if __name__ == "__main__":
     log.info("Performing checks for reading embedding")
     embedding_path = Path(args.embedding)
     assert embedding_path.is_file()
-    if args.dimension:
+    if args.embedding_dimension:
       log.warning("Dimension set, but we are not writing hypergraph")
 
   log.info("Checking that experimental flags are appropriate")
@@ -192,6 +195,14 @@ if __name__ == "__main__":
     log.info("Parsing %s with %s method", raw_data_path, args.raw_data_format)
     with raw_data_path.open('r') as raw_file:
       hypergraph = PARSING_OPTIONS[args.raw_data_format](raw_file)
+    if args.name:
+      log.info("Setting hypergraph name to %s", args.name)
+      log.info("Good name!")
+      hypergraph.name = args.name
+    else:
+      log.info("Setting hypergraph name to %s", args.hypergraph)
+      log.info("Bad name :(")
+      hypergraph.name = args.hypergraph
     log.info("Writing hypergraph proto to %s", hypergraph_path)
     with hypergraph_path.open('wb') as proto_file:
       proto_file.write(hypergraph.SerializeToString())
@@ -210,12 +221,13 @@ if __name__ == "__main__":
 
   if args.embedding and args.embedding_method:
     log.info("Checking embedding dimensionality is smaller than # nodes/edges")
-    assert min(len(hypergraph.node), len(hypergraph.edge)) > args.dimension
+    assert min(len(hypergraph.node),
+               len(hypergraph.edge)) > args.embedding_dimension
 
     log.info("Embedding using method %s", args.embedding_method)
     embedding = EMBEDDING_OPTIONS[args.embedding_method](
         hypergraph,
-        args.dimension)
+        args.embedding_dimension)
 
     log.info("Writing embedding")
     with embedding_path.open('wb') as proto:
@@ -242,7 +254,14 @@ if __name__ == "__main__":
       metrics = experiment(
           hypergraph,
           embedding,
-          args.experiment_lp_probability)
+          args.experiment_lp_probability,
+          False)
+    elif args.experiment_type == "LINK_RECALL":
+      metrics = experiment(
+          hypergraph,
+          embedding,
+          args.experiment_lp_probability,
+          True)
     log.info("Experiment results:")
     log.info(metrics)
     log.info("Writing metrics proto")
