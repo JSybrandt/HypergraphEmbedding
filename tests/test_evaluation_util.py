@@ -4,6 +4,8 @@ from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.data_util import *
 from hypergraph_embedding.evaluation_util import *
 from random import random, randint
+from scipy.spatial import distance
+from math import isclose
 
 
 class TestRemoveRandomConnections(unittest.TestCase):
@@ -101,5 +103,113 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[1].values.extend([0, 0])
     embedding.node[2].values.extend([0, 0.5])
 
+    # default is cosine
     actual = CommunityPrediction(hypergraph, embedding)
     self.assertEqual(set(actual), set([(2, 0)]))
+
+  def test_euclidian(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 0)
+    AddNodeToEdge(hypergraph, 1, 0)
+    AddNodeToEdge(hypergraph, 2, 0)
+
+    embedding = HypergraphEmbedding()
+    embedding.dim = 2
+    embedding.node[0].values.extend([0, 1])
+    embedding.node[1].values.extend([-1, -1])
+    embedding.node[2].values.extend([1, -1])
+    embedding.node[3].values.extend([0, 0])
+
+    actual = CommunityPrediction(hypergraph, embedding, distance.euclidean)
+    # expect that node 3 is inside the triangle
+    self.assertEqual(set(actual), set([(3, 0)]))
+
+  def test_multiple_edges(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 0)
+    AddNodeToEdge(hypergraph, 1, 0)
+    AddNodeToEdge(hypergraph, 0, 1)
+    AddNodeToEdge(hypergraph, 1, 1)
+
+    embedding = HypergraphEmbedding()
+    embedding.dim = 2
+    embedding.node[0].values.extend([0, 1])
+    embedding.node[1].values.extend([0, 0])
+    embedding.node[2].values.extend([0, 0.5])
+
+    actual = CommunityPrediction(hypergraph, embedding)
+    self.assertEqual(set(actual), set([(2, 0), (2, 1)]))
+
+
+class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
+
+  def test_typical(self):
+    predicted = [
+        (1, 2), # good prediction
+        (2, 1),  # bad prediction
+        (2, 3),  # bad prediction
+        (2, 4)  # good prediction
+        ]
+    expected = [
+        (1,
+         2),
+        (2,
+         4),
+        (2,
+         5)  # missed this one
+    ]
+    actual = CalculateCommunityPredictionMetrics(predicted, expected)
+
+    # precision = # found / # guessed = 2 / 4
+    self.assertTrue(isclose(actual.precision, 2 / 4, abs_tol=1e-4))
+
+    # recall = # found / # to find  = 2 / 3
+    self.assertTrue(isclose(actual.recall, 2 / 3, abs_tol=1e-4))
+
+    # f1 = 2 * precision * recall / (precision + recall)
+    #    = 2 * (2/4) * (2/3) / (2/4 + 2/3) ~ 0.57
+    expected_f1 = 2 * (2 / 4) * (2 / 3) / (2 / 4 + 2 / 3)
+    self.assertTrue(isclose(actual.f1, expected_f1, abs_tol=1e-4))
+
+    self.assertEqual(actual.num_true_pos, 2)
+    self.assertEqual(actual.num_false_pos, 2)
+    self.assertEqual(actual.num_false_neg, 1)
+
+    # these metrics are poorly defined for the IR challenge
+    self.assertTrue(not actual.HasField("accuracy"))
+    self.assertTrue(not actual.HasField("num_true_neg"))
+
+  def test_no_predictions(self):
+    predicted = []
+    expected = [(1,
+                 2)  # missed
+               ]
+    actual = CalculateCommunityPredictionMetrics(predicted, expected)
+    # precision = # found / # guessed = NAN
+    # SHOULD NOT CRASH
+    self.assertTrue(not actual.HasField("precision"))
+    self.assertTrue(isclose(actual.recall, 0))
+    # F1 is also nan at this pont
+    self.assertTrue(not actual.HasField("f1"))
+    self.assertEqual(actual.num_true_pos, 0)
+    self.assertEqual(actual.num_false_pos, 0)
+    self.assertEqual(actual.num_false_neg, 1)
+    self.assertTrue(not actual.HasField("accuracy"))
+    self.assertTrue(not actual.HasField("num_true_neg"))
+
+  def test_no_expected(self):
+    predicted = [(1, 2)]
+    expected = []
+    actual = CalculateCommunityPredictionMetrics(predicted, expected)
+
+    # recall = # found / # num to find = NAN
+    # SHOULD NOT CRASH
+    self.assertTrue(not actual.HasField("recall"))
+    self.assertTrue(isclose(actual.precision, 0))
+    # F1 is also nan at this pont
+    self.assertTrue(not actual.HasField("f1"))
+    self.assertEqual(actual.num_true_pos, 0)
+    self.assertEqual(actual.num_false_pos, 1)
+    self.assertEqual(actual.num_false_neg, 0)
+    self.assertTrue(not actual.HasField("accuracy"))
+    self.assertTrue(not actual.HasField("num_true_neg"))

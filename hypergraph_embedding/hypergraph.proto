@@ -30,3 +30,14 @@ message HypergraphEmbedding {
 	optional int32 dim = 3;
 	optional string method_name = 4;
 }
+
+message EvaluationMetrics {
+	optional float accuracy = 1;
+	optional float precision = 2;
+	optional float recall = 3;
+	optional float f1 = 4;
+	optional int32 num_true_pos = 5;
+	optional int32 num_true_neg = 6;
+	optional int32 num_false_pos = 7;
+	optional int32 num_false_neg = 8;
+}

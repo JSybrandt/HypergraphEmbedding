@@ -14,6 +14,7 @@ __all__ = [
     # proto
     "Hypergraph",
     "HypergraphEmbedding",
+    "EvaluationMetrics",
 
     # Parsing
     "AMinerToHypergraph",

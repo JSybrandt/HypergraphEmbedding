@@ -1,10 +1,11 @@
 # This file provides evaluation utilities for hypergraph experiments
 
 from random import random
-from . import Hypergraph
+from . import Hypergraph, EvaluationMetrics
 from .hypergraph_util import *
 from scipy.spatial.distance import cosine
 import numpy as np
+from collections import namedtuple
 
 
 def RemoveRandomConnections(original_hypergraph, probability):
@@ -82,3 +83,37 @@ def CommunityPrediction(hypergraph, embedding, distance_function=cosine):
         if edge_idx not in hypergraph.node[node_idx].edges:
           missing_links.append((node_idx, edge_idx))
   return missing_links
+
+
+def CalculateCommunityPredictionMetrics(
+    predicted_connections,
+    expected_connections):
+  """
+    Treats expected_connections as positive examples, and computes a Metrics
+    named tuple.
+    input:
+      - predicted_connections: iterable of (node_idx, edge_idx) pairs
+      - expected_connections: iterable of (node_idx, edge_idx) pairs
+    output:
+      - EvaluationMetrics proto containing all fields but accuracy
+        and num_true_neg
+    """
+  prediction_set = set(predicted_connections)
+  expected_set = set(expected_connections)
+
+  intersection = prediction_set.intersection(expected_set)
+
+  metrics = EvaluationMetrics()
+  if len(prediction_set):
+    metrics.precision = len(intersection) / len(prediction_set)
+  if len(expected_set):
+    metrics.recall = len(intersection) / len(expected_set)
+  if metrics.precision + metrics.recall:
+    metrics.f1 = 2 * metrics.precision * metrics.recall / (
+        metrics.precision + metrics.recall)
+  metrics.num_true_pos = len(intersection)
+  metrics.num_false_pos = len(prediction_set) - len(intersection)
+  metrics.num_false_neg = len(expected_set) - len(intersection)
+  # num_true_neg poorly defined
+  # accuracy poorly defined
+  return metrics
