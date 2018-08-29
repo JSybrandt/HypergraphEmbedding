@@ -17,6 +17,7 @@ message Hypergraph {
   map<int32, NodeData> node = 1;
   // Map from edge id to list of nodes
   map<int32, EdgeData> edge = 2;
+	optional string name = 3;
 }
 
 
@@ -40,4 +41,7 @@ message EvaluationMetrics {
 	optional int32 num_true_neg = 6;
 	optional int32 num_false_pos = 7;
 	optional int32 num_false_neg = 8;
+	optional string hypergraph_name = 9;
+	optional string embedding_method = 10;
+	optional int32 embedding_dim = 11;
 }

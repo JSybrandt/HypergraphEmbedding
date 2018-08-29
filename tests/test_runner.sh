@@ -4,14 +4,15 @@ echo "Testing runner end-to-end"
 
 tmp_embedding_path=$(mktemp -u)
 tmp_hypergraph_path=$(mktemp -u)
+tmp_metrics_path=$(mktemp -u)
 
 ./runner.py \
+	--log-level NONE \
 	--raw-data test_data/snap_youtube_tiny.cmty.txt \
 	--raw-data-format SNAP \
 	--embedding $tmp_embedding_path \
 	--embedding-method SVD \
 	--dimension 2 \
-	--log-level NONE \
 	$tmp_hypergraph_path
 
 if [ $? -eq 0 ]; then
@@ -26,10 +27,10 @@ rm -f $tmp_embedding_path
 echo "Testing runner premade hypergraph"
 
 ./runner.py \
+	--log-level NONE \
 	--embedding $tmp_embedding_path \
 	--embedding-method RANDOM \
 	--dimension 2 \
-	--log-level NONE \
 	$tmp_hypergraph_path
 
 if [ $? -eq 0 ]; then
@@ -39,5 +40,23 @@ else
 	exit 1
 fi
 
-rm -f $tmp_embedding_path
+echo "Testing link prediction experiment with leftover hg/embedding"
+
+./runner.py \
+	--log-level NONE \
+	--embedding $tmp_embedding_path \
+	--experiment-type LINK_PREDICTION \
+	--experiment-result $tmp_metrics_path \
+	--experiment-lp-probability 0.2 \
+	$tmp_hypergraph_path
+
+if [ $? -eq 0 ]; then
+	echo "Experiments on loaded hypergraph / embedding test success!"
+else
+	echo "Experiments on loaded hypergraph / embedding test failed"
+	exit 1
+fi
+
 rm -f $tmp_hypergraph_path
+rm -f $tmp_embedding_path
+rm -f $tmp_metrics_path

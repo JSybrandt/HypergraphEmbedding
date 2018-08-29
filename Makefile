@@ -11,8 +11,12 @@ proto:
 pip:
 	$(PIP) install --user -r requirements.txt
 
-test:
+test: unittest apptest
+
+unittest:
 	$(PYTHON) -m unittest discover -v
+
+apptest:
 	./tests/test_runner.sh
 
 clean:

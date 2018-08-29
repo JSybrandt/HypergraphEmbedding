@@ -140,6 +140,21 @@ class TestCommunityPrediction(unittest.TestCase):
     actual = CommunityPrediction(hypergraph, embedding)
     self.assertEqual(set(actual), set([(2, 0), (2, 1)]))
 
+  def test_dropped_edge(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 0)
+    AddNodeToEdge(hypergraph, 1, 0)
+    AddNodeToEdge(hypergraph, 1, 1)  # dropped, only 1
+
+    embedding = HypergraphEmbedding()
+    embedding.dim = 2
+    embedding.node[0].values.extend([0, 1])
+    embedding.node[1].values.extend([0, 0])
+    embedding.node[2].values.extend([0, 0.5])
+
+    actual = CommunityPrediction(hypergraph, embedding)
+    self.assertEqual(set(actual), set([(2, 0)]))
+
 
 class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
 

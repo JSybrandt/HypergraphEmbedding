@@ -8,6 +8,18 @@ import numpy as np
 from collections import namedtuple
 
 
+def RunLinkPrediction(hypergraph, embedding, removal_probability):
+  new_graph, removed_links = RemoveRandomConnections(hypergraph, removal_probability)
+  predicted_links = CommunityPrediction(new_graph, embedding)
+  metrics = CalculateCommunityPredictionMetrics(predicted_links, removed_links)
+  if hypergraph.HasField("name"):
+    metrics.hypergraph_name = hypergraph.name
+  if embedding.HasField("method_name"):
+    metrics.embedding_method = embedding.method_name
+  metrics.embedding_dim = embedding.dim
+  return metrics
+
+
 def RemoveRandomConnections(original_hypergraph, probability):
   """
     This function creates a new hypergraph where each node-edge with randomly
@@ -76,7 +88,7 @@ def CommunityPrediction(hypergraph, embedding, distance_function=cosine):
   missing_links = []
   for node_idx, embedding in embedding.node.items():
     vec = np.asarray(embedding.values)
-    for edge_idx in hypergraph.edge:
+    for edge_idx in edge2centroid:
       if distance_function(
           vec,
           edge2centroid[edge_idx]) <= edge2max_distance[edge_idx]:
