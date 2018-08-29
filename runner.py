@@ -17,10 +17,7 @@ PARSING_OPTIONS = {
     "SNAP": SnapCommunityToHypergraph
 }
 
-EXPERIMENT_OPTIONS = {
-    "LINK_PREDICTION": RunLinkPrediction,
-    "LINK_RECALL": RunLinkPrediction
-}
+EXPERIMENT_OPTIONS = {"LINK_PREDICTION": RunLinkPrediction}
 
 
 def ParseArgs():
@@ -254,14 +251,7 @@ if __name__ == "__main__":
       metrics = experiment(
           hypergraph,
           embedding,
-          args.experiment_lp_probability,
-          False)
-    elif args.experiment_type == "LINK_RECALL":
-      metrics = experiment(
-          hypergraph,
-          embedding,
-          args.experiment_lp_probability,
-          True)
+          args.experiment_lp_probability)
     log.info("Experiment results:")
     log.info(metrics)
     log.info("Writing metrics proto")

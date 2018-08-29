@@ -1,6 +1,6 @@
 # This file provides evaluation utilities for hypergraph experiments
 
-from random import random
+from random import random, choice
 from . import Hypergraph, EvaluationMetrics
 from .hypergraph_util import *
 from scipy.spatial.distance import cosine
@@ -14,22 +14,29 @@ from itertools import product
 log = logging.getLogger()
 
 
-def RunLinkPrediction(
-    hypergraph,
-    embedding,
-    removal_probability,
-    eval_only_removed=True):
+def RunLinkPrediction(hypergraph, embedding, removal_probability):
   log.info(
       "Removing links from original hypergraph with prob %f",
       removal_probability)
   new_graph, removed_links = RemoveRandomConnections(hypergraph, removal_probability)
+  log.info("Removed %i links", len(removed_links))
+
+  log.info("Sampling missing links for evaluation")
+  bad_links = SampleMissingConnections(hypergraph, len(removed_links))
+  log.info("Sampled %i links", len(bad_links))
+
   log.info("Predicting links on subset graph")
   predicted_links = CommunityPrediction(
       new_graph,
       embedding,
-      missing_links=removed_links if eval_only_removed else None)
+      bad_links + removed_links)
+
   log.info("Evaluting link prediction performance")
-  metrics = CalculateCommunityPredictionMetrics(predicted_links, removed_links)
+  metrics = CalculateCommunityPredictionMetrics(
+      predicted_links,
+      removed_links,
+      bad_links)
+
   if hypergraph.HasField("name"):
     metrics.hypergraph_name = hypergraph.name
   if embedding.HasField("method_name"):
@@ -71,6 +78,41 @@ def RemoveRandomConnections(original_hypergraph, probability):
             node.name if node.HasField("name") else None,
             edge.name if edge.HasField("name") else None)
   return new_hg, removed_connections
+
+
+def SampleMissingConnections(hypergraph, num_samples):
+  """
+    Given a hypergraph, Sample for random not-present node-edge connections.
+    Used as negative training data for the link prediction task.
+    input:
+      - hypergraph: hypergraph proto
+      - num_samples
+    output:
+      - list of node_idx, edge_idx pairs where node is not in edge
+  """
+  samples = set()
+  num_nodes = len(hypergraph.node)
+  num_edges = len(hypergraph.edge)
+  assert num_samples < num_nodes * num_edges
+  assert len(hypergraph.edge) > 0
+  assert len(hypergraph.node) > 0
+
+  nodes = [n for n in hypergraph.node]
+  edges = [e for e in hypergraph.edge]
+
+  num_tries_till_failure = 10 * num_samples
+  while len(samples) < num_samples and num_tries_till_failure:
+    num_tries_till_failure -= 1
+    node_idx = choice(nodes)
+    edge_idx = choice(edges)
+    if edge_idx not in hypergraph.node[node_idx].edges:
+      samples.add((node_idx, edge_idx))
+
+  if len(samples) < num_samples:
+    log.critical(
+        "SampleMissingConnections failed to find %i samples",
+        num_samples)
+  return list(samples)
 
 
 _shared_info = {}
@@ -144,8 +186,8 @@ def _get_missing_links(indices):
 def CommunityPrediction(
     hypergraph,
     embedding,
+    links,
     distance_function=cosine,
-    missing_links=None,
     run_in_parallel=True):
   """
   Given a hypergraph (assumed to contain missing links) and a corresponding
@@ -157,9 +199,9 @@ def CommunityPrediction(
     - hypergraph: Hypergraph proto
     - embedding: Hypergraph proto
     - distance_function: mesure of distance between embeddings
-    - missing_links: if set, only run predictions on specified pairs
+    - links: the set of node_idx, edge_idx pairs to evaluate
   output:
-    - list of missing node-edge pairs
+    - list of node-edge pairs from links predicted to be accurate
   """
 
   assert embedding.dim > 0
@@ -190,9 +232,6 @@ def CommunityPrediction(
   edge2range = {x[0]: x[2] for x in edge_centroid_range}
 
   predicted_links = []
-  if not missing_links:
-    log.info("Identifying missing links")
-    missing_links = product(embedding.node, edges)
 
   log.info("Calculating whether each point is in each edge's range")
   with Pool(num_cores,
@@ -202,7 +241,7 @@ def CommunityPrediction(
                       edge2range,
                       hypergraph,
                       distance_function)) as pool:
-    for res in pool.imap(_get_missing_links, missing_links, chunksize=250):
+    for res in pool.imap(_get_missing_links, links, chunksize=250):
       if res:
         predicted_links.append(res)
 
@@ -211,33 +250,50 @@ def CommunityPrediction(
 
 def CalculateCommunityPredictionMetrics(
     predicted_connections,
-    expected_connections):
+    good_links,
+    bad_links):
   """
-    Treats expected_connections as positive examples, and computes a Metrics
+    Treats good_links as positive examples, and computes a Metrics
     named tuple.
     input:
       - predicted_connections: iterable of (node_idx, edge_idx) pairs
-      - expected_connections: iterable of (node_idx, edge_idx) pairs
+      - good_links: iterable of (node_idx, edge_idx) pairs from original
+      - bad_links: iterable of (node_idx, edge_idx) not from original
     output:
       - EvaluationMetrics proto containing all fields but accuracy
         and num_true_neg
     """
-  prediction_set = set(predicted_connections)
-  expected_set = set(expected_connections)
+  predictions = set(predicted_connections)
+  positives = set(good_links)
+  negatives = set(bad_links)
 
-  intersection = prediction_set.intersection(expected_set)
+  # + and - must be disjoin
+  assert len(positives.intersection(negatives)) == 0
+
+  # predictions must be a subset of the + and - samples
+  assert len(predictions.intersection(
+      positives.union(negatives))) == len(predictions)
+
+  assert len(positives) + len(negatives) > 0
+
+  true_positives = predictions.intersection(positives)
 
   metrics = EvaluationMetrics()
-  if len(prediction_set):
-    metrics.precision = len(intersection) / len(prediction_set)
-  if len(expected_set):
-    metrics.recall = len(intersection) / len(expected_set)
+
+  if len(predictions):
+    metrics.precision = len(true_positives) / len(predictions)
+
+  if len(positives):
+    metrics.recall = len(true_positives) / len(positives)
+
   if metrics.precision + metrics.recall:
     metrics.f1 = 2 * metrics.precision * metrics.recall / (
         metrics.precision + metrics.recall)
-  metrics.num_true_pos = len(intersection)
-  metrics.num_false_pos = len(prediction_set) - len(intersection)
-  metrics.num_false_neg = len(expected_set) - len(intersection)
-  # num_true_neg poorly defined
-  # accuracy poorly defined
+
+  metrics.num_true_pos = len(true_positives)
+  metrics.num_false_pos = len(predictions) - len(true_positives)
+  metrics.num_false_neg = len(positives) - len(true_positives)
+  metrics.num_true_neg = len(negatives - predictions)
+  metrics.accuracy = (metrics.num_true_pos + metrics.num_true_neg) / (
+      len(positives) + len(negatives))
   return metrics

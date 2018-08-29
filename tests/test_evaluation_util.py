@@ -104,7 +104,7 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[2].values.extend([0.5, 0.5])
 
     # default is cosine
-    actual = CommunityPrediction(hypergraph, embedding)
+    actual = CommunityPrediction(hypergraph, embedding, [(2, 0)])
     self.assertEqual(set(actual), set([(2, 0)]))
 
   def test_euclidian(self):
@@ -123,6 +123,8 @@ class TestCommunityPrediction(unittest.TestCase):
     actual = CommunityPrediction(
         hypergraph,
         embedding,
+        [(3,
+          0)],
         distance_function=distance.euclidean)
     # expect that node 3 is inside the triangle
     self.assertEqual(set(actual), set([(3, 0)]))
@@ -140,7 +142,7 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[1].values.extend([1, 0])
     embedding.node[2].values.extend([0.5, 0.5])
 
-    actual = CommunityPrediction(hypergraph, embedding)
+    actual = CommunityPrediction(hypergraph, embedding, [(2, 0), (2, 1)])
     self.assertEqual(set(actual), set([(2, 0), (2, 1)]))
 
   def test_dropped_edge(self):
@@ -155,7 +157,7 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[1].values.extend([1, 0])
     embedding.node[2].values.extend([0.5, 0.5])
 
-    actual = CommunityPrediction(hypergraph, embedding)
+    actual = CommunityPrediction(hypergraph, embedding, [(2, 0), (2, 1)])
     self.assertEqual(set(actual), set([(2, 0)]))
 
   def test_only_missing_links(self):
@@ -171,12 +173,9 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[2].values.extend([0.5, 0.5])  # detect
     embedding.node[3].values.extend([0.5, 0.5])  # skip
 
-    missing_links = [(2, 0)]
+    links = [(2, 0)]
 
-    actual = CommunityPrediction(
-        hypergraph,
-        embedding,
-        missing_links=missing_links)
+    actual = CommunityPrediction(hypergraph, embedding, links)
     self.assertEqual(set(actual), set([(2, 0)]))
 
   def test_missing_edge_removed(self):
@@ -191,12 +190,9 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[1].values.extend([1, 0])
 
     # Test each case, none should fail
-    missing_links = [(2, 0), (0, 1), (1, 1)]
+    links = [(2, 0), (0, 1), (1, 1)]
 
-    actual = CommunityPrediction(
-        hypergraph,
-        embedding,
-        missing_links=missing_links)
+    actual = CommunityPrediction(hypergraph, embedding, links)
     self.assertEqual(set(actual), set())
 
 
@@ -209,7 +205,7 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
         (2, 3),  # bad prediction
         (2, 4)  # good prediction
         ]
-    expected = [
+    good_links = [
         (1,
          2),
         (2,
@@ -217,7 +213,19 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
         (2,
          5)  # missed this one
     ]
-    actual = CalculateCommunityPredictionMetrics(predicted, expected)
+    bad_links = [
+        (3, 0),  # properly identified!
+        (3, 2),  # properly identified!
+        (2, 1),  # bad prediction
+        (2, 3),  # bad prediction
+    ]
+    actual = CalculateCommunityPredictionMetrics(
+        predicted,
+        good_links,
+        bad_links)
+
+    # accuracy = # good / all = (2 + 2) / 7
+    self.assertTrue(isclose(actual.accuracy, 4 / 7, abs_tol=1e-4))
 
     # precision = # found / # guessed = 2 / 4
     self.assertTrue(isclose(actual.precision, 2 / 4, abs_tol=1e-4))
@@ -233,17 +241,19 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
     self.assertEqual(actual.num_true_pos, 2)
     self.assertEqual(actual.num_false_pos, 2)
     self.assertEqual(actual.num_false_neg, 1)
-
-    # these metrics are poorly defined for the IR challenge
-    self.assertTrue(not actual.HasField("accuracy"))
-    self.assertTrue(not actual.HasField("num_true_neg"))
+    self.assertEqual(actual.num_true_neg, 2)
 
   def test_no_predictions(self):
     predicted = []
-    expected = [(1,
-                 2)  # missed
-               ]
-    actual = CalculateCommunityPredictionMetrics(predicted, expected)
+    good_links = [(1,
+                   2)  # missed
+                 ]
+    bad_links = [(2, 3)]
+    actual = CalculateCommunityPredictionMetrics(
+        predicted,
+        good_links,
+        bad_links)
+    self.assertTrue(isclose(actual.accuracy, 0.5))
     # precision = # found / # guessed = NAN
     # SHOULD NOT CRASH
     self.assertTrue(not actual.HasField("precision"))
@@ -253,14 +263,18 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
     self.assertEqual(actual.num_true_pos, 0)
     self.assertEqual(actual.num_false_pos, 0)
     self.assertEqual(actual.num_false_neg, 1)
-    self.assertTrue(not actual.HasField("accuracy"))
-    self.assertTrue(not actual.HasField("num_true_neg"))
+    self.assertEqual(actual.num_true_neg, 1)
 
-  def test_no_expected(self):
+  def test_no_good(self):
     predicted = [(1, 2)]
-    expected = []
-    actual = CalculateCommunityPredictionMetrics(predicted, expected)
+    good_links = []
+    bad_links = [(1, 2)]
+    actual = CalculateCommunityPredictionMetrics(
+        predicted,
+        good_links,
+        bad_links)
 
+    self.assertTrue(actual.accuracy == 0)
     # recall = # found / # num to find = NAN
     # SHOULD NOT CRASH
     self.assertTrue(not actual.HasField("recall"))
@@ -270,5 +284,23 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
     self.assertEqual(actual.num_true_pos, 0)
     self.assertEqual(actual.num_false_pos, 1)
     self.assertEqual(actual.num_false_neg, 0)
-    self.assertTrue(not actual.HasField("accuracy"))
-    self.assertTrue(not actual.HasField("num_true_neg"))
+    self.assertEqual(actual.num_true_neg, 0)
+
+
+class TestSampleMissingConnections(unittest.TestCase):
+
+  def test_fuzz(self):
+    for i in range(100):
+      _input = CreateRandomHyperGraph(50, 50, 0.1)
+      num_nodes = len(_input.node)
+      num_edges = len(_input.edge)
+      num_samples = randint(0, 10)
+      missing_edges = SampleMissingConnections(_input, num_samples)
+      self.assertEqual(len(missing_edges), num_samples)
+      for node_idx, edge_idx in missing_edges:
+        # legal indices
+        self.assertTrue(node_idx in _input.node)
+        self.assertTrue(edge_idx in _input.edge)
+        # not present edge
+        self.assertTrue(edge_idx not in _input.node[node_idx].edges)
+        self.assertTrue(node_idx not in _input.edge[edge_idx].nodes)
