@@ -24,7 +24,7 @@ fi
 
 rm -f $tmp_embedding_path
 
-echo "Testing runner premade hypergraph"
+echo "Testing runner premade hypergraph saves embedding"
 
 ./runner.py \
 	--log-level NONE \
@@ -40,11 +40,14 @@ else
 	exit 1
 fi
 
-echo "Testing link prediction experiment with leftover hg/embedding"
+rm -f $tmp_embedding_path
+rm -f $tmp_metrics_path
+echo "Testing link prediction experiment with leftover hg"
 
 ./runner.py \
 	--log-level NONE \
-	--embedding $tmp_embedding_path \
+	--embedding-method RANDOM \
+	--embedding-dimension 2 \
 	--experiment-type LINK_PREDICTION \
 	--experiment-result $tmp_metrics_path \
 	--experiment-lp-probability 0.2 \

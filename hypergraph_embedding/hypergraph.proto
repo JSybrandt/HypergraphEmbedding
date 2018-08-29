@@ -41,7 +41,12 @@ message EvaluationMetrics {
 	optional int32 num_true_neg = 6;
 	optional int32 num_false_pos = 7;
 	optional int32 num_false_neg = 8;
-	optional string hypergraph_name = 9;
-	optional string embedding_method = 10;
-	optional int32 embedding_dim = 11;
+}
+
+message ExperimentalResult {
+	// This is the version of the original hypergraph with missing edges.
+	optional Hypergraph hypergraph = 1;
+	optional EvaluationMetrics metrics = 2;
+	// An embedding of this subgraph
+	optional HypergraphEmbedding embedding = 3;
 }

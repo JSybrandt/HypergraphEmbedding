@@ -16,15 +16,17 @@ __all__ = [
     "Hypergraph",
     "HypergraphEmbedding",
     "EvaluationMetrics",
+    "ExperimentalResult",
 
     # Parsing
-    "AMinerToHypergraph",
-    "SnapCommunityToHypergraph",
+    "ParseRawIntoHypergraph",
+    "PARSING_OPTIONS",
 
     # Embedding
-    "EmbedSvd",
-    "EmbedRandom",
+    "Embed",
+    "EMBEDDING_OPTIONS",
 
     # Experiments
-    "RunLinkPrediction"
+    "EXPERIMENT_OPTIONS",
+    "LinkPredictionExperiment",
 ]

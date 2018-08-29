@@ -6,6 +6,30 @@ from . import HypergraphEmbedding
 import scipy as sp
 from collections.abc import Mapping
 from random import random
+import logging
+
+log = logging.getLogger()
+
+global EMBEDDING_OPTIONS
+
+
+def Embed(args, hypergraph):
+  log.info("Checking embedding dimensionality is smaller than # nodes/edges")
+  assert min(len(hypergraph.node),
+             len(hypergraph.edge)) > args.embedding_dimension
+
+  log.info(
+      "Embedding using method %s with %i dim",
+      args.embedding_method,
+      args.embedding_dimension)
+  embedding = EMBEDDING_OPTIONS[args.embedding_method](
+      hypergraph,
+      args.embedding_dimension)
+  log.info(
+      "Embedding contains %i node and %i edge vectors",
+      len(embedding.node),
+      len(embedding.edge))
+  return embedding
 
 
 def EmbedSvd(hypergraph, dimension):
@@ -40,3 +64,6 @@ def EmbedRandom(hypergraph, dimension):
     embedding.edge[edge_idx].values.extend([random() for _ in range(dimension)])
 
   return embedding
+
+
+EMBEDDING_OPTIONS = {"SVD": EmbedSvd, "RANDOM": EmbedRandom}

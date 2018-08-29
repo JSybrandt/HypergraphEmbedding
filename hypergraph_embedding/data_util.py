@@ -6,6 +6,24 @@ import logging
 
 log = logging.getLogger()
 
+global PARSING_OPTIONS
+
+
+def ParseRawIntoHypergraph(args, raw_data_path):
+  log.info("Parsing %s with %s method", raw_data_path, args.raw_data_format)
+  with raw_data_path.open('r') as raw_file:
+    hypergraph = PARSING_OPTIONS[args.raw_data_format](raw_file)
+  if args.name:
+    log.info("Setting hypergraph name to %s", args.name)
+    log.info("Good name!")
+    hypergraph.name = args.name
+  else:
+    log.info("Setting hypergraph name to %s", args.hypergraph)
+    log.info("Bad name :(")
+    hypergraph.name = args.hypergraph
+  return hypergraph
+
+
 # Used to store paper data
 Paper = namedtuple("Paper", ['title', 'authors'])
 
@@ -68,3 +86,9 @@ def PapersToHypergraph(parser):
           author,
           paper.title)
   return result
+
+
+PARSING_OPTIONS = {
+    "AMINER": AMinerToHypergraph,
+    "SNAP": SnapCommunityToHypergraph
+}

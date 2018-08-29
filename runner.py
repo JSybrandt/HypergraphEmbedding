@@ -10,14 +10,9 @@ from hypergraph_embedding import *
 
 log = logging.getLogger()
 
-EMBEDDING_OPTIONS = {"SVD": EmbedSvd, "RANDOM": EmbedRandom}
-
-PARSING_OPTIONS = {
-    "AMINER": AMinerToHypergraph,
-    "SNAP": SnapCommunityToHypergraph
-}
-
-EXPERIMENT_OPTIONS = {"LINK_PREDICTION": RunLinkPrediction}
+global EMBEDDING_OPTIONS
+global PARSING_OPTIONS
+global EXPERIMENT_OPTIONS
 
 
 def ParseArgs():
@@ -56,10 +51,8 @@ def ParseArgs():
   parser.add_argument(
       "--embedding",
       type=str,
-      help=(
-          "Path to store / read embedding. "
-          "Result is an embedding proto. "
-          "Writes if --embedding-method is also specified."))
+      help=("Path to store embedding. "
+            "Result is an embedding proto."))
   parser.add_argument(
       "--embedding-method",
       type=str,
@@ -85,7 +78,7 @@ def ParseArgs():
       "--experiment-result",
       type=str,
       help=(
-          "Path to store experiment result proto. If set --experiment-type "
+          "Path to store experiment data proto. If set --experiment-type "
           "must also be set."))
   parser.add_argument(
       "--experiment-lp-probability",
@@ -149,8 +142,8 @@ if __name__ == "__main__":
     log.info("Checking hypergraph exists")
     assert hypergraph_path.is_file()
 
-  # check for writing
-  if args.embedding and args.embedding_method:
+  # check for writing embedding
+  if args.embedding:
     log.info("Performing checks for writing embedding")
     embedding_path = Path(args.embedding)
     log.info("Checking for valid embedding-method")
@@ -161,45 +154,24 @@ if __name__ == "__main__":
     assert not embedding_path.exists()
     assert embedding_path.parent.is_dir()
 
-  elif args.embedding:  # only embedding
-    log.info("Performing checks for reading embedding")
-    embedding_path = Path(args.embedding)
-    assert embedding_path.is_file()
-    if args.embedding_dimension:
-      log.warning("Dimension set, but we are not writing hypergraph")
-
   log.info("Checking that experimental flags are appropriate")
   log.info("Checking that if experiment-type is set, experiment-result is too")
   assert bool(args.experiment_type) == bool(args.experiment_result)
   if args.experiment_type:
     log.info("Checking that embedding is also specified")
-    assert args.embedding
-    log.info("Checking that --experiment-result is safe to write")
+    assert args.embedding_method
+    log.info("Checking for --experiment-result")
     experiment_result_path = Path(args.experiment_result)
     assert not experiment_result_path.exists()
     assert experiment_result_path.parent.is_dir()
     log.info("Checking that experiment-type is valid")
     assert args.experiment_type in EXPERIMENT_OPTIONS
-    if args.experiment_type == "LINK_PREDICTION":
-      log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
-      assert args.experiment_lp_probability >= 0
-      assert args.experiment_lp_probability <= 1
 
   log.info("Finished checking, lgtm")
 
   # do conversion
   if args.raw_data:
-    log.info("Parsing %s with %s method", raw_data_path, args.raw_data_format)
-    with raw_data_path.open('r') as raw_file:
-      hypergraph = PARSING_OPTIONS[args.raw_data_format](raw_file)
-    if args.name:
-      log.info("Setting hypergraph name to %s", args.name)
-      log.info("Good name!")
-      hypergraph.name = args.name
-    else:
-      log.info("Setting hypergraph name to %s", args.hypergraph)
-      log.info("Bad name :(")
-      hypergraph.name = args.hypergraph
+    hypergraph = ParseRawIntoHypergraph(args, raw_data_path)
     log.info("Writing hypergraph proto to %s", hypergraph_path)
     with hypergraph_path.open('wb') as proto_file:
       proto_file.write(hypergraph.SerializeToString())
@@ -216,46 +188,16 @@ if __name__ == "__main__":
       len(hypergraph.node),
       len(hypergraph.edge))
 
-  if args.embedding and args.embedding_method:
-    log.info("Checking embedding dimensionality is smaller than # nodes/edges")
-    assert min(len(hypergraph.node),
-               len(hypergraph.edge)) > args.embedding_dimension
-
-    log.info("Embedding using method %s", args.embedding_method)
-    embedding = EMBEDDING_OPTIONS[args.embedding_method](
-        hypergraph,
-        args.embedding_dimension)
-
-    log.info("Writing embedding")
+  if args.embedding:
+    log.info("Writing an embedding for FULL input hypergraph")
+    embedding = Embed(args, hypergraph)
     with embedding_path.open('wb') as proto:
       proto.write(embedding.SerializeToString())
-  elif args.embedding:
-    embedding = HypergraphEmbedding()
-    log.info("Reading embedding from %s", embedding_path)
-    with embedding_path.open('rb') as proto:
-      embedding.ParseFromString(proto.read())
-
-  log.info(
-      "Embedding contains %i node and %i edge vectors",
-      len(embedding.node),
-      len(embedding.edge))
-  log.info(
-      "Embedding is of dimensionality %i and was built with method (%s)",
-      embedding.dim,
-      embedding.method_name)
 
   if args.experiment_type:
     log.info("Performing %s experiment", args.experiment_type)
-    experiment = EXPERIMENT_OPTIONS[args.experiment_type]
-    if args.experiment_type == "LINK_PREDICTION":
-      metrics = experiment(
-          hypergraph,
-          embedding,
-          args.experiment_lp_probability)
-    log.info("Experiment results:")
-    log.info(metrics)
-    log.info("Writing metrics proto")
+    res = EXPERIMENT_OPTIONS[args.experiment_type](args, hypergraph)
     with experiment_result_path.open('wb') as proto:
-      proto.write(metrics.SerializeToString())
+      proto.write(res.SerializeToString())
 
   log.info("Done!")

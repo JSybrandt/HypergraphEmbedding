@@ -1,7 +1,7 @@
 # This file provides evaluation utilities for hypergraph experiments
 
 from random import random, choice
-from . import Hypergraph, EvaluationMetrics
+from . import Hypergraph, EvaluationMetrics, ExperimentalResult
 from .hypergraph_util import *
 from scipy.spatial.distance import cosine
 import numpy as np
@@ -10,39 +10,52 @@ import logging
 import multiprocessing
 from multiprocessing import Pool, Manager
 from itertools import product
+from .embedding import Embed
+import warnings
 
 log = logging.getLogger()
 
+global EXPERIMENT_OPTIONS
 
-def RunLinkPrediction(hypergraph, embedding, removal_probability):
+
+def LinkPredictionExperiment(args, hypergraph):
+  log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
+  assert args.experiment_lp_probability >= 0
+  assert args.experiment_lp_probability <= 1
+
   log.info(
-      "Removing links from original hypergraph with prob %f",
-      removal_probability)
-  new_graph, removed_links = RemoveRandomConnections(hypergraph, removal_probability)
-  log.info("Removed %i links", len(removed_links))
+      "Creating subgraph with removal prob. %f",
+      args.experiment_lp_probability)
+  new_graph, good_links = RemoveRandomConnections(hypergraph, args.experiment_lp_probability)
+  log.info("Removed %i links", len(good_links))
 
   log.info("Sampling missing links for evaluation")
-  bad_links = SampleMissingConnections(hypergraph, len(removed_links))
+  bad_links = SampleMissingConnections(hypergraph, len(good_links))
   log.info("Sampled %i links", len(bad_links))
+
+  log.info("Embedding new hypergraph")
+  embedding = Embed(args, new_graph)
 
   log.info("Predicting links on subset graph")
   predicted_links = CommunityPrediction(
       new_graph,
       embedding,
-      bad_links + removed_links)
+      bad_links + good_links)
 
   log.info("Evaluting link prediction performance")
   metrics = CalculateCommunityPredictionMetrics(
       predicted_links,
-      removed_links,
+      good_links,
       bad_links)
 
-  if hypergraph.HasField("name"):
-    metrics.hypergraph_name = hypergraph.name
-  if embedding.HasField("method_name"):
-    metrics.embedding_method = embedding.method_name
-  metrics.embedding_dim = embedding.dim
-  return metrics
+  log.info("Result:\n%s", metrics)
+
+  log.info("Storing data into Experimental Result proto")
+  res = ExperimentalResult()
+  res.metrics.ParseFromString(metrics.SerializeToString())
+  res.hypergraph.ParseFromString(new_graph.SerializeToString())
+  res.embedding.ParseFromString(embedding.SerializeToString())
+  return res
 
 
 def RemoveRandomConnections(original_hypergraph, probability):
@@ -145,9 +158,11 @@ def _get_edge_centroid_range(edge_idx):
       for i in _shared_info['hypergraph'].edge[edge_idx].nodes
   ]
   centroid = np.mean(points, axis=0)
-  max_dist = max(
-      [_shared_info['distance_function'](centroid,
-                                         vec) for vec in points])
+  with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    max_dist = max(
+        [_shared_info['distance_function'](centroid,
+                                           vec) for vec in points])
   return (edge_idx, centroid, max_dist)
 
 
@@ -176,10 +191,15 @@ def _get_missing_links(indices):
 
   vec = _shared_info['node2embedding'][node_idx]
   centroid = _shared_info['edge2centroid'][edge_idx]
-  if _shared_info['distance_function'](
-      vec,
-      centroid) <= _shared_info['edge2range'][edge_idx]:
-    return (node_idx, edge_idx)
+
+  # cosine distance might cause errors if we have a 0 vector
+  with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    if _shared_info['distance_function'](
+        vec,
+        centroid) <= _shared_info['edge2range'][edge_idx]:
+      return (node_idx, edge_idx)
+
   return None
 
 
@@ -297,3 +317,6 @@ def CalculateCommunityPredictionMetrics(
   metrics.accuracy = (metrics.num_true_pos + metrics.num_true_neg) / (
       len(positives) + len(negatives))
   return metrics
+
+
+EXPERIMENT_OPTIONS = {"LINK_PREDICTION": LinkPredictionExperiment}
