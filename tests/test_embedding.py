@@ -49,6 +49,22 @@ class EmbeddingTestCase(unittest.TestCase):
     # self.assertNonZero(embedding.node)
     # self.assertNonZero(embedding.edge)
 
+  def help_test_fuzz(self, embedding_function):
+    "Random embedding should never break"
+    for i in range(100):
+      hypergraph = CreateRandomHyperGraph(
+          randint(1,
+                  10),
+          randint(1,
+                  10),
+          random())
+      max_dim = min(len(hypergraph.node), len(hypergraph.edge))
+      if max_dim <= 1:
+        continue  # the random creation might not have actually made a hg
+      dim = randint(1, max_dim - 1)
+      actual = embedding_function(hypergraph, dim)
+      self.checkEmbedding(actual, hypergraph, dim)
+
 
 class EmbedSvdTest(EmbeddingTestCase):
 
@@ -72,19 +88,7 @@ class EmbedSvdTest(EmbeddingTestCase):
 
   def test_fuzz(self):
     "EmbedSvd embedding should never break with valid input"
-    for i in range(100):
-      hypergraph = CreateRandomHyperGraph(
-          randint(1,
-                  10),
-          randint(1,
-                  10),
-          random())
-      max_dim = min(len(hypergraph.node), len(hypergraph.edge))
-      if max_dim <= 1:
-        continue  # the random creation might not have actually made a hg
-      dim = randint(1, max_dim - 1)
-      actual = EmbedSvd(hypergraph, dim)
-      self.checkEmbedding(actual, hypergraph, dim)
+    self.help_test_fuzz(EmbedSvd)
 
 
 class EmbedRandomTest(EmbeddingTestCase):
@@ -98,16 +102,17 @@ class EmbedRandomTest(EmbeddingTestCase):
 
   def test_fuzz(self):
     "Random embedding should never break"
-    for i in range(100):
-      hypergraph = CreateRandomHyperGraph(
-          randint(1,
-                  10),
-          randint(1,
-                  10),
-          random())
-      max_dim = min(len(hypergraph.node), len(hypergraph.edge))
-      if max_dim <= 1:
-        continue  # the random creation might not have actually made a hg
-      dim = randint(1, max_dim - 1)
-      actual = EmbedRandom(hypergraph, dim)
-      self.checkEmbedding(actual, hypergraph, dim)
+    self.help_test_fuzz(EmbedRandom)
+
+
+class EmbedNmfTest(EmbeddingTestCase):
+
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedNMF(_input, dim)
+    self.checkEmbedding(actual, _input, dim)
+
+  def test_fuzz(self):
+    "Random embedding should never break"
+    self.help_test_fuzz(EmbedNMF)

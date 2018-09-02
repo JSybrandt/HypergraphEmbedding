@@ -4,6 +4,7 @@
 from . import ToCsrMatrix
 from . import HypergraphEmbedding
 import scipy as sp
+from sklearn.decomposition import NMF
 from collections.abc import Mapping
 from random import random
 import logging
@@ -42,7 +43,7 @@ def EmbedSvd(hypergraph, dimension):
   embedding.method_name = "SVD"
 
   matrix = ToCsrMatrix(hypergraph)
-  U, _, V = embedding_data = sp.sparse.linalg.svds(matrix, dimension)
+  U, _, V = sp.sparse.linalg.svds(matrix, dimension)
   for node_idx in hypergraph.node:
     embedding.node[node_idx].values.extend(U[node_idx, :])
   for edge_idx in hypergraph.edge:
@@ -66,4 +67,25 @@ def EmbedRandom(hypergraph, dimension):
   return embedding
 
 
-EMBEDDING_OPTIONS = {"SVD": EmbedSvd, "RANDOM": EmbedRandom}
+def EmbedNMF(hypergraph, dimension):
+  assert dimension > 0
+  assert dimension < len(hypergraph.node)
+  assert dimension < len(hypergraph.edge)
+
+  embedding = HypergraphEmbedding()
+  embedding.dim = dimension
+  embedding.method_name = "NMF"
+
+  matrix = ToCsrMatrix(hypergraph)
+  nmf_model = NMF(dimension)
+  W = nmf_model.fit_transform(matrix)
+  H = nmf_model.components_
+  for node_idx in hypergraph.node:
+    embedding.node[node_idx].values.extend(W[node_idx, :])
+  for edge_idx in hypergraph.edge:
+    embedding.edge[edge_idx].values.extend(H[:, edge_idx])
+
+  return embedding
+
+
+EMBEDDING_OPTIONS = {"SVD": EmbedSvd, "RANDOM": EmbedRandom, "NMF": EmbedNMF}
