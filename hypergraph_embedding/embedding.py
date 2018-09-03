@@ -122,7 +122,7 @@ def EmbedNode2VecBipartide(
       q=q,
       dimensions=dimension,
       walk_length=walk_length,
-      num_walks=len(bipartide) * num_walks_per_node,
+      num_walks=num_walks_per_node,
       workers=workers)
   model = embedder.fit(window=window, min_count=1, batch_words=4)
 
@@ -169,7 +169,7 @@ def EmbedNode2VecClique(
       q=q,
       dimensions=dimension,
       walk_length=walk_length,
-      num_walks=len(clique) * num_walks_per_node,
+      num_walks=num_walks_per_node,
       workers=workers)
   model = embedder.fit(window=window, min_count=1, batch_words=4)
 
