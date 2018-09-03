@@ -124,7 +124,7 @@ def ToBipartideNxGraph(hypergraph):
 
 def ToCliqueNxGraph(hypergraph):
   """
-    Converts the hyperfraph into a networkx graph via the clique method.
+    Converts the hypergraph into a networkx graph via the clique method.
     Communities from the original graph are replaced with fully connected
     cliques in the result graph.
     """

@@ -3,3 +3,4 @@ scipy
 protobuf
 networkx
 sklearn
+node2vec
