@@ -5,7 +5,10 @@ from hypergraph_embedding.data_util import *
 from hypergraph_embedding.evaluation_util import *
 from random import random, randint
 from scipy.spatial import distance
-from math import isclose
+
+
+def isclose(actual, expected, abs_tol=1e-6):
+  return abs(actual - expected) < abs_tol
 
 
 class TestRemoveRandomConnections(unittest.TestCase):
