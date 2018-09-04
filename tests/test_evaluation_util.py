@@ -81,6 +81,15 @@ class TestRemoveRandomConnections(unittest.TestCase):
     self.assertEqual(actual_hg, _input)
     self.checkSubset(actual_hg, _input, [])
 
+  def test_keep_hg_name(self):
+    _input = Hypergraph()
+    _input.name = "KEEP_ME"
+    AddNodeToEdge(_input, 0, 0)
+    AddNodeToEdge(_input, 0, 1)
+    AddNodeToEdge(_input, 1, 1)
+    actual_hg, removed_list = RemoveRandomConnections(_input, 0)
+    self.assertEqual(actual_hg.name, "KEEP_ME")
+
   def test_fuzz(self):
     for i in range(100):
       num_nodes = randint(0, 10)

@@ -76,6 +76,8 @@ def RemoveRandomConnections(original_hypergraph, probability):
   removed_connections = []
 
   new_hg = Hypergraph()
+  if original_hypergraph.HasField("name"):
+    new_hg.name = original_hypergraph.name
   for node_idx, node in original_hypergraph.node.items():
     for edge_idx in node.edges:
       edge = original_hypergraph.edge[edge_idx]
