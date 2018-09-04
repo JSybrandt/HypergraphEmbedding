@@ -99,41 +99,35 @@ def PrintCumulativeResult(key, results):
   "Results is an iterable container of EvaluationMetric messages, all related"
   "to the same experiment"
 
-  def meanAndStd(data):
+  def TableData(data):
     mean = sum(data) / len(data)
     std = stdev(data) if len(data) > 1 else 0
-    return (mean, std)
+    return (mean, std, min(data), max(data))
 
-  m_acc, s_acc = meanAndStd([r.accuracy for r in results])
-  m_pre, s_pre = meanAndStd([r.precision for r in results])
-  m_rec, s_rec = meanAndStd([r.recall for r in results])
-  m_f1, s_f1 = meanAndStd([r.f1 for r in results])
+  def TableDataToLine(res):
+    return "| {0:5.4f} | {1:5.4f} | {2:5.4f} | {3:5.4f} |".format(*res)
 
   result_text = dedent(
       """\
   Experiment: {key}
   Trials:     {trials}
 
-  Value     |  MEAN  |  STD   |
-  -----------------------------
-  Accuracy  | {ma:5.4f} | {sa:5.4f} |
-  Precision | {mp:5.4f} | {sp:5.4f} |
-  Recall    | {mr:5.4f} | {sr:5.4f} |
-  F1        | {mf:5.4f} | {sf:5.4f} |
-  -----------------------------
+  Value     |  MEAN  |  STD   |  MIN   |  MAX   |
+  -----------------------------------------------
+  Accuracy  {acc_line}
+  Precision {pre_line}
+  Recall    {rec_line}
+  F1        {f1_line}
+  -----------------------------------------------
       """)
   print(
       result_text.format(
           key=key,
           trials=len(results),
-          ma=m_acc,
-          sa=s_acc,
-          mp=m_pre,
-          sp=s_pre,
-          mr=m_rec,
-          sr=s_rec,
-          mf=m_f1,
-          sf=s_f1))
+          acc_line=TableDataToLine(TableData([r.accuracy for r in results])),
+          pre_line=TableDataToLine(TableData([r.precision for r in results])),
+          rec_line=TableDataToLine(TableData([r.recall for r in results])),
+          f1_line=TableDataToLine(TableData([r.f1 for r in results])))
 
 
 if __name__ == "__main__":
