@@ -101,7 +101,7 @@ def PrintCumulativeResult(key, results):
 
   def meanAndStd(data):
     mean = sum(data) / len(data)
-    std = stdev(data) if len(data) > 1 else "N/A"
+    std = stdev(data) if len(data) > 1 else 0
     return (mean, std)
 
   m_acc, s_acc = meanAndStd([r.accuracy for r in results])
