@@ -127,7 +127,7 @@ def PrintCumulativeResult(key, results):
           acc_line=TableDataToLine(TableData([r.accuracy for r in results])),
           pre_line=TableDataToLine(TableData([r.precision for r in results])),
           rec_line=TableDataToLine(TableData([r.recall for r in results])),
-          f1_line=TableDataToLine(TableData([r.f1 for r in results])))
+          f1_line=TableDataToLine(TableData([r.f1 for r in results]))))
 
 
 if __name__ == "__main__":
