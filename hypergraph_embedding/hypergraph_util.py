@@ -97,7 +97,28 @@ def ToCsrMatrix(hypergraph):
       vals.append(1)
       rows.append(node_idx)
       cols.append(edge_idx)
-  return sp.sparse.csr_matrix((vals, (rows, cols)), dtype=np.float32)
+  return sp.sparse.csr_matrix((vals, (rows, cols)), dtype=np.bool)
+
+
+def ToEdgeCsrMatrix(hypergraph):
+  """
+    ToSparseMatrix accepts a hypergraph proto message and converts it to a
+    Compressed Sparse Row matrix via scipy. Each row represents a node, each
+    column represents an edge. A 1 in row i and column j represents that node i
+    belongs to edge j.
+    """
+  if IsEmpty(hypergraph):
+    # if the hypergraph is empty, return empty matrix
+    return sp.sparse.csr_matrix([])
+  vals = []
+  rows = []
+  cols = []
+  for edge_idx, edge in hypergraph.edge.items():
+    for node_idx in edge.nodes:
+      vals.append(1)
+      rows.append(edge_idx)
+      cols.append(node_idx)
+  return sp.sparse.csr_matrix((vals, (rows, cols)), dtype=np.bool)
 
 
 def ToCscMatrix(hypergraph):
@@ -118,7 +139,7 @@ def ToCscMatrix(hypergraph):
       vals.append(1)
       rows.append(node_idx)
       cols.append(edge_idx)
-  return sp.sparse.csc_matrix((vals, (rows, cols)), dtype=np.float32)
+  return sp.sparse.csc_matrix((vals, (rows, cols)), dtype=np.bool)
 
 
 def ToBipartideNxGraph(hypergraph):

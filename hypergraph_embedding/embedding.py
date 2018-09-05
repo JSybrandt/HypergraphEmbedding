@@ -6,6 +6,7 @@ from . import HypergraphEmbedding
 from .hypergraph_util import *
 import scipy as sp
 from scipy.spatial.distance import jaccard
+from scipy.sparse import csr_matrix
 import numpy as np
 from sklearn.decomposition import NMF
 from collections.abc import Mapping
@@ -14,6 +15,7 @@ import logging
 from node2vec import Node2Vec
 import multiprocessing
 from itertools import combinations, permutations, product
+from tqdm import tqdm
 
 import keras
 from keras.layers import Input, Embedding, Multiply, Dense, Dot, Reshape, Add, Subtract, Concatenate, Flatten, Lambda, Average
@@ -54,7 +56,7 @@ def EmbedSvd(hypergraph, dimension):
   embedding.dim = dimension
   embedding.method_name = "SVD"
 
-  matrix = ToCsrMatrix(hypergraph)
+  matrix = ToCsrMatrix(hypergraph).asfptype()
   U, _, V = sp.sparse.linalg.svds(matrix, dimension)
   for node_idx in hypergraph.node:
     embedding.node[node_idx].values.extend(U[node_idx, :])
@@ -220,15 +222,20 @@ def _GetSecondDegConnections(mat):
   return neighbors
 
 
-def _GetNodeNeighbors(hypergraph, node2edges=None):
+def _GetNodeNeighbors(hypergraph):
   """
     Returns a Csr matrix where if i,j=1 then node i and node j share an edge.
-    If node2edges is set, then we skip the ToCsrMatrix computation on the
-    hypergraph.
   """
-  if node2edges is None:
-    node2edges = ToCsrMatrix(hypergraph)
-  return _GetSecondDegConnections(node2edges)
+  row = []
+  col = []
+  val = []
+  for node_idx, node in hypergraph.node.items():
+    for edge_idx in node.edges:
+      for neigh_idx in hypergraph.edge[edge_idx].nodes:
+        row.append(node_idx)
+        col.append(neigh_idx)
+        val.append(1)
+  return csr_matrix((val, (row, col)), dtype=np.bool)
 
 
 def _GetEdgeNeighbors(hypergraph, edge2nodes=None):
@@ -236,18 +243,35 @@ def _GetEdgeNeighbors(hypergraph, edge2nodes=None):
     Returns a Csr matrix where if i,j=1 then edge i and edge j share a node.
     If edge2nodes is set, then we skip the ToCsrMatrix computation
   """
-  if edge2nodes is None:
-    edge2nodes = ToCscMatrix(hypergraph).T
-  return _GetSecondDegConnections(edge2nodes)
+  row = []
+  col = []
+  val = []
+  for edge_idx, edge in hypergraph.edge.items():
+    for node_idx in edge.nodes:
+      for neigh_idx in hypergraph.node[node_idx].edges:
+        row.append(edge_idx)
+        col.append(neigh_idx)
+        val.append(1)
+  return csr_matrix((val, (row, col)), dtype=np.bool)
 
 
-def _PrecomputeSimilarities(hypergraph, num_neighbors):
+def _PrecomputeSimilarities(
+    hypergraph,
+    num_neighbors,
+    num_pos_samples_per,
+    num_neg_samples_per):
   log.info("Precomputing similarities")
-  node2edges = ToCsrMatrix(hypergraph)
-  edge2nodes = ToCscMatrix(hypergraph).T
 
-  node2neighbors = _GetNodeNeighbors(hypergraph, node2edges)
-  edge2neighbors = _GetEdgeNeighbors(hypergraph, edge2nodes)
+  log.info("Converting hypergraph to node-major sparse matrix")
+  node2edges = ToCsrMatrix(hypergraph)
+
+  log.info("Converting hypergraph to edge-major sparse matrix")
+  edge2nodes = ToEdgeCsrMatrix(hypergraph)
+
+  log.info("Getting 2nd order node neighbors")
+  node2neighbors = _GetNodeNeighbors(hypergraph)
+  log.info("Getting 2nd order edge neighbors")
+  edge2neighbors = _GetEdgeNeighbors(hypergraph)
 
   def NodeNodeSim(idx_i, idx_j):
     edge_set_i = node2edges[idx_i, :]
@@ -269,68 +293,124 @@ def _PrecomputeSimilarities(hypergraph, num_neighbors):
     cols = list(matrix[idx, :].nonzero()[1])
     if len(cols) > num_neighbors:
       cols = sample(cols, num_neighbors)
-    return [c + 1 for c in cols]
-
-  # precomputed array size
-  rows = len(hypergraph.node) * (len(hypergraph.node)-1) \
-       + len(hypergraph.edge) * (len(hypergraph.edge)-1) \
-       + len(hypergraph.node) * len(hypergraph.edge)
-  # idx, bool(types) idx of neighbors
+    return [c for c in cols]
 
   log.info("Instantiating arrays")
-  left_node_idx = np.zeros((rows,), dtype=np.int32)
-  left_edge_idx = np.zeros((rows,), dtype=np.int32)
+  left_node_idx = []
+  left_edge_idx = []
+  right_node_idx = []
+  right_edge_idx = []
 
-  right_node_idx = np.zeros((rows,), dtype=np.int32)
-  right_edge_idx = np.zeros((rows,), dtype=np.int32)
+  edges_containing_node = [[] for _ in range(num_neighbors)]
+  nodes_in_edge = [[] for _ in range(num_neighbors)]
 
-  edges_containing_node = [
-      np.zeros((rows,
-               ),
-               dtype=np.int32) for _ in range(num_neighbors)
-  ]
-  nodes_in_edge = [
-      np.zeros((rows,
-               ),
-               dtype=np.int32) for _ in range(num_neighbors)
-  ]
+  node_node_prob = []
+  edge_edge_prob = []
+  node_edge_prob = []
 
-  node_node_prob = np.zeros((rows,), dtype=np.float16)
-  edge_edge_prob = np.zeros((rows,), dtype=np.float16)
-  node_edge_prob = np.zeros((rows,), dtype=np.float16)
+  def add_value(
+      ln=None,
+      le=None,
+      rn=None,
+      re=None,
+      ne=[],
+      nn=[],
+      nnp=0,
+      eep=0,
+      nep=0):
 
-  row_idx = 0
+    def ZeroOrInc(x):
+      if x is None:
+        return 0
+      else:
+        return x + 1
+
+    left_node_idx.append(ZeroOrInc(ln))
+    left_edge_idx.append(ZeroOrInc(le))
+    right_node_idx.append(ZeroOrInc(rn))
+    right_edge_idx.append(ZeroOrInc(re))
+    for i in range(num_neighbors):
+      if i >= len(ne):
+        edges_containing_node[i].append(0)
+      else:
+        edges_containing_node[i].append(ne[i] + 1)
+      if i >= len(nn):
+        nodes_in_edge[i].append(0)
+      else:
+        nodes_in_edge[i].append(nn[i] + 1)
+    node_node_prob.append(nnp)
+    edge_edge_prob.append(eep)
+    node_edge_prob.append(nep)
 
   # Note, we are going to store indices + 1 because 0 is a mask value
 
-  log.info("Computing all node-node probabilities")
-  for i, j in permutations(hypergraph.node, 2):
-    left_node_idx[row_idx] = i + 1
-    right_node_idx[row_idx] = j + 1
+  log.info("Sampling node-node probabilities")
+  all_node_indices = set(i for i in hypergraph.node)
 
-    node_node_prob[row_idx] = NodeNodeSim(i, j)
-    row_idx += 1
+  for node_idx in tqdm(hypergraph.node):
+    neighbors = node2neighbors[node_idx]
+    pos_indices = set(neighbors.nonzero()[1])
+    neg_indices = all_node_indices - pos_indices
+    num_pos_samples = min(num_pos_samples_per, len(pos_indices))
+    num_neg_samples = min(num_neg_samples_per, len(neg_indices))
+    for neigh_idx in sample(pos_indices, num_pos_samples) \
+                   + sample(neg_indices, num_neg_samples):
+      add_value(ln=node_idx, rn=neigh_idx, nnp=NodeNodeSim(node_idx, neigh_idx))
 
-  log.info("Computing all edge-edge probabilities")
-  for i, j in permutations(hypergraph.edge, 2):
-    left_edge_idx[row_idx] = i + 1
-    right_edge_idx[row_idx] = j + 1
+  log.info("Sampling edge-edge probabilities")
+  all_edge_indices = set(i for i in hypergraph.edge)
+  for edge_idx in tqdm(hypergraph.edge):
+    neighbors = edge2neighbors[edge_idx]
+    pos_indices = set(neighbors.nonzero()[1])
+    neg_indices = all_edge_indices - pos_indices
+    num_pos_samples = min(num_pos_samples_per, len(pos_indices))
+    num_neg_samples = min(num_neg_samples_per, len(neg_indices))
+    for neigh_idx in sample(pos_indices, num_pos_samples) \
+                   + sample(neg_indices, num_neg_samples):
+      add_value(le=edge_idx, re=neigh_idx, eep=EdgeEdgeSim(edge_idx, neigh_idx))
 
-    edge_edge_prob[row_idx] = EdgeEdgeSim(i, j)
-    row_idx += 1
+  log.info("Sampling node-edge probabilities")
+  for node_idx in tqdm(hypergraph.node):
+    pos_indices = set(node2edges[node_idx].nonzero()[1])
+    neg_indices = all_edge_indices - pos_indices
+    num_pos_samples = min(num_pos_samples_per, len(pos_indices))
+    num_neg_samples = min(num_neg_samples_per, len(neg_indices))
+    for edge_idx in sample(pos_indices, num_pos_samples) \
+                  + sample(neg_indices, num_neg_samples):
+      add_value(
+          ln=node_idx,
+          re=edge_idx,
+          nep=NodeEdgeSim(node_idx,
+                          edge_idx),
+          ne=sample_column_indices(node_idx,
+                                   node2edges),
+          nn=sample_column_indices(edge_idx,
+                                   edge2nodes))
 
-  log.info("Computing all node-edge probabilities")
-  for n, e in product(hypergraph.node, hypergraph.edge):
-    left_node_idx[row_idx] = n + 1
-    right_edge_idx[row_idx] = e + 1
+  log.info("Sampling edge-node probabilities")
+  for edge_idx in tqdm(hypergraph.edge):
+    pos_indices = set(edge2nodes[edge_idx].nonzero()[1])
+    neg_indices = all_node_indices - pos_indices
+    num_pos_samples = min(num_pos_samples_per, len(pos_indices))
+    num_neg_samples = min(num_neg_samples_per, len(neg_indices))
+    for node_idx in sample(pos_indices, num_pos_samples) \
+                  + sample(neg_indices, num_neg_samples):
+      add_value(
+          ln=node_idx,
+          re=edge_idx,
+          nep=NodeEdgeSim(node_idx,
+                          edge_idx),
+          ne=sample_column_indices(node_idx,
+                                   node2edges),
+          nn=sample_column_indices(edge_idx,
+                                   edge2nodes))
 
-    for col, neigh_sample in enumerate(sample_column_indices(n, node2edges)):
-      edges_containing_node[col][row_idx] = neigh_sample
-    for col, neigh_sample in enumerate(sample_column_indices(e, edge2nodes)):
-      nodes_in_edge[col][row_idx] = neigh_sample
-
-    node_edge_prob[row_idx] = NodeEdgeSim(n, e)
-    row_idx += 1
+  assert len(left_node_idx) \
+      == len(left_edge_idx) \
+      == len(right_node_idx) \
+      == len(left_edge_idx) \
+      == len(edges_containing_node[0]) \
+      == len(nodes_in_edge[0])
 
   return ([left_node_idx,
            left_edge_idx,
@@ -427,7 +507,7 @@ def _GetModel(hypergraph, dimension, num_neighbors):
 
 
 def EmbedHypergraph(hypergraph, dimension, num_neighbors=5):
-  input_features, output_probs = _PrecomputeSimilarities(hypergraph, num_neighbors)
+  input_features, output_probs = _PrecomputeSimilarities(hypergraph, num_neighbors, 1, 1)
   model = _GetModel(hypergraph, dimension, num_neighbors)
   model.fit(input_features, output_probs, batch_size=1)
 
