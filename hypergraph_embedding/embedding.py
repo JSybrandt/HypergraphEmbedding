@@ -507,7 +507,7 @@ def _GetModel(hypergraph, dimension, num_neighbors):
 
 
 def EmbedHypergraph(hypergraph, dimension, num_neighbors=5):
-  input_features, output_probs = _PrecomputeSimilarities(hypergraph, num_neighbors, 1, 1)
+  input_features, output_probs = _PrecomputeSimilarities(hypergraph, num_neighbors, 10, 5)
   model = _GetModel(hypergraph, dimension, num_neighbors)
   model.fit(input_features, output_probs, batch_size=1)
 
