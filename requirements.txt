@@ -2,5 +2,7 @@ numpy
 scipy
 protobuf
 networkx
-sklearn
 node2vec
+sklearn
+keras
+tensorflow

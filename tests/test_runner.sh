@@ -60,6 +60,23 @@ else
 	exit 1
 fi
 
+rm -f $tmp_embedding_path
+echo "Testing new embedding model"
+
+./runner.py \
+	--log-level NONE \
+	--embedding-method HYPERGRAPH \
+	--embedding-dimension 2 \
+	--embedding $tmp_embedding_path \
+	$tmp_hypergraph_path
+
+if [ $? -eq 0 ]; then
+	echo "Keras method success!"
+else
+	echo "Keras method fail!"
+	exit 1
+fi
+
 rm -f $tmp_hypergraph_path
 rm -f $tmp_embedding_path
 rm -f $tmp_metrics_path

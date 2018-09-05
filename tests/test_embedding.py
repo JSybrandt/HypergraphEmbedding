@@ -3,6 +3,7 @@ from hypergraph_embedding import Hypergraph
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.hypergraph_util import *
 from hypergraph_embedding.embedding import *
+from hypergraph_embedding import embedding
 import scipy as sp
 import itertools
 from random import random, randint
@@ -171,3 +172,50 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
     actual = EmbedNode2VecClique(hg, dim)
     self.checkEmbedding(actual, hg, dim)
     self.assertEqual(actual.method_name, "Node2VecClique")
+
+
+class EmbedHypergraphTest(EmbeddingTestCase):
+
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedHypergraph(_input, dim)
+    self.checkEmbedding(actual, _input, dim)
+    self.assertEqual(actual.method_name, "Hypergraph")
+
+  def test_fuzz(self):
+    "Random embedding should never break"
+    self.help_test_fuzz(EmbedHypergraph, num_fuzz=10)
+
+  def test_helper_get_node_neighbors(self):
+    _input = TestHypergraph()
+    num_nodes = len(_input.node)
+    actual = embedding._GetNodeNeighbors(_input)
+    expected = sp.sparse.csr_matrix((num_nodes, num_nodes), dtype=np.bool)
+    expected[0, 0] = 1
+    expected[0, 1] = 1
+    expected[1, 0] = 1
+    expected[1, 1] = 1
+    expected[1, 2] = 1
+    expected[2, 1] = 1
+    expected[2, 2] = 1
+    expected[2, 3] = 1
+    expected[3, 2] = 1
+    expected[3, 3] = 1
+    self.assertEqual(actual.shape, expected.shape)
+    self.assertEqual((actual != expected).nnz, 0)
+
+  def test_helper_get_edge_neighbors(self):
+    _input = TestHypergraph()
+    num_edges = len(_input.edge)
+    actual = embedding._GetEdgeNeighbors(_input)
+    expected = sp.sparse.csr_matrix((num_edges, num_edges), dtype=np.bool)
+    expected[0, 0] = 1
+    expected[0, 1] = 1
+    expected[1, 0] = 1
+    expected[1, 1] = 1
+    expected[1, 2] = 1
+    expected[2, 1] = 1
+    expected[2, 2] = 1
+    self.assertEqual(actual.shape, expected.shape)
+    self.assertEqual((actual != expected).nnz, 0)
