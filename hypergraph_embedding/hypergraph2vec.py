@@ -14,6 +14,7 @@ import logging
 import multiprocessing
 from itertools import combinations, permutations, product
 from tqdm import tqdm
+from collections import namedtuple
 
 import keras
 from keras.models import Model
@@ -56,6 +57,129 @@ def GetEdgeNeighbors(hypergraph):
   return csr_matrix((val, (row, col)), dtype=np.bool)
 
 
+def _SameTypeSimilarity(row_i, row_j, matrix):
+  "Computes the jaccard of two nodes or two edges"
+  set_i = matrix[row_i, :]
+  set_j = matrix[row_j, :]
+  return jaccard(set_i, set_j)
+
+
+def _NodeEdgeSim(
+    node_idx,
+    edge_idx,
+    node2edges,
+    edge2nodes,
+    node2neighbors,
+    edge2neighbors):
+  "Computes the similarity of a node with an edge baised on both neighborhoods"
+  edges_containing_node = node2edges[node_idx, :]
+  nodes_in_edge = edge2nodes[edge_idx, :]
+  return jaccard(node2neighbors[node_idx, :], nodes_in_edge) \
+       * jaccard(edge2neighbors[edge_idx, :], edges_containing_node)
+
+
+def _sample_column_indices(idx, matrix, samples):
+  "Returns at most # samples results"
+  cols = list(matrix[idx, :].nonzero()[1])
+  if len(cols) > samples:
+    cols = sample(cols, samples)
+  return [c for c in cols]
+
+
+_shared_info = {}
+
+
+def _init_precompute_shared_data(
+    _node2edges,
+    _edge2nodes,
+    _node2neighbors,
+    _edge2neighbors,
+    _all_node_indices,
+    _all_edge_indices):
+  _shared_info["node2edges"] = _node2edges
+  _shared_info["edge2nodes"] = _edge2nodes
+  _shared_info["node2neighbors"] = _node2neighbors
+  _shared_info["edge2neighbors"] = _edge2neighbors
+  _shared_info["all_node_indices"] = _all_node_indices
+  _shared_info["all_edge_indices"] = _all_edge_indices
+
+
+SimilarityRecord = namedtuple(
+    "SimilarityRecord",
+    (
+        "left_node_idx",
+        "left_edge_idx",
+        "right_node_idx",
+        "right_edge_idx",
+        "edges_containing_node",
+        "nodes_in_edge",
+        "node_node_prob",
+        "edge_edge_prob",
+        "node_edge_prob"))
+# Set all field defaults to none
+SimilarityRecord.__new__.__defaults__ = (None,) * len(SimilarityRecord._fields)
+
+
+def _SimilarityValuesToResults(similarity_records, num_neighbors):
+  "Converts a list of similarity_records to a tuple of "
+  "(feature lists, output_lists)"
+
+  left_node_idx = []
+  right_node_idx = []
+  left_edge_idx = []
+  right_edge_idx = []
+  edges_containing_node = [[] for _ in range(num_neighbors)]
+  nodes_in_edge = [[] for _ in range(num_neighbors)]
+  node_node_prob = []
+  edge_edge_prob = []
+  node_edge_prob = []
+
+  for r in similarity_records:
+
+    def IncOrZero(x):
+      if x is None:
+        return 0
+      else:
+        return x + 1
+
+    def LenOrZero(x):
+      if x is None:
+        return 0
+      else:
+        return len(x)
+
+    def ValOrZero(x):
+      if x is None:
+        return 0
+      else:
+        return x
+
+    left_node_idx.append(IncOrZero(r.left_node_idx))
+    left_edge_idx.append(IncOrZero(r.left_edge_idx))
+    right_node_idx.append(IncOrZero(r.right_node_idx))
+    right_edge_idx.append(IncOrZero(r.right_edge_idx))
+    for i in range(num_neighbors):
+      if i >= LenOrZero(r.edges_containing_node):
+        edges_containing_node[i].append(0)
+      else:
+        edges_containing_node[i].append(r.edges_containing_node[i] + 1)
+      if i >= LenOrZero(r.nodes_in_edge):
+        nodes_in_edge[i].append(0)
+      else:
+        nodes_in_edge[i].append(r.nodes_in_edge[i] + 1)
+    node_node_prob.append(ValOrZero(r.node_node_prob))
+    edge_edge_prob.append(ValOrZero(r.edge_edge_prob))
+    node_edge_prob.append(ValOrZero(r.node_edge_prob))
+
+  return ([left_node_idx,
+           left_edge_idx,
+           right_node_idx,
+           right_edge_idx] + edges_containing_node + nodes_in_edge,
+          [node_node_prob,
+           edge_edge_prob,
+           node_edge_prob])
+
+
 def PrecomputeSimilarities(
     hypergraph,
     num_neighbors,
@@ -74,80 +198,17 @@ def PrecomputeSimilarities(
   log.info("Getting 2nd order edge neighbors")
   edge2neighbors = GetEdgeNeighbors(hypergraph)
 
-  def NodeNodeSim(idx_i, idx_j):
-    edge_set_i = node2edges[idx_i, :]
-    edge_set_j = node2edges[idx_j, :]
-    return jaccard(edge_set_i, edge_set_j)
+  log.info("Indexing all node indices")
+  all_node_indices = set(i for i in hypergraph.node)
 
-  def EdgeEdgeSim(idx_i, idx_j):
-    node_set_i = edge2nodes[idx_i, :]
-    node_set_j = edge2nodes[idx_j, :]
-    return jaccard(node_set_i, node_set_j)
+  log.info("Indexing all edge indices")
+  all_edge_indices = set(i for i in hypergraph.edge)
 
-  def NodeEdgeSim(node_idx, edge_idx):
-    edges_containing_node = node2edges[node_idx, :]
-    nodes_in_edge = edge2nodes[edge_idx, :]
-    return jaccard(node2neighbors[node_idx, :], nodes_in_edge) \
-         * jaccard(edge2neighbors[edge_idx, :], edges_containing_node)
-
-  def sample_column_indices(idx, matrix):
-    cols = list(matrix[idx, :].nonzero()[1])
-    if len(cols) > num_neighbors:
-      cols = sample(cols, num_neighbors)
-    return [c for c in cols]
-
-  log.info("Instantiating arrays")
-  left_node_idx = []
-  left_edge_idx = []
-  right_node_idx = []
-  right_edge_idx = []
-
-  edges_containing_node = [[] for _ in range(num_neighbors)]
-  nodes_in_edge = [[] for _ in range(num_neighbors)]
-
-  node_node_prob = []
-  edge_edge_prob = []
-  node_edge_prob = []
-
-  def add_value(
-      ln=None,
-      le=None,
-      rn=None,
-      re=None,
-      ne=[],
-      nn=[],
-      nnp=0,
-      eep=0,
-      nep=0):
-
-    def ZeroOrInc(x):
-      if x is None:
-        return 0
-      else:
-        return x + 1
-
-    left_node_idx.append(ZeroOrInc(ln))
-    left_edge_idx.append(ZeroOrInc(le))
-    right_node_idx.append(ZeroOrInc(rn))
-    right_edge_idx.append(ZeroOrInc(re))
-    for i in range(num_neighbors):
-      if i >= len(ne):
-        edges_containing_node[i].append(0)
-      else:
-        edges_containing_node[i].append(ne[i] + 1)
-      if i >= len(nn):
-        nodes_in_edge[i].append(0)
-      else:
-        nodes_in_edge[i].append(nn[i] + 1)
-    node_node_prob.append(nnp)
-    edge_edge_prob.append(eep)
-    node_edge_prob.append(nep)
+  similarity_records = []
 
   # Note, we are going to store indices + 1 because 0 is a mask value
 
   log.info("Sampling node-node probabilities")
-  all_node_indices = set(i for i in hypergraph.node)
-
   for node_idx in tqdm(hypergraph.node):
     neighbors = node2neighbors[node_idx]
     pos_indices = set(neighbors.nonzero()[1])
@@ -156,10 +217,16 @@ def PrecomputeSimilarities(
     num_neg_samples = min(num_neg_samples_per, len(neg_indices))
     for neigh_idx in sample(pos_indices, num_pos_samples) \
                    + sample(neg_indices, num_neg_samples):
-      add_value(ln=node_idx, rn=neigh_idx, nnp=NodeNodeSim(node_idx, neigh_idx))
+      similarity_records.append(
+          SimilarityRecord(
+              left_node_idx=node_idx,
+              right_node_idx=neigh_idx,
+              node_node_prob=_SameTypeSimilarity(
+                  node_idx,
+                  neigh_idx,
+                  node2edges)))
 
   log.info("Sampling edge-edge probabilities")
-  all_edge_indices = set(i for i in hypergraph.edge)
   for edge_idx in tqdm(hypergraph.edge):
     neighbors = edge2neighbors[edge_idx]
     pos_indices = set(neighbors.nonzero()[1])
@@ -168,7 +235,14 @@ def PrecomputeSimilarities(
     num_neg_samples = min(num_neg_samples_per, len(neg_indices))
     for neigh_idx in sample(pos_indices, num_pos_samples) \
                    + sample(neg_indices, num_neg_samples):
-      add_value(le=edge_idx, re=neigh_idx, eep=EdgeEdgeSim(edge_idx, neigh_idx))
+      similarity_records.append(
+          SimilarityRecord(
+              left_edge_idx=edge_idx,
+              right_edge_idx=neigh_idx,
+              edge_edge_prob=_SameTypeSimilarity(
+                  edge_idx,
+                  neigh_idx,
+                  edge2nodes)))
 
   log.info("Sampling node-edge probabilities")
   for node_idx in tqdm(hypergraph.node):
@@ -178,15 +252,25 @@ def PrecomputeSimilarities(
     num_neg_samples = min(num_neg_samples_per, len(neg_indices))
     for edge_idx in sample(pos_indices, num_pos_samples) \
                   + sample(neg_indices, num_neg_samples):
-      add_value(
-          ln=node_idx,
-          re=edge_idx,
-          nep=NodeEdgeSim(node_idx,
-                          edge_idx),
-          ne=sample_column_indices(node_idx,
-                                   node2edges),
-          nn=sample_column_indices(edge_idx,
-                                   edge2nodes))
+      similarity_records.append(
+          SimilarityRecord(
+              left_node_idx=node_idx,
+              right_edge_idx=edge_idx,
+              node_edge_prob=_NodeEdgeSim(
+                  node_idx,
+                  edge_idx,
+                  node2edges,
+                  edge2nodes,
+                  node2neighbors,
+                  edge2neighbors),
+              edges_containing_node=_sample_column_indices(
+                  node_idx,
+                  node2edges,
+                  num_neighbors),
+              nodes_in_edge=_sample_column_indices(
+                  edge_idx,
+                  edge2nodes,
+                  num_neighbors)))
 
   log.info("Sampling edge-node probabilities")
   for edge_idx in tqdm(hypergraph.edge):
@@ -196,30 +280,26 @@ def PrecomputeSimilarities(
     num_neg_samples = min(num_neg_samples_per, len(neg_indices))
     for node_idx in sample(pos_indices, num_pos_samples) \
                   + sample(neg_indices, num_neg_samples):
-      add_value(
-          ln=node_idx,
-          re=edge_idx,
-          nep=NodeEdgeSim(node_idx,
-                          edge_idx),
-          ne=sample_column_indices(node_idx,
-                                   node2edges),
-          nn=sample_column_indices(edge_idx,
-                                   edge2nodes))
-
-  assert len(left_node_idx) \
-      == len(left_edge_idx) \
-      == len(right_node_idx) \
-      == len(left_edge_idx) \
-      == len(edges_containing_node[0]) \
-      == len(nodes_in_edge[0])
-
-  return ([left_node_idx,
-           left_edge_idx,
-           right_node_idx,
-           right_edge_idx] + edges_containing_node + nodes_in_edge,
-          [node_node_prob,
-           edge_edge_prob,
-           node_edge_prob])
+      similarity_records.append(
+          SimilarityRecord(
+              left_node_idx=node_idx,
+              right_edge_idx=edge_idx,
+              node_edge_prob=_NodeEdgeSim(
+                  node_idx,
+                  edge_idx,
+                  node2edges,
+                  edge2nodes,
+                  node2neighbors,
+                  edge2neighbors),
+              edges_containing_node=_sample_column_indices(
+                  node_idx,
+                  node2edges,
+                  num_neighbors),
+              nodes_in_edge=_sample_column_indices(
+                  edge_idx,
+                  edge2nodes,
+                  num_neighbors)))
+  return _SimilarityValuesToResults(similarity_records, num_neighbors)
 
 
 def GetModel(hypergraph, dimension, num_neighbors):
