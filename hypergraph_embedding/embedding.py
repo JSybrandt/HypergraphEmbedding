@@ -197,11 +197,11 @@ def EmbedNode2VecClique(
 def EmbedHypergraph(
     hypergraph,
     dimension,
-    num_neighbors=5,
-    pos_samples=5,
-    neg_samples=1,
-    batch_size=32,
-    epochs=1):
+    num_neighbors=10,
+    pos_samples=200,
+    neg_samples=0,
+    batch_size=256,
+    epochs=5):
   input_features, output_probs = PrecomputeSimilarities(hypergraph,
                                                         num_neighbors,
                                                         pos_samples,

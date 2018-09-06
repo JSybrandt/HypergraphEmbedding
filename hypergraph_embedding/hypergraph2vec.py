@@ -443,5 +443,5 @@ def GetModel(hypergraph, dimension, num_neighbors):
                edge_edge_prob,
                node_edge_prob])
 
-  model.compile(optimizer="rmsprop", loss="kullback_leibler_divergence")
+  model.compile(optimizer="adagrad", loss="kullback_leibler_divergence")
   return model
