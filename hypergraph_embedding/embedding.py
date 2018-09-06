@@ -199,13 +199,15 @@ def EmbedHypergraph(
     dimension,
     num_neighbors=5,
     pos_samples=5,
-    neg_samples=1):
+    neg_samples=1,
+    batch_size=32,
+    epochs=1):
   input_features, output_probs = PrecomputeSimilarities(hypergraph,
                                                         num_neighbors,
                                                         pos_samples,
                                                         neg_samples)
   model = GetModel(hypergraph, dimension, num_neighbors)
-  model.fit(input_features, output_probs, batch_size=1)
+  model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
 
   log.info("Recording Embeddings")
 

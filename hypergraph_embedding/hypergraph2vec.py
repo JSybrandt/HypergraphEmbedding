@@ -408,26 +408,26 @@ def GetModel(hypergraph, dimension, num_neighbors):
       1,
       activation="sigmoid",
       name="node_node_prob")(
-          Dot(0)([left_node_vec,
+          Dot(1)([left_node_vec,
                   right_node_vec]))
   edge_edge_prob = Dense(
       1,
       activation="sigmoid",
       name="edge_edge_prob")(
-          Dot(0)([left_edge_vec,
+          Dot(1)([left_edge_vec,
                   right_edge_vec]))
 
   # Get neighborhood embeddings
   nodes_dot_sigs = [
       Dense(1,
             activation="sigmoid")(
-                Dot(0)([Flatten()(node_emb(node)),
+                Dot(1)([Flatten()(node_emb(node)),
                         left_node_vec])) for node in nodes_in_edge
   ]
   edges_dot_sigs = [
       Dense(1,
             activation="sigmoid")(
-                Dot(0)([Flatten()(edge_emb(edge)),
+                Dot(1)([Flatten()(edge_emb(edge)),
                         right_edge_vec])) for edge in edges_containing_node
   ]
 
