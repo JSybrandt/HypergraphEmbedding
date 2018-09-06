@@ -12,6 +12,7 @@ from scipy.sparse import csr_matrix
 from random import random, sample
 import logging
 import multiprocessing
+from multiprocessing import Pool
 from itertools import combinations, permutations, product
 from tqdm import tqdm
 from collections import namedtuple
@@ -84,24 +85,6 @@ def _sample_column_indices(idx, matrix, samples):
   if len(cols) > samples:
     cols = sample(cols, samples)
   return [c for c in cols]
-
-
-_shared_info = {}
-
-
-def _init_precompute_shared_data(
-    _node2edges,
-    _edge2nodes,
-    _node2neighbors,
-    _edge2neighbors,
-    _all_node_indices,
-    _all_edge_indices):
-  _shared_info["node2edges"] = _node2edges
-  _shared_info["edge2nodes"] = _edge2nodes
-  _shared_info["node2neighbors"] = _node2neighbors
-  _shared_info["edge2neighbors"] = _edge2neighbors
-  _shared_info["all_node_indices"] = _all_node_indices
-  _shared_info["all_edge_indices"] = _all_edge_indices
 
 
 SimilarityRecord = namedtuple(
@@ -180,11 +163,56 @@ def _SimilarityValuesToResults(similarity_records, num_neighbors):
            node_edge_prob])
 
 
+# Used to coordinate between parallel processes
+_shared_info = {}
+
+
+def _init_precompute_shared_data(
+    _node2edges,
+    _edge2nodes,
+    _node2neighbors,
+    _edge2neighbors,
+    _all_node_indices,
+    _all_edge_indices,
+    _num_pos_samples_per,
+    _num_neg_samples_per):
+  _shared_info["node2edges"] = _node2edges
+  _shared_info["edge2nodes"] = _edge2nodes
+  _shared_info["node2neighbors"] = _node2neighbors
+  _shared_info["edge2neighbors"] = _edge2neighbors
+  _shared_info["all_node_indices"] = _all_node_indices
+  _shared_info["all_edge_indices"] = _all_edge_indices
+  _shared_info["num_pos_samples_per"] = _num_pos_samples_per
+  _shared_info["num_neg_samples_per"] = _num_neg_samples_per
+
+
+def _GetNodeNodeSamples(node_idx):
+  "Parallel helper function. Assumes _init_precompute_shared_data was run."
+  results = []
+  neighbors = _shared_info["node2neighbors"][node_idx]
+  pos_indices = set(neighbors.nonzero()[1])
+  neg_indices = _shared_info["all_node_indices"] - pos_indices
+  num_pos_samples = min(_shared_info["num_pos_samples_per"], len(pos_indices))
+  num_neg_samples = min(_shared_info["num_neg_samples_per"], len(neg_indices))
+  for neigh_idx in sample(pos_indices, num_pos_samples) \
+                 + sample(neg_indices, num_neg_samples):
+    results.append(
+        SimilarityRecord(
+            left_node_idx=node_idx,
+            right_node_idx=neigh_idx,
+            node_node_prob=_SameTypeSimilarity(
+                node_idx,
+                neigh_idx,
+                _shared_info["node2edges"])))
+  return results
+
+
 def PrecomputeSimilarities(
     hypergraph,
     num_neighbors,
     num_pos_samples_per,
-    num_neg_samples_per):
+    num_neg_samples_per,
+    run_in_parallel=True):
   log.info("Precomputing similarities")
 
   log.info("Converting hypergraph to node-major sparse matrix")
@@ -206,25 +234,25 @@ def PrecomputeSimilarities(
 
   similarity_records = []
 
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+
   # Note, we are going to store indices + 1 because 0 is a mask value
 
   log.info("Sampling node-node probabilities")
-  for node_idx in tqdm(hypergraph.node):
-    neighbors = node2neighbors[node_idx]
-    pos_indices = set(neighbors.nonzero()[1])
-    neg_indices = all_node_indices - pos_indices
-    num_pos_samples = min(num_pos_samples_per, len(pos_indices))
-    num_neg_samples = min(num_neg_samples_per, len(neg_indices))
-    for neigh_idx in sample(pos_indices, num_pos_samples) \
-                   + sample(neg_indices, num_neg_samples):
-      similarity_records.append(
-          SimilarityRecord(
-              left_node_idx=node_idx,
-              right_node_idx=neigh_idx,
-              node_node_prob=_SameTypeSimilarity(
-                  node_idx,
-                  neigh_idx,
-                  node2edges)))
+  with Pool(num_cores,
+            initializer=_init_precompute_shared_data,
+            initargs=(node2edges,
+                      edge2nodes,
+                      node2neighbors,
+                      edge2neighbors,
+                      all_node_indices,
+                      all_edge_indices,
+                      num_pos_samples_per,
+                      num_neg_samples_per)) as pool:
+    with tqdm(total=len(hypergraph.node)) as pbar:
+      for result in pool.imap(_GetNodeNodeSamples, hypergraph.node):
+        similarity_records += result
+        pbar.update(1)
 
   log.info("Sampling edge-edge probabilities")
   for edge_idx in tqdm(hypergraph.edge):
