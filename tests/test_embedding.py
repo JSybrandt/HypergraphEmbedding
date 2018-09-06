@@ -3,7 +3,7 @@ from hypergraph_embedding import Hypergraph
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.hypergraph_util import *
 from hypergraph_embedding.embedding import *
-from hypergraph_embedding import embedding
+from hypergraph_embedding.hypergraph2vec import *
 import scipy as sp
 import itertools
 from random import random, randint
@@ -190,7 +190,7 @@ class EmbedHypergraphTest(EmbeddingTestCase):
   def test_helper_get_node_neighbors(self):
     _input = TestHypergraph()
     num_nodes = len(_input.node)
-    actual = embedding._GetNodeNeighbors(_input)
+    actual = GetNodeNeighbors(_input)
     expected = sp.sparse.csr_matrix((num_nodes, num_nodes), dtype=np.bool)
     expected[0, 0] = 1
     expected[0, 1] = 1
@@ -208,7 +208,7 @@ class EmbedHypergraphTest(EmbeddingTestCase):
   def test_helper_get_edge_neighbors(self):
     _input = TestHypergraph()
     num_edges = len(_input.edge)
-    actual = embedding._GetEdgeNeighbors(_input)
+    actual = GetEdgeNeighbors(_input)
     expected = sp.sparse.csr_matrix((num_edges, num_edges), dtype=np.bool)
     expected[0, 0] = 1
     expected[0, 1] = 1
