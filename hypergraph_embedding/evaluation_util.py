@@ -422,6 +422,7 @@ def GetPersonalizedClassifiers(
     hypergraph,
     embedding,
     per_edge=True,
+    idx_subset=None,
     run_in_parallel=True):
   """
   Returns a dict from idx-classifier.
@@ -441,12 +442,17 @@ def GetPersonalizedClassifiers(
 
   result = {}
   log.info("Training classifier per %s", "edge" if per_edge else "node")
+  if idx_subset is None:
+    idx_subset = idx2neighbors.keys()
+  else:
+    log.info("Subset provided with %i entires", len(idx_subset))
+
   with Pool(num_cores,
             initializer=_init_train_personalized_classifier,
             initargs=(idx2neighbors,
                       neighbor_idx2embedding)) as pool:
-    with tqdm(total=len(idx2neighbors)) as pbar:
-      for idx, classifier in pool.imap(_train_personalized_classifier, idx2neighbors):
+    with tqdm(total=len(idx_subset)) as pbar:
+      for idx, classifier in pool.imap(_train_personalized_classifier, idx_subset):
         result[idx] = classifier
         pbar.update(1)
   return result
@@ -481,10 +487,14 @@ def EdgeClassifierPrediction(
       if link[0] in embedding.node and link[1] in embedding.edge
   ]
 
+  # Get only the needed ones
+  nessesary_edges = set(l[1] for l in links)
+
   log.info("Training a classifier per edge")
   edge2classifier = GetPersonalizedClassifiers(
       hypergraph,
       embedding,
+      idx_subset=nessesary_edges,
       run_in_parallel=run_in_parallel)
   log.info("Mapping nodes to embeddings")
   node2embedding = {idx: emb.values for idx, emb in embedding.node.items()}
