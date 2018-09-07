@@ -129,7 +129,7 @@ class EmbedNode2VecBipartideTest(EmbeddingTestCase):
     _input = TestHypergraph()
     actual = EmbedNode2VecBipartide(_input, dim)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Node2VecBipartide")
+    self.assertEqual(actual.method_name, "Node2VecBipartide(5)")
 
   def test_fuzz(self):
     "Random embedding should never break"
@@ -145,7 +145,7 @@ class EmbedNode2VecBipartideTest(EmbeddingTestCase):
 
     actual = EmbedNode2VecBipartide(hg, dim)
     self.checkEmbedding(actual, hg, dim)
-    self.assertEqual(actual.method_name, "Node2VecBipartide")
+    self.assertEqual(actual.method_name, "Node2VecBipartide(5)")
 
 
 class EmbedNode2VecCliqueTest(EmbeddingTestCase):
@@ -155,7 +155,7 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
     _input = TestHypergraph()
     actual = EmbedNode2VecClique(_input, dim)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Node2VecClique")
+    self.assertEqual(actual.method_name, "Node2VecClique(5)")
 
   def test_fuzz(self):
     "Random embedding should never break"
@@ -171,7 +171,7 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
 
     actual = EmbedNode2VecClique(hg, dim)
     self.checkEmbedding(actual, hg, dim)
-    self.assertEqual(actual.method_name, "Node2VecClique")
+    self.assertEqual(actual.method_name, "Node2VecClique(5)")
 
 
 class EmbedHypergraphTest(EmbeddingTestCase):

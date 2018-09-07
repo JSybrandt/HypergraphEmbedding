@@ -117,7 +117,7 @@ def EmbedNode2VecBipartide(
 
   embedding = HypergraphEmbedding()
   embedding.dim = dimension
-  embedding.method_name = "Node2VecBipartide"
+  embedding.method_name = "Node2VecBipartide({})".format(walk_length)
 
   bipartide = ToBipartideNxGraph(hypergraph)
   embedder = Node2Vec(
@@ -164,7 +164,7 @@ def EmbedNode2VecClique(
 
   embedding = HypergraphEmbedding()
   embedding.dim = dimension
-  embedding.method_name = "Node2VecClique"
+  embedding.method_name = "Node2VecClique({})".format(walk_length)
 
   clique = ToCliqueNxGraph(hypergraph)
   embedder = Node2Vec(
@@ -229,7 +229,11 @@ EMBEDDING_OPTIONS = {
     "SVD": EmbedSvd,
     "RANDOM": EmbedRandom,
     "NMF": EmbedNMF,
-    "N2V_BIPARTIDE": EmbedNode2VecBipartide,
-    "N2V_CLIQUE": EmbedNode2VecClique,
+    "N2V3_BIPARTIDE": lambda h, d:EmbedNode2VecBipartide(h, d, walk_length=3),
+    "N2V3_CLIQUE": lambda h, d: EmbedNode2VecClique(h, d, walk_length=3),
+    "N2V5_BIPARTIDE": EmbedNode2VecBipartide,
+    "N2V5_CLIQUE": EmbedNode2VecClique,
+    "N2V7_BIPARTIDE": lambda h, d:EmbedNode2VecBipartide(h, d, walk_length=7),
+    "N2V7_CLIQUE": lambda h, d: EmbedNode2VecClique(h, d, walk_length=7),
     "HYPERGRAPH": EmbedHypergraph
 }
