@@ -3,6 +3,7 @@ from hypergraph_embedding import Hypergraph
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.data_util import *
 from hypergraph_embedding.evaluation_util import *
+from hypergraph_embedding.embedding import EmbedRandom
 from random import random, randint
 from scipy.spatial import distance
 
@@ -102,7 +103,7 @@ class TestRemoveRandomConnections(unittest.TestCase):
       self.checkValid(removed_hg)
 
 
-class TestCommunityPrediction(unittest.TestCase):
+class TestEdgeCentroidPrediction(unittest.TestCase):
 
   def test_typical(self):
     hypergraph = Hypergraph()
@@ -116,7 +117,7 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[2].values.extend([0.5, 0.5])
 
     # default is cosine
-    actual = CommunityPrediction(hypergraph, embedding, [(2, 0)])
+    actual = EdgeCentroidPrediction(hypergraph, embedding, [(2, 0)])
     self.assertEqual(set(actual), set([(2, 0)]))
 
   def test_euclidian(self):
@@ -132,7 +133,7 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[2].values.extend([1, -1])
     embedding.node[3].values.extend([0, 0])
 
-    actual = CommunityPrediction(
+    actual = EdgeCentroidPrediction(
         hypergraph,
         embedding,
         [(3,
@@ -154,7 +155,7 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[1].values.extend([1, 0])
     embedding.node[2].values.extend([0.5, 0.5])
 
-    actual = CommunityPrediction(hypergraph, embedding, [(2, 0), (2, 1)])
+    actual = EdgeCentroidPrediction(hypergraph, embedding, [(2, 0), (2, 1)])
     self.assertEqual(set(actual), set([(2, 0), (2, 1)]))
 
   def test_dropped_edge(self):
@@ -169,7 +170,7 @@ class TestCommunityPrediction(unittest.TestCase):
     embedding.node[1].values.extend([1, 0])
     embedding.node[2].values.extend([0.5, 0.5])
 
-    actual = CommunityPrediction(hypergraph, embedding, [(2, 0), (2, 1)])
+    actual = EdgeCentroidPrediction(hypergraph, embedding, [(2, 0), (2, 1)])
     self.assertEqual(set(actual), set([(2, 0)]))
 
   def test_only_missing_links(self):
@@ -187,7 +188,7 @@ class TestCommunityPrediction(unittest.TestCase):
 
     links = [(2, 0)]
 
-    actual = CommunityPrediction(hypergraph, embedding, links)
+    actual = EdgeCentroidPrediction(hypergraph, embedding, links)
     self.assertEqual(set(actual), set([(2, 0)]))
 
   def test_missing_edge_removed(self):
@@ -204,7 +205,7 @@ class TestCommunityPrediction(unittest.TestCase):
     # Test each case, none should fail
     links = [(2, 0), (0, 1), (1, 1)]
 
-    actual = CommunityPrediction(hypergraph, embedding, links)
+    actual = EdgeCentroidPrediction(hypergraph, embedding, links)
     self.assertEqual(set(actual), set())
 
 
@@ -316,3 +317,149 @@ class TestSampleMissingConnections(unittest.TestCase):
         # not present edge
         self.assertTrue(edge_idx not in _input.node[node_idx].edges)
         self.assertTrue(node_idx not in _input.edge[edge_idx].nodes)
+
+
+class TestGetPersonalizedClassifiers(unittest.TestCase):
+
+  def DummySetup(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 1)
+    AddNodeToEdge(hypergraph, 1, 1)
+    AddNodeToEdge(hypergraph, 0, 2)
+    AddNodeToEdge(hypergraph, 1, 3)
+    AddNodeToEdge(hypergraph, 3, 4)
+
+    embedding = HypergraphEmbedding()
+    embedding.node[0].values.extend([0, 0])
+    embedding.node[1].values.extend([1, 0])
+    embedding.node[3].values.extend([3, 0])
+    embedding.edge[1].values.extend([0, 1])
+    embedding.edge[2].values.extend([0, 2])
+    embedding.edge[3].values.extend([0, 3])
+    embedding.edge[4].values.extend([0, 4])
+
+    return hypergraph, embedding
+
+  def test_per_edge_typical(self):
+    "Ensures that the edge-wise option provides a dict with classifier"
+    "per edge"
+    hypergraph, embedding = self.DummySetup()
+    actual = GetPersonalizedClassifiers(
+        hypergraph,
+        embedding,
+        per_edge=True,
+        run_in_parallel=False)
+    self.assertEqual(len(actual), len(hypergraph.edge))
+    for edge_idx in hypergraph.edge:
+      self.assertTrue(edge_idx in actual)
+      self.assertTrue(hasattr(actual[edge_idx], "predict"))
+
+  def test_per_node_typical(self):
+    "Ensures that the edge-wise option provides a dict with classifier"
+    "per edge"
+    hypergraph, embedding = self.DummySetup()
+    actual = GetPersonalizedClassifiers(
+        hypergraph,
+        embedding,
+        per_edge=False,
+        run_in_parallel=False)
+    self.assertEqual(len(actual), len(hypergraph.node))
+    for node_idx in hypergraph.node:
+      self.assertTrue(node_idx in actual)
+      self.assertTrue(hasattr(actual[node_idx], "predict"))
+
+  def test_edge_all_nodes(self):
+    "In the case where there exist no negative training examples."
+    "We can't crash"
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 1)
+    AddNodeToEdge(hypergraph, 1, 1)
+
+    embedding = HypergraphEmbedding()
+    embedding.node[0].values.extend([0, 0])
+    embedding.node[1].values.extend([1, 0])
+    embedding.edge[1].values.extend([0, 1])
+
+    actual = GetPersonalizedClassifiers(
+        hypergraph,
+        embedding,
+        per_edge=True,
+        run_in_parallel=False)
+    self.assertEqual(len(actual), len(hypergraph.edge))
+    for edge_idx in hypergraph.edge:
+      self.assertTrue(edge_idx in actual)
+      self.assertTrue(hasattr(actual[edge_idx], "predict"))
+
+  def test_edge_no_nodes(self):
+    "In this case there is an edge without any nodes, and it doesn't "
+    "have an embedding."
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 1)
+    AddNodeToEdge(hypergraph, 1, 1)
+    hypergraph.edge[2].name = "I'm gonna break it!"
+
+    embedding = HypergraphEmbedding()
+    embedding.node[0].values.extend([0, 0])
+    embedding.node[1].values.extend([1, 0])
+    embedding.edge[1].values.extend([0, 1])
+
+    actual = GetPersonalizedClassifiers(
+        hypergraph,
+        embedding,
+        per_edge=True,
+        run_in_parallel=False)
+    self.assertEqual(len(actual), len(hypergraph.edge))
+    for edge_idx in hypergraph.edge:
+      self.assertTrue(edge_idx in actual)
+      self.assertTrue(hasattr(actual[edge_idx], "predict"))
+
+  def test_edge_one_node(self):
+    "In this case we only have one connection"
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 1)
+
+    embedding = HypergraphEmbedding()
+    embedding.node[0].values.extend([0, 0])
+    embedding.node[1].values.extend([1, 0])
+
+    actual = GetPersonalizedClassifiers(
+        hypergraph,
+        embedding,
+        per_edge=True,
+        run_in_parallel=False)
+    self.assertEqual(len(actual), len(hypergraph.edge))
+    for edge_idx in hypergraph.edge:
+      self.assertTrue(edge_idx in actual)
+      self.assertTrue(hasattr(actual[edge_idx], "predict"))
+
+  def test_actually_predicts(self):
+    hypergraph, embedding = self.DummySetup()
+    actual = GetPersonalizedClassifiers(
+        hypergraph,
+        embedding,
+        per_edge=True,
+        run_in_parallel=False)
+    # I don't care what it predicts, just don't mess up
+    self.assertTrue(actual[1].predict([[0, 1]]) >= 0)
+
+  def test_fuzz(self):
+    for i in range(10):
+      hypergraph = CreateRandomHyperGraph(100, 100, 0.25)
+      embedding = EmbedRandom(hypergraph, 2)
+      actual_edge = GetPersonalizedClassifiers(
+          hypergraph,
+          embedding,
+          per_edge=True)
+      self.assertEqual(len(actual_edge), len(hypergraph.edge))
+      for edge_idx in hypergraph.edge:
+        self.assertTrue(edge_idx in actual_edge)
+        self.assertTrue(hasattr(actual_edge[edge_idx], "predict"))
+
+      actual_node = GetPersonalizedClassifiers(
+          hypergraph,
+          embedding,
+          per_edge=False)
+      self.assertEqual(len(actual_node), len(hypergraph.node))
+      for node_idx in hypergraph.node:
+        self.assertTrue(node_idx in actual_node)
+        self.assertTrue(hasattr(actual_node[node_idx], "predict"))

@@ -48,7 +48,7 @@ echo "Testing link prediction experiment with leftover hg"
 	--log-level NONE \
 	--embedding-method RANDOM \
 	--embedding-dimension 2 \
-	--experiment-type LINK_PREDICTION \
+	--experiment-type LP_EDGE_CENTROID \
 	--experiment-result $tmp_metrics_path \
 	--experiment-lp-probability 0.2 \
 	$tmp_hypergraph_path
@@ -57,6 +57,25 @@ if [ $? -eq 0 ]; then
 	echo "Experiments on loaded hypergraph / embedding test success!"
 else
 	echo "Experiments on loaded hypergraph / embedding test failed"
+	exit 1
+fi
+
+rm -f $tmp_metrics_path
+echo "Testing link prediction experiment with personalized classifiers"
+
+./runner.py \
+	--log-level INFO \
+	--embedding-method RANDOM \
+	--embedding-dimension 2 \
+	--experiment-type LP_EDGE_CLASSIFIERS \
+	--experiment-result $tmp_metrics_path \
+	--experiment-lp-probability 0.2 \
+	$tmp_hypergraph_path
+
+if [ $? -eq 0 ]; then
+	echo "Experiments for personalized classifiers success!"
+else
+	echo "Experiments for personalized classifiers failed!"
 	exit 1
 fi
 

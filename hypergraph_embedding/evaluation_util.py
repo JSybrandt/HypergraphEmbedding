@@ -1,24 +1,49 @@
 # This file provides evaluation utilities for hypergraph experiments
 
-from random import random, choice
 from . import Hypergraph, EvaluationMetrics, ExperimentalResult
 from .hypergraph_util import *
-from scipy.spatial.distance import cosine
-import numpy as np
+from .embedding import Embed
 from collections import namedtuple
+from itertools import product
 import logging
+import numpy as np
 import multiprocessing
 from multiprocessing import Pool, Manager
-from itertools import product
-from .embedding import Embed
+from sklearn.utils import shuffle
+from scipy.spatial.distance import cosine
+from sklearn.svm import LinearSVC as LP_Model
+from tqdm import tqdm
+from random import random, choice, sample
 import warnings
 
 log = logging.getLogger()
 
 global EXPERIMENT_OPTIONS
 
+# Constant used to share information across processors.
+# Each map will call an _init* function that sets values in
+# this dict.
+_k_shared_data = {}
 
-def LinkPredictionExperiment(args, hypergraph):
+
+def LinkPredictionExperiment(args, hypergraph, predictor):
+  """
+  This function sets up a link-prediction experiment."
+  First we sample the given hypergraph, then we embed it using details from"
+  args. Finally we use predictor to evaluate samples and get metrics."
+  inputs:
+    - args: parsed arguments from main
+    - hypergraph: a hypergraph proto message to be evaluated
+    - predictor: a function
+      - inputs:
+        - hypergraph: Sampled hypergraph proto message
+        - embedding: embedding proto corresponding to sampled hypergraph
+        - links: list of pos+neg node-edge samples
+      - outputs:
+        - predicted_links: list of links filtered from input links
+                           only outputs node-edge links that are "true"
+  """
+
   log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
   assert args.experiment_lp_probability >= 0
   assert args.experiment_lp_probability <= 1
@@ -37,10 +62,7 @@ def LinkPredictionExperiment(args, hypergraph):
   embedding = Embed(args, new_graph)
 
   log.info("Predicting links on subset graph")
-  predicted_links = CommunityPrediction(
-      new_graph,
-      embedding,
-      bad_links + good_links)
+  predicted_links = predictor(new_graph, embedding, bad_links + good_links)
 
   log.info("Evaluting link prediction performance")
   metrics = CalculateCommunityPredictionMetrics(
@@ -130,146 +152,6 @@ def SampleMissingConnections(hypergraph, num_samples):
   return list(samples)
 
 
-_shared_info = {}
-
-
-def _init_to_numpy(_embedding):
-  _shared_info['embedding'] = _embedding
-
-
-def _to_numpy(node_idx):
-  return (
-      node_idx,
-      np.asarray(
-          _shared_info['embedding'].node[node_idx].values,
-          dtype=np.float32))
-
-
-def _init_get_edge_centroid_range(
-    _node2embedding,
-    _hypergraph,
-    _distance_function):
-  _shared_info['node2embedding'] = _node2embedding
-  _shared_info['hypergraph'] = _hypergraph
-  _shared_info['distance_function'] = _distance_function
-
-
-def _get_edge_centroid_range(edge_idx):
-  points = [
-      _shared_info['node2embedding'][i]
-      for i in _shared_info['hypergraph'].edge[edge_idx].nodes
-  ]
-  centroid = np.mean(points, axis=0)
-  with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    max_dist = max(
-        [_shared_info['distance_function'](centroid,
-                                           vec) for vec in points])
-  return (edge_idx, centroid, max_dist)
-
-
-def _init_get_missing_links(
-    _node2embedding,
-    _edge2centroid,
-    _edge2range,
-    _hypergraph,
-    _distance_function):
-  _shared_info['node2embedding'] = _node2embedding
-  _shared_info['edge2centroid'] = _edge2centroid
-  _shared_info['edge2range'] = _edge2range
-  _shared_info['hypergraph'] = _hypergraph
-  _shared_info['distance_function'] = _distance_function
-
-
-def _get_missing_links(indices):
-  "Checks if this node is in any of the edges"
-  node_idx, edge_idx = indices
-  if edge_idx in _shared_info['hypergraph'].node[node_idx].edges:
-    return None
-  if node_idx not in _shared_info['node2embedding']:
-    return None
-  if edge_idx not in _shared_info['edge2centroid']:
-    return None
-
-  vec = _shared_info['node2embedding'][node_idx]
-  centroid = _shared_info['edge2centroid'][edge_idx]
-
-  # cosine distance might cause errors if we have a 0 vector
-  with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    if _shared_info['distance_function'](
-        vec,
-        centroid) <= _shared_info['edge2range'][edge_idx]:
-      return (node_idx, edge_idx)
-
-  return None
-
-
-def CommunityPrediction(
-    hypergraph,
-    embedding,
-    links,
-    distance_function=cosine,
-    run_in_parallel=True):
-  """
-  Given a hypergraph (assumed to contain missing links) and a corresponding
-  embedding, idetify missing node-edge connections. Performs this task by
-  comparing cosine similarities of potential connections with existing ones.
-  Note, drops edges with < 2 nodes.
-  Note, all nodes must be embedded.
-  input:
-    - hypergraph: Hypergraph proto
-    - embedding: Hypergraph proto
-    - distance_function: mesure of distance between embeddings
-    - links: the set of node_idx, edge_idx pairs to evaluate
-  output:
-    - list of node-edge pairs from links predicted to be accurate
-  """
-
-  assert embedding.dim > 0
-
-  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
-
-  log.info("Converting all node embeddings to numpy")
-  with Pool(num_cores,
-            initializer=_init_to_numpy,
-            initargs=(embedding,
-                     )) as pool:
-    node2embedding = {x[0]: x[1] for x in pool.map(_to_numpy, embedding.node)}
-
-  log.info("Finding edges with at least two nodes")
-  edges = [idx for idx, edge in hypergraph.edge.items() if len(edge.nodes) >= 2]
-
-  log.info("Identifying each edge's centroid and range")
-
-  with Pool(num_cores,
-            initializer=_init_get_edge_centroid_range,
-            initargs=(node2embedding,
-                      hypergraph,
-                      distance_function)) as pool:
-    edge_centroid_range = pool.map(_get_edge_centroid_range, edges)
-
-  log.info("Indexing edges")
-  edge2centroid = {x[0]: x[1] for x in edge_centroid_range}
-  edge2range = {x[0]: x[2] for x in edge_centroid_range}
-
-  predicted_links = []
-
-  log.info("Calculating whether each point is in each edge's range")
-  with Pool(num_cores,
-            initializer=_init_get_missing_links,
-            initargs=(node2embedding,
-                      edge2centroid,
-                      edge2range,
-                      hypergraph,
-                      distance_function)) as pool:
-    for res in pool.imap(_get_missing_links, links, chunksize=250):
-      if res:
-        predicted_links.append(res)
-
-  return predicted_links
-
-
 def CalculateCommunityPredictionMetrics(
     predicted_connections,
     good_links,
@@ -321,4 +203,309 @@ def CalculateCommunityPredictionMetrics(
   return metrics
 
 
-EXPERIMENT_OPTIONS = {"LINK_PREDICTION": LinkPredictionExperiment}
+################################################################################
+# EdgeCentroidPrediction - Helper Functions                                    #
+################################################################################
+
+
+def _init_node_emb_to_numpy(_embedding):
+  _k_shared_data['embedding'] = _embedding
+
+
+def _node_emb_to_numpy(node_idx):
+  return (
+      node_idx,
+      np.asarray(
+          _k_shared_data['embedding'].node[node_idx].values,
+          dtype=np.float32))
+
+
+def _init_get_edge_centroid_range(
+    _node2embedding,
+    _hypergraph,
+    _distance_function):
+  _k_shared_data['node2embedding'] = _node2embedding
+  _k_shared_data['hypergraph'] = _hypergraph
+  _k_shared_data['distance_function'] = _distance_function
+
+
+def _get_edge_centroid_range(edge_idx):
+  points = [
+      _k_shared_data['node2embedding'][i]
+      for i in _k_shared_data['hypergraph'].edge[edge_idx].nodes
+  ]
+  centroid = np.mean(points, axis=0)
+  with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    max_dist = max(
+        [_k_shared_data['distance_function'](centroid,
+                                             vec) for vec in points])
+  return (edge_idx, centroid, max_dist)
+
+
+def _init_is_node_in_sphere(
+    _node2embedding,
+    _edge2centroid,
+    _edge2range,
+    _hypergraph,
+    _distance_function):
+  _k_shared_data['node2embedding'] = _node2embedding
+  _k_shared_data['edge2centroid'] = _edge2centroid
+  _k_shared_data['edge2range'] = _edge2range
+  _k_shared_data['hypergraph'] = _hypergraph
+  _k_shared_data['distance_function'] = _distance_function
+
+
+def _is_node_in_sphere(indices):
+  "Checks if this node is in any of the edges"
+  node_idx, edge_idx = indices
+  if edge_idx in _k_shared_data['hypergraph'].node[node_idx].edges:
+    return None
+  if node_idx not in _k_shared_data['node2embedding']:
+    return None
+  if edge_idx not in _k_shared_data['edge2centroid']:
+    return None
+
+  vec = _k_shared_data['node2embedding'][node_idx]
+  centroid = _k_shared_data['edge2centroid'][edge_idx]
+
+  # cosine distance might cause errors if we have a 0 vector
+  with warnings.catch_warnings():
+    warnings.simplefilter("ignore")
+    if _k_shared_data['distance_function'](
+        vec,
+        centroid) <= _k_shared_data['edge2range'][edge_idx]:
+      return (node_idx, edge_idx)
+
+  return None
+
+
+def EdgeCentroidPrediction(
+    hypergraph,
+    embedding,
+    links,
+    distance_function=cosine,
+    run_in_parallel=True):
+  """
+  Given a hypergraph (assumed to contain missing links) and a corresponding
+  embedding, idetify missing node-edge connections. Performs this task by
+  comparing cosine similarities of potential connections with existing ones.
+  Note, drops edges with < 2 nodes.
+  Note, all nodes must be embedded.
+  input:
+    - hypergraph: Hypergraph proto
+    - embedding: Hypergraph proto
+    - distance_function: mesure of distance between embeddings
+    - links: the set of node_idx, edge_idx pairs to evaluate
+  output:
+    - list of node-edge pairs from links predicted to be accurate
+  """
+
+  assert embedding.dim > 0
+
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+
+  log.info("Converting all node embeddings to numpy")
+  with Pool(num_cores,
+            initializer=_init_node_emb_to_numpy,
+            initargs=(embedding,
+                     )) as pool:
+    node2embedding = {
+        x[0]: x[1] for x in pool.map(_node_emb_to_numpy,
+                                     embedding.node)
+    }
+
+  log.info("Finding edges with at least two nodes")
+  edges = [idx for idx, edge in hypergraph.edge.items() if len(edge.nodes) >= 2]
+
+  log.info("Identifying each edge's centroid and range")
+
+  with Pool(num_cores,
+            initializer=_init_get_edge_centroid_range,
+            initargs=(node2embedding,
+                      hypergraph,
+                      distance_function)) as pool:
+    edge_centroid_range = pool.map(_get_edge_centroid_range, edges)
+
+  log.info("Indexing edges")
+  edge2centroid = {x[0]: x[1] for x in edge_centroid_range}
+  edge2range = {x[0]: x[2] for x in edge_centroid_range}
+
+  predicted_links = []
+
+  log.info("Calculating whether each point is in each edge's range")
+  with Pool(num_cores,
+            initializer=_init_is_node_in_sphere,
+            initargs=(node2embedding,
+                      edge2centroid,
+                      edge2range,
+                      hypergraph,
+                      distance_function)) as pool:
+    for res in pool.imap(_is_node_in_sphere, links, chunksize=250):
+      if res:
+        predicted_links.append(res)
+
+  return predicted_links
+
+
+################################################################################
+# EdgeClassifierPrediction - Helper functions                                  #
+################################################################################
+
+## These stub classes are used for edge cases where we don't want a typical   ##
+## Classifier                                                                 ##
+
+
+class LetEverythingIn():
+
+  def predict(*args, **kargs):
+    return 1
+
+
+class LetNothingIn():
+
+  def predict(*args, **kargs):
+    return 0
+
+
+def _init_evaluate_classifier(_node2embedding, _edge2classifier):
+  _k_shared_data['node2embedding'] = _node2embedding
+  _k_shared_data['edge2classifer'] = _edge2classifier
+
+
+def _evaluate_classifier(indices):
+  "Checks if this node is in any of the edges"
+  node_idx, edge_idx = indices
+  node_vec = _k_shared_data['node2embedding'][node_idx]
+  edge_model = _k_shared_data['edge2classifer'][edge_idx]
+
+  return indices, edge_model.predict([node_vec])[0]
+
+
+def _init_train_personalized_classifier(
+    _idx2neighbors,
+    _neighbor_idx2embedding):
+  _k_shared_data['idx2neighbors'] = _idx2neighbors
+  _k_shared_data['neighbor_idx2embedding'] = _neighbor_idx2embedding
+
+
+def _train_personalized_classifier(idx):
+
+  # Sample positive results
+  pos_indices = set(_k_shared_data["idx2neighbors"][idx])
+  if (len(pos_indices) == 0):
+    return (idx, LetNothingIn())
+
+  neg_indices = _k_shared_data["neighbor_idx2embedding"].keys() - pos_indices
+  if (len(neg_indices) == 0):
+    return (idx, LetEverythingIn())
+
+  # sample negative results to equal positive
+  neg_indices = sample(neg_indices, min(len(neg_indices), len(pos_indices)))
+
+  assert len(pos_indices) > 0
+  assert len(neg_indices) > 0
+
+  samples = []
+  labels = []
+  for neigh_idx in pos_indices:
+    samples.append(_k_shared_data["neighbor_idx2embedding"][neigh_idx].values)
+    labels.append(1)
+  for neigh_idx in neg_indices:
+    samples.append(_k_shared_data["neighbor_idx2embedding"][neigh_idx].values)
+    labels.append(0)
+  samples, labels = shuffle(samples, labels)
+  return (idx, LP_Model().fit(samples, labels))
+
+
+def GetPersonalizedClassifiers(
+    hypergraph,
+    embedding,
+    per_edge=True,
+    run_in_parallel=True):
+  """
+  Returns a dict from idx-classifier.
+  If per_edge=True then there will be |edges| classifiers each mapping
+  node embedding to boolean. If per_edge=False, then there will be
+  |nodes| classifiers mapping edge embedding to boolean.
+  Outputs a dict from idx to classifier.
+  """
+
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+
+  if per_edge:
+    idx2neighbors = {idx: edge.nodes for idx, edge in hypergraph.edge.items()}
+  else:
+    idx2neighbors = {idx: node.edges for idx, node in hypergraph.node.items()}
+  neighbor_idx2embedding = embedding.node if per_edge else embedding.edge
+
+  result = {}
+  log.info("Training classifier per %s", "edge" if per_edge else "node")
+  with Pool(num_cores,
+            initializer=_init_train_personalized_classifier,
+            initargs=(idx2neighbors,
+                      neighbor_idx2embedding)) as pool:
+    with tqdm(total=len(idx2neighbors)) as pbar:
+      for idx, classifier in pool.imap(_train_personalized_classifier, idx2neighbors):
+        result[idx] = classifier
+        pbar.update(1)
+  return result
+
+
+def EdgeClassifierPrediction(
+    hypergraph,
+    embedding,
+    links,
+    run_in_parallel=True):
+  """
+  Given a hypergraph (assumed to contain missing links) and a corresponding
+  embedding, idetify missing node-edge connections. Performs this task by
+  comparing cosine similarities of potential connections with existing ones.
+  Note, drops edges with < 2 nodes.
+  Note, all nodes must be embedded.
+  input:
+    - hypergraph: Hypergraph proto
+    - embedding: embedding proto
+    - links: the set of node_idx, edge_idx pairs to evaluate
+  output:
+    - list of node-edge pairs from links predicted to be accurate
+  """
+
+  assert embedding.dim > 0
+
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+
+  log.info("Removing potential links that do not have embeddings")
+  links = [
+      link for link in links
+      if link[0] in embedding.node and link[1] in embedding.edge
+  ]
+
+  log.info("Training a classifier per edge")
+  edge2classifier = GetPersonalizedClassifiers(
+      hypergraph,
+      embedding,
+      run_in_parallel=run_in_parallel)
+  log.info("Mapping nodes to embeddings")
+  node2embedding = {idx: emb.values for idx, emb in embedding.node.items()}
+
+  predicted_links = []
+
+  log.info("Running each node-edge classification")
+  with Pool(num_cores,
+            initializer=_init_evaluate_classifier,
+            initargs=(node2embedding,
+                      edge2classifier)) as pool:
+    for indices, res in pool.imap(_evaluate_classifier, links, chunksize=250):
+      if res is not None and res > 0:
+        predicted_links.append(indices)
+
+  return predicted_links
+
+
+EXPERIMENT_OPTIONS = {
+    "LP_EDGE_CENTROID": lambda args, hypergraph: LinkPredictionExperiment(
+    args, hypergraph, EdgeCentroidPrediction),
+    "LP_EDGE_CLASSIFIERS": lambda args, hypergraph: LinkPredictionExperiment(
+    args, hypergraph, EdgeClassifierPrediction)
+}

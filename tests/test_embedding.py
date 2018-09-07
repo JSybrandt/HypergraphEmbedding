@@ -179,13 +179,21 @@ class EmbedHypergraphTest(EmbeddingTestCase):
   def test_typical(self):
     dim = 2
     _input = TestHypergraph()
-    actual = EmbedHypergraph(_input, dim)
+    actual = EmbedHypergraph(
+        _input,
+        dim,
+        num_neighbors=2,
+        pos_samples=2,
+        neg_samples=1,
+        batch_size=1,
+        epochs=1)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "Hypergraph")
 
   def test_fuzz(self):
     "Random embedding should never break"
-    self.help_test_fuzz(EmbedHypergraph, num_fuzz=10)
+    embed = lambda x, y: EmbedHypergraph(x, y, num_neighbors=2, pos_samples=2, neg_samples=1, batch_size=1, epochs=1)
+    self.help_test_fuzz(embed, num_fuzz=10)
 
   def test_helper_get_node_neighbors(self):
     _input = TestHypergraph()
