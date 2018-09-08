@@ -106,8 +106,9 @@ def PrintResult(result):
 
 
 def ExperimentKey(result):
-  return "{graph} {method}:{dim}".format(
+  return "{graph} {experiment} {method}:{dim}".format(
       graph=result.hypergraph.name,
+      experiment=result.experiment_name,
       method=result.embedding.method_name,
       dim=result.embedding.dim)
 

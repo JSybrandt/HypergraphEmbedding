@@ -77,6 +77,7 @@ def LinkPredictionExperiment(args, hypergraph, predictor):
   res.metrics.ParseFromString(metrics.SerializeToString())
   res.hypergraph.ParseFromString(new_graph.SerializeToString())
   res.embedding.ParseFromString(embedding.SerializeToString())
+  res.experiment_name = args.experiment_type
   return res
 
 
