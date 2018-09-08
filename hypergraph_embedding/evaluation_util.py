@@ -369,16 +369,16 @@ class LetNothingIn():
     return 0
 
 
-def _init_evaluate_classifier(_node2embedding, _edge2classifier):
-  _k_shared_data['node2embedding'] = _node2embedding
-  _k_shared_data['edge2classifer'] = _edge2classifier
+def _init_evaluate_classifier(_idx2embedding, _idx2classifier):
+  _k_shared_data['idx2embedding'] = _idx2embedding
+  _k_shared_data['idx2classifer'] = _idx2classifier
 
 
 def _evaluate_classifier(indices):
   "Checks if this node is in any of the edges"
-  node_idx, edge_idx = indices
-  node_vec = _k_shared_data['node2embedding'][node_idx]
-  edge_model = _k_shared_data['edge2classifer'][edge_idx]
+  emb_idx, classifier_idx = indices
+  node_vec = _k_shared_data['idx2embedding'][emb_idx]
+  edge_model = _k_shared_data['idx2classifer'][classifier_idx]
 
   return indices, edge_model.predict([node_vec])[0]
 
@@ -459,21 +459,22 @@ def GetPersonalizedClassifiers(
   return result
 
 
-def EdgeClassifierPrediction(
+def ClassifierPrediction(
     hypergraph,
     embedding,
     links,
+    per_edge=True,
     run_in_parallel=True):
   """
   Given a hypergraph (assumed to contain missing links) and a corresponding
   embedding, idetify missing node-edge connections. Performs this task by
-  comparing cosine similarities of potential connections with existing ones.
-  Note, drops edges with < 2 nodes.
-  Note, all nodes must be embedded.
+  training a classifier per_node / per_edge and running predictions through
+  each "personalized classifier"
   input:
     - hypergraph: Hypergraph proto
     - embedding: embedding proto
     - links: the set of node_idx, edge_idx pairs to evaluate
+    - per_edge: whether to train a classifer for each edge or node
   output:
     - list of node-edge pairs from links predicted to be accurate
   """
@@ -483,40 +484,68 @@ def EdgeClassifierPrediction(
   num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
 
   log.info("Removing potential links that do not have embeddings")
-  links = [
-      link for link in links
-      if link[0] in embedding.node and link[1] in embedding.edge
-  ]
+  entity_idx_classifier_idx = [(n,
+                                e) if per_edge else (e,
+                                                     n)
+                               for n,
+                               e in links
+                               if n in embedding.node and e in embedding.edge]
 
   # Get only the needed ones
-  nessesary_edges = set(l[1] for l in links)
+  nessesary_classifiers = set(c for _, c in entity_idx_classifier_idx)
 
   log.info("Training a classifier per edge")
-  edge2classifier = GetPersonalizedClassifiers(
+  idx2classifier = GetPersonalizedClassifiers(
       hypergraph,
       embedding,
-      idx_subset=nessesary_edges,
+      per_edge=per_edge,
+      idx_subset=nessesary_classifiers,
       run_in_parallel=run_in_parallel)
-  log.info("Mapping nodes to embeddings")
-  node2embedding = {idx: emb.values for idx, emb in embedding.node.items()}
+  log.info("Mapping %s to embeddings", "nodes" if per_edge else "edges")
+  if per_edge:
+    idx2embedding = {idx: emb.values for idx, emb in embedding.node.items()}
+  else:
+    idx2embedding = {idx: emb.values for idx, emb in embedding.edge.items()}
 
   predicted_links = []
 
   log.info("Running each node-edge classification")
   with Pool(num_cores,
             initializer=_init_evaluate_classifier,
-            initargs=(node2embedding,
-                      edge2classifier)) as pool:
-    for indices, res in pool.imap(_evaluate_classifier, links, chunksize=250):
+            initargs=(idx2embedding,
+                      idx2classifier)) as pool:
+    for (entity_idx, classifier_idx), res in pool.imap(_evaluate_classifier, entity_idx_classifier_idx, chunksize=250):
       if res is not None and res > 0:
-        predicted_links.append(indices)
+        if per_edge:
+          node_idx, edge_idx = (entity_idx, classifier_idx)
+        else:
+          edge_idx, node_idx = (entity_idx, classifier_idx)
+        predicted_links.append((node_idx, edge_idx))
 
   return predicted_links
 
 
+################################################################################
+# Details for runner - Includes wrappers for experiment types                  #
+################################################################################
+
+
+def _EdgeCentroidExperiment(args, hypergraph):
+  return LinkPredictionExperiment(args, hypergraph, EdgeCentroidPrediction)
+
+
+def _EdgeClassifierExperiment(args, hypergraph):
+  predictor = lambda h, e, p: ClassifierPrediction(h, e, p, per_edge=True)
+  return LinkPredictionExperiment(args, hypergraph, predictor)
+
+
+def _NodeClassifierExperiment(args, hypergraph):
+  predictor = lambda h, e, p: ClassifierPrediction(h, e, p, per_edge=False)
+  return LinkPredictionExperiment(args, hypergraph, predictor)
+
+
 EXPERIMENT_OPTIONS = {
-    "LP_EDGE_CENTROID": lambda args, hypergraph: LinkPredictionExperiment(
-    args, hypergraph, EdgeCentroidPrediction),
-    "LP_EDGE_CLASSIFIERS": lambda args, hypergraph: LinkPredictionExperiment(
-    args, hypergraph, EdgeClassifierPrediction)
+    "LP_EDGE_CENTROID": _EdgeCentroidExperiment,
+    "LP_EDGE_CLASSIFIERS": _EdgeClassifierExperiment,
+    "LP_NODE_CLASSIFIERS": _NodeClassifierExperiment
 }

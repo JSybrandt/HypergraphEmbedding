@@ -466,18 +466,35 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
         self.assertTrue(hasattr(actual_node[node_idx], "predict"))
 
 
-class TestEdgeClassifierPrediction(unittest.TestCase):
+class TestClassifierPrediction(unittest.TestCase):
 
-  def test_fuzz(self):
+  def test_edge_fuzz(self):
     for i in range(10):
       hypergraph = CreateRandomHyperGraph(10, 10, 0.25)
       embedding = EmbedRandom(hypergraph, 2)
       all_pairs = list(product(hypergraph.node, hypergraph.edge))
       potential_links = sample(all_pairs, randint(0, len(all_pairs) - 1))
-      predicted_links = EdgeCentroidPrediction(
+      predicted_links = ClassifierPrediction(
           hypergraph,
           embedding,
-          potential_links)
+          potential_links,
+          per_edge=True)
+      # All predicted links must have existed in input
+      self.assertEqual(
+          len(set(predicted_links).intersection(set(potential_links))),
+          len(predicted_links))
+
+  def test_node_fuzz(self):
+    for i in range(10):
+      hypergraph = CreateRandomHyperGraph(10, 10, 0.25)
+      embedding = EmbedRandom(hypergraph, 2)
+      all_pairs = list(product(hypergraph.node, hypergraph.edge))
+      potential_links = sample(all_pairs, randint(0, len(all_pairs) - 1))
+      predicted_links = ClassifierPrediction(
+          hypergraph,
+          embedding,
+          potential_links,
+          per_edge=False)
       # All predicted links must have existed in input
       self.assertEqual(
           len(set(predicted_links).intersection(set(potential_links))),

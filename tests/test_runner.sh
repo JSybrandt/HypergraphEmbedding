@@ -61,10 +61,10 @@ else
 fi
 
 rm -f $tmp_metrics_path
-echo "Testing link prediction experiment with personalized classifiers"
+echo "Testing link prediction experiment with personalized edge classifiers"
 
 ./runner.py \
-	--log-level INFO \
+	--log-level NONE \
 	--embedding-method RANDOM \
 	--embedding-dimension 2 \
 	--experiment-type LP_EDGE_CLASSIFIERS \
@@ -73,9 +73,28 @@ echo "Testing link prediction experiment with personalized classifiers"
 	$tmp_hypergraph_path
 
 if [ $? -eq 0 ]; then
-	echo "Experiments for personalized classifiers success!"
+	echo "Experiments for personalized edge classifiers success!"
 else
-	echo "Experiments for personalized classifiers failed!"
+	echo "Experiments for personalized edge classifiers failed!"
+	exit 1
+fi
+
+rm -f $tmp_metrics_path
+echo "Testing link prediction experiment with personalized node classifiers"
+
+./runner.py \
+	--log-level NONE \
+	--embedding-method RANDOM \
+	--embedding-dimension 2 \
+	--experiment-type LP_NODE_CLASSIFIERS \
+	--experiment-result $tmp_metrics_path \
+	--experiment-lp-probability 0.2 \
+	$tmp_hypergraph_path
+
+if [ $? -eq 0 ]; then
+	echo "Experiments for personalized node classifiers success!"
+else
+	echo "Experiments for personalized node classifiers failed!"
 	exit 1
 fi
 
