@@ -49,4 +49,5 @@ message ExperimentalResult {
 	optional EvaluationMetrics metrics = 2;
 	// An embedding of this subgraph
 	optional HypergraphEmbedding embedding = 3;
+  optional string experiment_name = 4;
 }

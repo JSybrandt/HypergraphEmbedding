@@ -1,10 +1,11 @@
 import unittest
+from itertools import product
 from hypergraph_embedding import Hypergraph
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.data_util import *
 from hypergraph_embedding.evaluation_util import *
 from hypergraph_embedding.embedding import EmbedRandom
-from random import random, randint
+from random import random, randint, sample
 from scipy.spatial import distance
 
 
@@ -319,7 +320,7 @@ class TestSampleMissingConnections(unittest.TestCase):
         self.assertTrue(node_idx not in _input.edge[edge_idx].nodes)
 
 
-class TestGetPersonalizedClassifiers(unittest.TestCase):
+class TestPersonalizedEdgeClassifiers(unittest.TestCase):
 
   def DummySetup(self):
     hypergraph = Hypergraph()
@@ -463,3 +464,38 @@ class TestGetPersonalizedClassifiers(unittest.TestCase):
       for node_idx in hypergraph.node:
         self.assertTrue(node_idx in actual_node)
         self.assertTrue(hasattr(actual_node[node_idx], "predict"))
+
+
+class TestClassifierPrediction(unittest.TestCase):
+
+  def test_edge_fuzz(self):
+    for i in range(10):
+      hypergraph = CreateRandomHyperGraph(10, 10, 0.25)
+      embedding = EmbedRandom(hypergraph, 2)
+      all_pairs = list(product(hypergraph.node, hypergraph.edge))
+      potential_links = sample(all_pairs, randint(0, len(all_pairs) - 1))
+      predicted_links = ClassifierPrediction(
+          hypergraph,
+          embedding,
+          potential_links,
+          per_edge=True)
+      # All predicted links must have existed in input
+      self.assertEqual(
+          len(set(predicted_links).intersection(set(potential_links))),
+          len(predicted_links))
+
+  def test_node_fuzz(self):
+    for i in range(10):
+      hypergraph = CreateRandomHyperGraph(10, 10, 0.25)
+      embedding = EmbedRandom(hypergraph, 2)
+      all_pairs = list(product(hypergraph.node, hypergraph.edge))
+      potential_links = sample(all_pairs, randint(0, len(all_pairs) - 1))
+      predicted_links = ClassifierPrediction(
+          hypergraph,
+          embedding,
+          potential_links,
+          per_edge=False)
+      # All predicted links must have existed in input
+      self.assertEqual(
+          len(set(predicted_links).intersection(set(potential_links))),
+          len(predicted_links))
