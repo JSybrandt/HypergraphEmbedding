@@ -69,6 +69,7 @@ def GetNodeNeighbors(hypergraph, run_in_parallel=True):
         col += c
         pbar.update(1)
   val = [1] * len(row)
+  log.info("Converting to sparse matrix")
   return csr_matrix((val, (row, col)), dtype=np.bool)
 
 
@@ -90,6 +91,7 @@ def GetEdgeNeighbors(hypergraph, run_in_parallel=True):
         col += c
         pbar.update(1)
   val = [1] * len(row)
+  log.info("Converting to sparse matrix")
   return csr_matrix((val, (row, col)), dtype=np.bool)
 
 
