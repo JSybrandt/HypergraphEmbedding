@@ -14,8 +14,7 @@ pip:
 test: unittest apptest
 
 unittest:
-	$(PYTHON) -m unittest discover -v
-
+	$(PYTHON) -W ignore::DeprecationWarning -m unittest discover -v
 apptest:
 	./tests/test_runner.sh
 
