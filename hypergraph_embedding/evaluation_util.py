@@ -12,10 +12,13 @@ from multiprocessing import Pool, Manager
 from sklearn.utils import shuffle
 from scipy.spatial.distance import cosine
 from sklearn.svm import LinearSVC
-from sklearn.neural_network import MLPClassifier
 from tqdm import tqdm
 from random import random, choice, sample
 import warnings
+
+import keras
+from keras.models import Model
+from keras.layers import Input, Dense
 
 log = logging.getLogger()
 
@@ -579,12 +582,18 @@ def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding):
     examples.append(_GetVectorFromIdx(node_idx, edge_idx, embedding))
     labels.append(0)
 
+  examples = np.array(examples)
+  labels = np.array(labels)
+
   log.info("Training node-edge embedding classifier")
-  examples, labels = shuffle(examples, labels)
-  # I've selected a MLP classifier with 1 hidden layer equal to the embedding length
-  # This means, for the classifier to succeed it must discover a linear mapping
-  # from each embedding space into a shared space of equal size.
-  return MLPClassifier((embedding.dim,)).fit(examples, labels)
+
+  input_emb = Input((2*embedding.dim,), dtype=np.float32)
+  hidden = Dense(embedding.dim, activation="relu")(input_emb)
+  out = Dense(1, activation="sigmoid")(hidden)
+  model = Model(inputs=[input_emb], outputs=[out])
+  model.compile(optimizer="adagrad", loss="mean_squared_error")
+  model.fit(examples, labels, batch_size=100, epochs=5)
+  return model
 
 
 def NodeEdgeEmbeddingPrediction(
@@ -621,11 +630,11 @@ def NodeEdgeEmbeddingPrediction(
   input_data = []
   for node_idx, edge_idx in tqdm(potential_links):
     input_data.append(_GetVectorFromIdx(node_idx, edge_idx, embedding))
-
+  input_data = np.array(input_data)
   log.info("Evaluating predictions")
   predicted_links = []
   for link, prediction in zip(potential_links, classifier.predict(input_data)):
-    if prediction == 1:
+    if prediction > 0.5:
       predicted_links.append(link)
   return predicted_links
 

@@ -197,8 +197,8 @@ def EmbedNode2VecClique(
 def EmbedHypergraph(
     hypergraph,
     dimension,
-    num_neighbors=10,
-    pos_samples=200,
+    num_neighbors=5,
+    pos_samples=100,
     neg_samples=0,
     batch_size=256,
     epochs=5):
