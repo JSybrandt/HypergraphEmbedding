@@ -26,23 +26,20 @@ global EXPERIMENT_OPTIONS
 # this dict.
 _k_shared_data = {}
 
+LinkPredictionData = namedtuple(
+    "LinkPredictionData",
+    ("hypergraph",
+     "embedding",
+     "good_links",
+     "bad_links"))
 
-def LinkPredictionExperiment(args, hypergraph, predictor):
+
+def PrepLinkPredictionExperiment(hypergraph, args):
   """
-  This function sets up a link-prediction experiment."
-  First we sample the given hypergraph, then we embed it using details from"
-  args. Finally we use predictor to evaluate samples and get metrics."
-  inputs:
-    - args: parsed arguments from main
-    - hypergraph: a hypergraph proto message to be evaluated
-    - predictor: a function
-      - inputs:
-        - hypergraph: Sampled hypergraph proto message
-        - embedding: embedding proto corresponding to sampled hypergraph
-        - links: list of pos+neg node-edge samples
-      - outputs:
-        - predicted_links: list of links filtered from input links
-                           only outputs node-edge links that are "true"
+  Given data from command line arguments, create a subgraph by removing
+  random node-edge connections, embed that hypergraph, and return a list
+  of node-edge connections consisting of the removed and negative sampled
+  connections. Output is stored in a LinkPredictionData namedtuple
   """
 
   log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
@@ -62,23 +59,39 @@ def LinkPredictionExperiment(args, hypergraph, predictor):
   log.info("Embedding new hypergraph")
   embedding = Embed(args, new_graph)
 
+  return LinkPredictionData(
+      hypergraph=new_graph,
+      embedding=embedding,
+      good_links=good_links,
+      bad_links=bad_links)
+
+
+def RunLinkPredictionExperiment(link_prediction_data, experiment_name):
+  assert experiment_name in EXPERIMENT_OPTIONS
+
+  (hypergraph, embedding, good_links, bad_links) = link_prediction_data
+
   log.info("Predicting links on subset graph")
-  predicted_links = predictor(new_graph, embedding, bad_links + good_links)
+  predictor = EXPERIMENT_OPTIONS[experiment_name]
+  predicted_links = predictor(hypergraph, embedding, bad_links + good_links)
 
   log.info("Evaluting link prediction performance")
   metrics = CalculateCommunityPredictionMetrics(
       predicted_links,
       good_links,
       bad_links)
+  metrics.experiment_name = experiment_name
 
   log.info("Result:\n%s", metrics)
+  return metrics
 
+
+def LinkPredictionDataToResultProto(lp_data):
   log.info("Storing data into Experimental Result proto")
+  (hypergraph, embedding, _, _) = lp_data
   res = ExperimentalResult()
-  res.metrics.ParseFromString(metrics.SerializeToString())
-  res.hypergraph.ParseFromString(new_graph.SerializeToString())
+  res.hypergraph.ParseFromString(hypergraph.SerializeToString())
   res.embedding.ParseFromString(embedding.SerializeToString())
-  res.experiment_name = args.experiment_type
   return res
 
 
@@ -495,7 +508,6 @@ def PersonalizedClassifierPrediction(
   # Get only the needed ones
   nessesary_classifiers = set(c for _, c in entity_idx_classifier_idx)
 
-  log.info("Training a classifier per edge")
   idx2classifier = GetPersonalizedClassifiers(
       hypergraph,
       embedding,
@@ -510,7 +522,7 @@ def PersonalizedClassifierPrediction(
 
   predicted_links = []
 
-  log.info("Running each node-edge classification")
+  log.info("Running each classifier")
   with Pool(num_cores,
             initializer=_init_evaluate_classifier,
             initargs=(idx2embedding,
@@ -623,28 +635,37 @@ def NodeEdgeEmbeddingPrediction(
 ################################################################################
 
 
-def _EdgeCentroidExperiment(args, hypergraph):
-  return LinkPredictionExperiment(args, hypergraph, EdgeCentroidPrediction)
+def PersonalizedEdgeClassifierPrediction(
+    hypergraph,
+    embedding,
+    links,
+    run_in_parallel=True):
+  return PersonalizedClassifierPrediction(
+      hypergraph,
+      embedding,
+      links,
+      per_edge=True,
+      run_in_parallel=run_in_parallel)
 
 
-def _EdgeClassifiersExperiment(args, hypergraph):
-  predictor = lambda h, e, p: PersonalizedClassifierPrediction(h, e, p, per_edge=True)
-  return LinkPredictionExperiment(args, hypergraph, predictor)
+def PersonalizedNodeClassifierPrediction(
+    hypergraph,
+    embedding,
+    links,
+    run_in_parallel=True):
+  return PersonalizedClassifierPrediction(
+      hypergraph,
+      embedding,
+      links,
+      per_edge=False,
+      run_in_parallel=run_in_parallel)
 
 
-def _NodeClassifiersExperiment(args, hypergraph):
-  predictor = lambda h, e, p: PersonalizedClassifierPrediction(h, e, p, per_edge=False)
-  return LinkPredictionExperiment(args, hypergraph, predictor)
-
-
-def _NodeEdgeEmbeddingExperiment(args, hypergraph):
-  predictor = lambda h, e, p: NodeEdgeEmbeddingPrediction(h, e, p)
-  return LinkPredictionExperiment(args, hypergraph, predictor)
-
+# Each is a function taking (hypergraph, embedding, links)
 
 EXPERIMENT_OPTIONS = {
-    "LP_EDGE_CENTROID": _EdgeCentroidExperiment,
-    "LP_EDGE_CLASSIFIERS": _EdgeClassifiersExperiment,
-    "LP_NODE_CLASSIFIERS": _NodeClassifiersExperiment,
-    "LP_NODE_EDGE_CLASSIFIER": _NodeEdgeEmbeddingExperiment
+    "LP_EDGE_CENTROID": EdgeCentroidPrediction,
+    "LP_EDGE_CLASSIFIERS": PersonalizedEdgeClassifierPrediction,
+    "LP_NODE_CLASSIFIERS": PersonalizedNodeClassifierPrediction,
+    "LP_NODE_EDGE_CLASSIFIER": NodeEdgeEmbeddingPrediction
 }

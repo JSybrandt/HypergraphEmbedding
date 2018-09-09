@@ -82,7 +82,7 @@ def ConfigureLogger(args):
   log.addHandler(handler)
 
 
-def PrintResult(result):
+def PrintResult(result, metric):
   result_text = dedent(
       """\
   --------------------
@@ -102,18 +102,18 @@ def PrintResult(result):
           edges=len(result.hypergraph.edge),
           method=result.embedding.method_name,
           dim=result.embedding.dim,
-          metrics=result.metrics))
+          metrics=metric))
 
 
-def ExperimentKey(result):
+def ExperimentKey(result, metric):
   return "{graph} {experiment} {method}:{dim}".format(
       graph=result.hypergraph.name,
-      experiment=result.experiment_name,
+      experiment=metric.experiment_name,
       method=result.embedding.method_name,
       dim=result.embedding.dim)
 
 
-def PrintCumulativeResult(key, results):
+def PrintCumulativeResult(key, metrics):
   "Results is an iterable container of EvaluationMetric messages, all related"
   "to the same experiment"
 
@@ -141,11 +141,11 @@ def PrintCumulativeResult(key, results):
   print(
       result_text.format(
           key=key,
-          trials=len(results),
-          acc_line=TableDataToLine(TableData([r.accuracy for r in results])),
-          pre_line=TableDataToLine(TableData([r.precision for r in results])),
-          rec_line=TableDataToLine(TableData([r.recall for r in results])),
-          f1_line=TableDataToLine(TableData([r.f1 for r in results]))))
+          trials=len(metrics),
+          acc_line=TableDataToLine(TableData([r.accuracy for r in metrics])),
+          pre_line=TableDataToLine(TableData([r.precision for r in metrics])),
+          rec_line=TableDataToLine(TableData([r.recall for r in metrics])),
+          f1_line=TableDataToLine(TableData([r.f1 for r in metrics]))))
 
 
 def PrintPicture(result, path, num_samples):
@@ -217,15 +217,18 @@ if __name__ == "__main__":
             "[ERROR]:{} is not an Experimental Result".format(path),
             file=sys.stderr)
         exit(1)
-      if args.individual:
-        PrintResult(result)
-      if args.cumulative:
-        key = ExperimentKey(result)
-        if key not in experiment2metrics:
-          experiment2metrics[key] = []
-        experiment2metrics[key].append(result.metrics)
+      for metric in result.metrics:
+        if args.individual:
+          PrintResult(result, metric)
+        if args.cumulative:
+          key = ExperimentKey(result, metric)
+          if key not in experiment2metrics:
+            experiment2metrics[key] = []
+          experiment2metrics[key].append(result.metrics)
+
       if args.picture:
         PrintPicture(result, picture_path, args.picture_samples)
+
   if args.cumulative:
-    for key, results in experiment2metrics.items():
-      PrintCumulativeResult(key, results)
+    for key, metrics in experiment2metrics.items():
+      PrintCumulativeResult(key, metrics)

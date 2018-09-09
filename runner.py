@@ -68,24 +68,25 @@ def ParseArgs():
 
   # experiment options
   parser.add_argument(
-      "--experiment-type",
+      "--experiment",
       type=str,
       help=(
           "If set, perform an evaluation experiment on the hypergraph. "
           "--experiment-result must also be set. "
-          "Options: " + " ".join([o for o in EXPERIMENT_OPTIONS])))
+          "Options: " + " ".join([o for o in EXPERIMENT_OPTIONS])),
+      nargs="*")
   parser.add_argument(
       "--experiment-result",
       type=str,
       help=(
-          "Path to store experiment data proto. If set --experiment-type "
+          "Path to store experiment data proto. If set --experiment"
           "must also be set."))
   parser.add_argument(
       "--experiment-lp-probability",
       type=float,
       help=(
-          "If --experiment-type=LINK_PREDICTION then this flag specifies "
-          "the probabilty of removing a node from an edge."),
+          "Used to determine the proportion of removed node-edge connections ",
+          "for LP_* experiments"),
       default=0.1)
 
   # Required hypergraph argument
@@ -155,17 +156,18 @@ if __name__ == "__main__":
     assert embedding_path.parent.is_dir()
 
   log.info("Checking that experimental flags are appropriate")
-  log.info("Checking that if experiment-type is set, experiment-result is too")
-  assert bool(args.experiment_type) == bool(args.experiment_result)
-  if args.experiment_type:
+  log.info("Checking that if experiment is set, experiment-result is too")
+  assert bool(args.experiment) == bool(args.experiment_result)
+  if args.experiment is not None:
     log.info("Checking that embedding is also specified")
     assert args.embedding_method
     log.info("Checking for --experiment-result")
     experiment_result_path = Path(args.experiment_result)
     assert not experiment_result_path.exists()
     assert experiment_result_path.parent.is_dir()
-    log.info("Checking that experiment-type is valid")
-    assert args.experiment_type in EXPERIMENT_OPTIONS
+    log.info("Checking that experiment is valid")
+    for experiment in args.experiment:
+      assert experiment in EXPERIMENT_OPTIONS
 
   log.info("Finished checking, lgtm")
 
@@ -194,10 +196,15 @@ if __name__ == "__main__":
     with embedding_path.open('wb') as proto:
       proto.write(embedding.SerializeToString())
 
-  if args.experiment_type:
-    log.info("Performing %s experiment", args.experiment_type)
-    res = EXPERIMENT_OPTIONS[args.experiment_type](args, hypergraph)
+  if args.experiment:
+    lp_data = PrepLinkPredictionExperiment(hypergraph, args)
+    result = LinkPredictionDataToResultProto(lp_data)
+    for experiment in args.experiment:
+      log.info("Performing %s experiment", experiment)
+      metric = RunLinkPredictionExperiment(lp_data, experiment)
+      new_metric = result.metrics.add()
+      new_metric.ParseFromString(metric.SerializeToString())
     with experiment_result_path.open('wb') as proto:
-      proto.write(res.SerializeToString())
+      proto.write(result.SerializeToString())
 
   log.info("Done!")

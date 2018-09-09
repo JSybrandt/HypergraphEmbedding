@@ -7,13 +7,18 @@ tmp_hypergraph_path=$(mktemp -u)
 tmp_metrics_path=$(mktemp -u)
 
 ./runner.py \
+	$tmp_hypergraph_path \
 	--log-level NONE \
 	--raw-data test_data/snap_youtube_tiny.cmty.txt \
 	--raw-data-format SNAP \
 	--embedding $tmp_embedding_path \
-	--embedding-method SVD \
+	--embedding-method RANDOM \
 	--embedding-dimension 2 \
-	$tmp_hypergraph_path
+  --experiment \
+    LP_NODE_EDGE_CLASSIFIER \
+    LP_NODE_CLASSIFIERS \
+    LP_EDGE_CLASSIFIERS \
+  --experiment-result=$tmp_metrics_path
 
 if [ $? -eq 0 ]; then
 	echo "End-to-end success!"
@@ -22,7 +27,18 @@ else
 	exit 1
 fi
 
+echo "Testing results viewer"
+./results_viewer.py -i $tmp_metrics_path
+if [ $? -eq 0 ]; then
+	echo "Results viewer success!"
+else
+  echo "Results viewer failed :("
+	exit 1
+fi
+
+
 rm -f $tmp_embedding_path
+rm -f $tmp_metrics_path
 
 echo "Testing runner premade hypergraph saves embedding"
 
@@ -48,7 +64,7 @@ echo "Testing link prediction experiment with leftover hg"
 	--log-level NONE \
 	--embedding-method RANDOM \
 	--embedding-dimension 2 \
-	--experiment-type LP_EDGE_CENTROID \
+	--experiment LP_EDGE_CENTROID \
 	--experiment-result $tmp_metrics_path \
 	--experiment-lp-probability 0.2 \
 	$tmp_hypergraph_path
@@ -67,7 +83,7 @@ echo "Testing link prediction experiment with personalized edge classifiers"
 	--log-level NONE \
 	--embedding-method RANDOM \
 	--embedding-dimension 2 \
-	--experiment-type LP_EDGE_CLASSIFIERS \
+	--experiment LP_EDGE_CLASSIFIERS \
 	--experiment-result $tmp_metrics_path \
 	--experiment-lp-probability 0.2 \
 	$tmp_hypergraph_path
@@ -86,7 +102,7 @@ echo "Testing link prediction experiment with personalized node classifiers"
 	--log-level NONE \
 	--embedding-method RANDOM \
 	--embedding-dimension 2 \
-	--experiment-type LP_NODE_CLASSIFIERS \
+	--experiment LP_NODE_CLASSIFIERS \
 	--experiment-result $tmp_metrics_path \
 	--experiment-lp-probability 0.2 \
 	$tmp_hypergraph_path
@@ -105,7 +121,7 @@ echo "Testing link prediction experiment with node-edge classifier"
 	--log-level INFO \
 	--embedding-method RANDOM \
 	--embedding-dimension 2 \
-	--experiment-type LP_NODE_EDGE_CLASSIFIER \
+	--experiment LP_NODE_EDGE_CLASSIFIER \
 	--experiment-result $tmp_metrics_path \
 	--experiment-lp-probability 0.2 \
 	$tmp_hypergraph_path
