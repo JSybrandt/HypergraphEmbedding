@@ -532,6 +532,8 @@ def PersonalizedClassifierPrediction(
 
 
 def _GetVectorFromIdx(node_idx, edge_idx, embedding):
+  assert node_idx in embedding.node
+  assert edge_idx in embedding.edge
   return np.concatenate(
       (embedding.node[node_idx].values,
        embedding.edge[edge_idx].values),
@@ -595,6 +597,13 @@ def NodeEdgeEmbeddingPrediction(
     """
   if classifier is None:
     classifier = _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding)
+
+  log.info("Deleting input edges that are not represented in the subgraph")
+  potential_links = [(n,
+                      e)
+                     for n,
+                     e in potential_links
+                     if n in hypergraph.node and e in hypergraph.edge]
 
   log.info("Converting potential links to embedding vectors")
   input_data = []

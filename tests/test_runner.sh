@@ -98,6 +98,25 @@ else
 	exit 1
 fi
 
+rm -f $tmp_metrics_path
+echo "Testing link prediction experiment with node-edge classifier"
+
+./runner.py \
+	--log-level INFO \
+	--embedding-method RANDOM \
+	--embedding-dimension 2 \
+	--experiment-type LP_NODE_EDGE_CLASSIFIER \
+	--experiment-result $tmp_metrics_path \
+	--experiment-lp-probability 0.2 \
+	$tmp_hypergraph_path
+
+if [ $? -eq 0 ]; then
+	echo "Experiments for personalized node-edge classifier success!"
+else
+	echo "Experiments for personalized node-edge classifier failed!"
+	exit 1
+fi
+
 rm -f $tmp_embedding_path
 echo "Testing new embedding model"
 

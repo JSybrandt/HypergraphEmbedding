@@ -554,3 +554,25 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
     actual = [tuple(p) for p in actual]
     expected = [(0, 0), (1, 1)]
     self.assertEqual(set(actual), set(expected))
+
+  def test_drop_out_of_bounds(self):
+    "If you supply a node-ege pair that is not in the hg, don't report"
+
+    class AcceptAll():
+
+      def predict(self, embeddings):
+        return [1] * len(embeddings)
+
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 0)
+    embedding = HypergraphEmbedding()
+    embedding.node[0].values.extend([0])
+    embedding.edge[0].values.extend([0])
+    potential_links = [[0, 0], [0, 1], [1, 0], [1, 1]]
+    actual = NodeEdgeEmbeddingPrediction(
+        hypergraph,
+        embedding,
+        potential_links,
+        AcceptAll())
+    expected = [(0, 0)]
+    self.assertEqual(set(actual), set(expected))
