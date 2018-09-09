@@ -24,37 +24,74 @@ from keras.layers import Dot, Flatten, Average
 
 log = logging.getLogger()
 
+# Used to coordinate between parallel processes
+_shared_info = {}
 
-def GetNodeNeighbors(hypergraph):
+
+def _init_hypergraph(hypergraph):
+  _shared_info["hypergraph"] = hypergraph
+
+
+def _get_neighbor_nodes(node_idx):
+  row = []
+  col = []
+  for edge_idx in _shared_info["hypergraph"].node[node_idx].edges:
+    for neigh_idx in _shared_info["hypergraph"].edge[edge_idx].nodes:
+      row.append(node_idx)
+      col.append(neigh_idx)
+  return row, col
+
+
+def _get_neighbor_edges(edge_idx):
+  row = []
+  col = []
+  for node_idx in _shared_info["hypergraph"].edge[edge_idx].nodes:
+    for neigh_idx in _shared_info["hypergraph"].node[node_idx].edges:
+      row.append(edge_idx)
+      col.append(neigh_idx)
+  return row, col
+
+
+def GetNodeNeighbors(hypergraph, run_in_parallel=True):
   """
     Returns a Csr matrix where if i,j=1 then node i and node j share an edge.
   """
   row = []
   col = []
-  val = []
-  for node_idx, node in hypergraph.node.items():
-    for edge_idx in node.edges:
-      for neigh_idx in hypergraph.edge[edge_idx].nodes:
-        row.append(node_idx)
-        col.append(neigh_idx)
-        val.append(1)
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+  with Pool(num_cores,
+            initializer=_init_hypergraph,
+            initargs=(hypergraph,
+                     )) as pool:
+    with tqdm(total=len(hypergraph.node)) as pbar:
+      for r, c in pool.imap(_get_neighbor_nodes, hypergraph.node.keys()):
+        row += r
+        col += c
+        pbar.update(1)
+  val = [1] * len(row)
+  log.info("Converting to sparse matrix")
   return csr_matrix((val, (row, col)), dtype=np.bool)
 
 
-def GetEdgeNeighbors(hypergraph):
+def GetEdgeNeighbors(hypergraph, run_in_parallel=True):
   """
     Returns a Csr matrix where if i,j=1 then edge i and edge j share a node.
     If edge2nodes is set, then we skip the ToCsrMatrix computation
   """
   row = []
   col = []
-  val = []
-  for edge_idx, edge in hypergraph.edge.items():
-    for node_idx in edge.nodes:
-      for neigh_idx in hypergraph.node[node_idx].edges:
-        row.append(edge_idx)
-        col.append(neigh_idx)
-        val.append(1)
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+  with Pool(num_cores,
+            initializer=_init_hypergraph,
+            initargs=(hypergraph,
+                     )) as pool:
+    with tqdm(total=len(hypergraph.edge)) as pbar:
+      for r, c in pool.imap(_get_neighbor_edges, hypergraph.edge.keys()):
+        row += r
+        col += c
+        pbar.update(1)
+  val = [1] * len(row)
+  log.info("Converting to sparse matrix")
   return csr_matrix((val, (row, col)), dtype=np.bool)
 
 
@@ -161,10 +198,6 @@ def _SimilarityValuesToResults(similarity_records, num_neighbors):
           [node_node_prob,
            edge_edge_prob,
            node_edge_prob])
-
-
-# Used to coordinate between parallel processes
-_shared_info = {}
 
 
 def _init_precompute_shared_data(
