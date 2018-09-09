@@ -466,7 +466,7 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
         self.assertTrue(hasattr(actual_node[node_idx], "predict"))
 
 
-class TestClassifierPrediction(unittest.TestCase):
+class TestPersonalizedClassifierPrediction(unittest.TestCase):
 
   def test_edge_fuzz(self):
     for i in range(10):
@@ -474,7 +474,7 @@ class TestClassifierPrediction(unittest.TestCase):
       embedding = EmbedRandom(hypergraph, 2)
       all_pairs = list(product(hypergraph.node, hypergraph.edge))
       potential_links = sample(all_pairs, randint(0, len(all_pairs) - 1))
-      predicted_links = ClassifierPrediction(
+      predicted_links = PersonalizedClassifierPrediction(
           hypergraph,
           embedding,
           potential_links,
@@ -490,7 +490,7 @@ class TestClassifierPrediction(unittest.TestCase):
       embedding = EmbedRandom(hypergraph, 2)
       all_pairs = list(product(hypergraph.node, hypergraph.edge))
       potential_links = sample(all_pairs, randint(0, len(all_pairs) - 1))
-      predicted_links = ClassifierPrediction(
+      predicted_links = PersonalizedClassifierPrediction(
           hypergraph,
           embedding,
           potential_links,
@@ -499,3 +499,58 @@ class TestClassifierPrediction(unittest.TestCase):
       self.assertEqual(
           len(set(predicted_links).intersection(set(potential_links))),
           len(predicted_links))
+
+
+class TestNodeEdgeClassifierPrediction(unittest.TestCase):
+
+  def test_fuzz(self):
+    "NodeEdgeEmbeddingPrediction shouldn't break on random input"
+    for i in range(10):
+      hypergraph = CreateRandomHyperGraph(10, 10, 0.25)
+      embedding = EmbedRandom(hypergraph, 2)
+      all_pairs = list(product(hypergraph.node, hypergraph.edge))
+      potential_links = sample(all_pairs, randint(0, len(all_pairs) - 1))
+      predicted_links = NodeEdgeEmbeddingPrediction(
+          hypergraph,
+          embedding,
+          potential_links)
+      # All predicted links must have existed in input
+      self.assertEqual(
+          len(set(predicted_links).intersection(set(potential_links))),
+          len(predicted_links))
+
+  def test_prediction_by_classifier(self):
+    "NodeEdgeClassifierPrediction should only output what classifier says"
+
+    class OutputIfEqual():
+
+      def predict(self, embeddings):
+        "Assumes embedding is a concatination of two 1-d embeddings"
+        res = []
+        for embedding in embeddings:
+          if embedding[0] == embedding[1]:
+            res.append(1)
+          else:
+            res.append(0)
+        return res
+
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 0)
+    AddNodeToEdge(hypergraph, 1, 1)
+
+    embedding = HypergraphEmbedding()
+    embedding.node[0].values.extend([0])
+    embedding.edge[0].values.extend([0])
+    embedding.node[1].values.extend([1])
+    embedding.edge[1].values.extend([1])
+
+    potential_links = [[0, 0], [0, 1], [1, 0], [1, 1]]
+
+    actual = NodeEdgeEmbeddingPrediction(
+        hypergraph,
+        embedding,
+        potential_links,
+        OutputIfEqual())
+    actual = [tuple(p) for p in actual]
+    expected = [(0, 0), (1, 1)]
+    self.assertEqual(set(actual), set(expected))

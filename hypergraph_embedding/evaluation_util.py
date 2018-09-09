@@ -11,7 +11,8 @@ import multiprocessing
 from multiprocessing import Pool, Manager
 from sklearn.utils import shuffle
 from scipy.spatial.distance import cosine
-from sklearn.svm import LinearSVC as LP_Model
+from sklearn.svm import LinearSVC
+from sklearn.neural_network import MLPClassifier
 from tqdm import tqdm
 from random import random, choice, sample
 import warnings
@@ -416,7 +417,7 @@ def _train_personalized_classifier(idx):
     samples.append(_k_shared_data["neighbor_idx2embedding"][neigh_idx].values)
     labels.append(0)
   samples, labels = shuffle(samples, labels)
-  return (idx, LP_Model().fit(samples, labels))
+  return (idx, LinearSVC().fit(samples, labels))
 
 
 def GetPersonalizedClassifiers(
@@ -459,7 +460,7 @@ def GetPersonalizedClassifiers(
   return result
 
 
-def ClassifierPrediction(
+def PersonalizedClassifierPrediction(
     hypergraph,
     embedding,
     links,
@@ -526,6 +527,89 @@ def ClassifierPrediction(
 
 
 ################################################################################
+# NodeEdgeClassifierPrediction - Train a binary classifier for node/edge emb.  #
+################################################################################
+
+
+def _GetVectorFromIdx(node_idx, edge_idx, embedding):
+  return np.concatenate(
+      (embedding.node[node_idx].values,
+       embedding.edge[edge_idx].values),
+      axis=0)
+
+
+def _NodeEdgeVectors(hypergraph, embedding):
+  for node_idx, node in hypergraph.node.items():
+    for edge_idx in node.edges:
+      yield _GetVectorFromIdx(node_idx, edge_idx, embedding)
+
+
+def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding):
+  """
+  Returns a classifier trained to predict node-edge connections biased
+  on the provided hypergraph and embedding.
+  Output:
+    - A model that impliments a `predict` method, mapping
+      [node_embedding edge_embedding] to 0 or 1
+  """
+
+  log.info("Collecting postive training examples")
+  examples = []
+  labels = []
+  for vec in _NodeEdgeVectors(hypergraph, embedding):
+    examples.append(vec)
+    labels.append(1)
+
+  log.info("Collecting negative training examples")
+  for node_idx, edge_idx in SampleMissingConnections(hypergraph, len(examples)):
+    examples.append(_GetVectorFromIdx(node_idx, edge_idx, embedding))
+    labels.append(0)
+
+  log.info("Training node-edge embedding classifier")
+  examples, labels = shuffle(examples, labels)
+  # I've selected a MLP classifier with 1 hidden layer equal to the embedding length
+  # This means, for the classifier to succeed it must discover a linear mapping
+  # from each embedding space into a shared space of equal size.
+  return MLPClassifier((embedding.dim,)).fit(examples, labels)
+
+
+def NodeEdgeEmbeddingPrediction(
+    hypergraph,
+    embedding,
+    potential_links,
+    classifier=None):
+  """
+    Returns a subset of the input potential_links that a binary classifier
+    deems good. If classifier is set, we will use that instead of
+    training our own (intended for testing purposes).
+    Inputs:
+      - hypergraph: a Hypergraph proto message
+      - embedding: a HypergraphEmbedding proto message
+      - potential_links: an iterable of (node_idx, edge_idx) pairs
+      - (optional) classifier: if set, use this.
+                               Must define predict(x)
+    Output:
+      - An iterable of (node_idx, edge_idx) pairs.
+        These correspond to the predicted links, and will be a subset of
+        potential_links
+    """
+  if classifier is None:
+    classifier = _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding)
+
+  log.info("Converting potential links to embedding vectors")
+  input_data = []
+  for node_idx, edge_idx in tqdm(potential_links):
+    input_data.append(_GetVectorFromIdx(node_idx, edge_idx, embedding))
+
+  log.info("Evaluating predictions")
+  predicted_links = []
+  for link, prediction in zip(potential_links, classifier.predict(input_data)):
+    if prediction == 1:
+      predicted_links.append(link)
+  return predicted_links
+
+
+################################################################################
 # Details for runner - Includes wrappers for experiment types                  #
 ################################################################################
 
@@ -534,18 +618,24 @@ def _EdgeCentroidExperiment(args, hypergraph):
   return LinkPredictionExperiment(args, hypergraph, EdgeCentroidPrediction)
 
 
-def _EdgeClassifierExperiment(args, hypergraph):
-  predictor = lambda h, e, p: ClassifierPrediction(h, e, p, per_edge=True)
+def _EdgeClassifiersExperiment(args, hypergraph):
+  predictor = lambda h, e, p: PersonalizedClassifierPrediction(h, e, p, per_edge=True)
   return LinkPredictionExperiment(args, hypergraph, predictor)
 
 
-def _NodeClassifierExperiment(args, hypergraph):
-  predictor = lambda h, e, p: ClassifierPrediction(h, e, p, per_edge=False)
+def _NodeClassifiersExperiment(args, hypergraph):
+  predictor = lambda h, e, p: PersonalizedClassifierPrediction(h, e, p, per_edge=False)
+  return LinkPredictionExperiment(args, hypergraph, predictor)
+
+
+def _NodeEdgeEmbeddingExperiment(args, hypergraph):
+  predictor = lambda h, e, p: NodeEdgeEmbeddingPrediction(h, e, p)
   return LinkPredictionExperiment(args, hypergraph, predictor)
 
 
 EXPERIMENT_OPTIONS = {
     "LP_EDGE_CENTROID": _EdgeCentroidExperiment,
-    "LP_EDGE_CLASSIFIERS": _EdgeClassifierExperiment,
-    "LP_NODE_CLASSIFIERS": _NodeClassifierExperiment
+    "LP_EDGE_CLASSIFIERS": _EdgeClassifiersExperiment,
+    "LP_NODE_CLASSIFIERS": _NodeClassifiersExperiment,
+    "LP_NODE_EDGE_CLASSIFIER": _NodeEdgeEmbeddingExperiment
 }
