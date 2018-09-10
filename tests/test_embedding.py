@@ -233,3 +233,55 @@ class EmbedHypergraphTest(EmbeddingTestCase):
     expected[2, 2] = 1
     self.assertEqual(actual.shape, expected.shape)
     self.assertEqual((actual != expected).nnz, 0)
+
+
+class EmbedHypergraphPPTest(EmbeddingTestCase):
+
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedHypergraphPP(
+        _input,
+        dim,
+        num_neighbors=2,
+        pos_samples=2,
+        neg_samples=1,
+        batch_size=1,
+        epochs=1)
+    self.checkEmbedding(actual, _input, dim)
+    self.assertEqual(actual.method_name, "Hypergraph")
+
+  def test_fuzz(self):
+    "Random embedding should never break"
+    embed = lambda x, y: EmbedHypergraphPP(x,
+                                         y,
+                                         num_neighbors=2,
+                                         pos_samples=2,
+                                         neg_samples=1,
+                                         batch_size=1,
+                                         epochs=1)
+    self.help_test_fuzz(embed, num_fuzz=10)
+
+  def test_2nd_order_node_neighbors(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 1)
+    AddNodeToEdge(hypergraph, 1, 1)  # 1st order neighbor
+    AddNodeToEdge(hypergraph, 1, 2)
+    AddNodeToEdge(hypergraph, 2, 2)  # 2nd order neighbor
+    AddNodeToEdge(hypergraph, 2, 3)
+    AddNodeToEdge(hypergraph, 3, 3)  # 3rd order neighbor
+    actual = SecondOrderNodeNeighbors(0, hypergraph)
+    expected = [0, 1, 2]  # 0th, 1st, and 2nd order neighbors
+    self.assertEqual(set(actual), set(expected))
+
+  def test_2nd_order_edge_negihbors(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 1, 0)
+    AddNodeToEdge(hypergraph, 1, 1)  # 1st order
+    AddNodeToEdge(hypergraph, 2, 1)
+    AddNodeToEdge(hypergraph, 2, 2)  # 2nd order
+    AddNodeToEdge(hypergraph, 3, 2)
+    AddNodeToEdge(hypergraph, 3, 3)  # 3rd order
+    actual = SecondOrderEdgeNeighbors(0, hypergraph)
+    expected = [0, 1, 2]  # 0th, 1st, and 2nd order neighbors
+    self.assertEqual(set(actual), set(expected))

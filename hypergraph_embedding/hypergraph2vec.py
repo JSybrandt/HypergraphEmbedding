@@ -395,6 +395,143 @@ def PrecomputeSimilarities(
   return _SimilarityValuesToResults(similarity_records, num_neighbors)
 
 
+################################################################################
+# Hypergraph2Vec++ - Involves a new sampling routine                           #
+################################################################################
+
+
+# Run init_hypergraph first
+def SecondOrderNodeNeighbors(node_i, hypergraph=None):
+  "Given a node idx, return indices of 2nd order neighbors"
+  "That is, node_k shares an edge with node_j shares an edge with node_i"
+  if hypergraph is None:
+    hypergraph = _shared_info["hypergraph"]
+  neighbors = set()
+  neighbors.add(node_i)
+  for edge_1 in hypergraph.node[node_i].edges:
+    for node_j in hypergraph.edge[edge_1].nodes:
+      neighbors.add(node_j)
+      for edge_2 in hypergraph.node[node_j].edges:
+        for node_k in hypergraph.edge[edge_2].nodes:
+          neighbors.add(node_k)
+  return neighbors
+
+
+# Run init_hypergraph first
+def SecondOrderEdgeNeighbors(edge_i, hypergraph=None):
+  "Given an edge idx, return indices of 2nd order neighbors"
+  "That is, edge_k shares a node with edge_j shares a node with edge_i"
+  if hypergraph is None:
+    hypergraph = _shared_info["hypergraph"]
+  neighbors = set()
+  neighbors.add(edge_i)
+  for node_1 in hypergraph.edge[edge_i].nodes:
+    for edge_j in hypergraph.node[node_1].edges:
+      neighbors.add(edge_j)
+      for node_2 in hypergraph.edge[edge_j].nodes:
+        for edge_k in hypergraph.node[node_2].edges:
+          neighbors.add(edge_k)
+  return neighbors
+
+
+def HypergraphNeighborsCsrMatrix(
+    hypergraph,
+    per_edge,
+    col_function,
+    run_in_parallel=True):
+  rows = []
+  cols = []
+  input_set = hypergraph.edge if per_edge else hypergraph.node
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+  row_col_func = lambda row: (row, col_function(row))
+  with Pool(num_cores,
+            initializer=_init_hypergraph,
+            initargs=(hypergraph,
+                     )) as pool:
+    with tqdm(total=len(input_set)) as pbar:
+      for row, tmp_cols in pool.imap(row_col_func, input_set):
+        rows.extend([row] * len(cols))
+        cols.extend(tmp_cols)
+  val = [1] * len(rows)
+  log.info("Converting to sparse matrix")
+  return csr_matrix((val, (rows, cols)), dtype=np.bool)
+
+
+def PrecomputeSimilaritiesPP(
+    hypergraph,
+    num_neighbors,
+    num_pos_samples_per,
+    num_neg_samples_per,
+    run_in_parallel=True):
+  log.info("Precomputing similarities for hypergraph2vec++")
+  log.info("Getting node-edge matrix")
+  node2edge = ToCsrMatrix(hypergraph2vec)
+  log.info("Getting node neighbors")
+  node2neighbors = GetNodeNeighbors(hypergraph)
+  log.info("Getting edge neighbors")
+  edge2neighbors = GetEdgeNeighbors(hypergraph)
+  log.info("Getting 2nd order node neighbors")
+  node2secondNode = HypergraphNeighborsCsrMatrix(
+      hypergraph,
+      False,
+      SecondOrderNodeNeighbors)
+  log.info("Getting 2nd order edge neighbors")
+  edge2secondEdge = HypergraphNeighborsCsrMatrix(
+      hypergraph,
+      True,
+      SecondOrderEdgeNeighbors)
+
+  log.info("Indexing all node indices")
+  all_node_indices = set(i for i in hypergraph.node)
+
+  log.info("Indexing all edge indices")
+  all_edge_indices = set(i for i in hypergraph.edge)
+
+  similarity_records = []
+
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+
+  # Note, we are going to store indices + 1 because 0 is a mask value
+
+  with Pool(num_cores,
+            initializer=_init_precompute_shared_data,
+            initargs=(node2secondNode,
+                      edge2secondEdge,
+                      node2neighbors,
+                      edge2neighbors,
+                      all_node_indices,
+                      all_edge_indices,
+                      num_pos_samples_per,
+                      num_neg_samples_per,
+                      num_neighbors)) as pool:
+    log.info("Sampling node-node probabilities")
+    with tqdm(total=len(hypergraph.node)) as pbar:
+      for result in pool.imap(_GetNodeNodeSamples, hypergraph.node):
+        similarity_records += result
+        pbar.update(1)
+
+    log.info("Sampling edge-edge probabilities")
+    with tqdm(total=len(hypergraph.edge)) as pbar:
+      for result in pool.imap(_GetEdgeEdgeSamples, hypergraph.edge):
+        similarity_records += result
+        pbar.update(1)
+
+    log.info("Sampling node-edge probabilities")
+    with tqdm(total=len(hypergraph.node)) as pbar:
+      for result in pool.imap(_GetNodeEdgeSamples, hypergraph.node):
+        similarity_records += result
+        pbar.update(1)
+
+    log.info("Sampling edge-node probabilities")
+    with tqdm(total=len(hypergraph.edge)) as pbar:
+      for result in pool.imap(_GetEdgeNodeSimilarity, hypergraph.edge):
+        similarity_records += result
+        pbar.update(1)
+
+  log.info("Converting to input for Keras Model")
+  return _SimilarityValuesToResults(similarity_records, num_neighbors)
+
+
 def GetModel(hypergraph, dimension, num_neighbors):
   log.info("Constructing Keras Model")
 
