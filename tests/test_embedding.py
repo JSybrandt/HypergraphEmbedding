@@ -200,3 +200,31 @@ class EmbedHypergraphTest(EmbeddingTestCase):
                                          batch_size=1,
                                          epochs=1)
     self.help_test_fuzz(embed, num_fuzz=10)
+
+
+class EmbedHypergraphPlusPlusTest(EmbeddingTestCase):
+
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedHypergraphPlusPlus(
+        _input,
+        dim,
+        num_neighbors=2,
+        pos_samples=2,
+        neg_samples=1,
+        batch_size=1,
+        epochs=1)
+    self.checkEmbedding(actual, _input, dim)
+    self.assertEqual(actual.method_name, "Hypergraph++")
+
+  def test_fuzz(self):
+    "Random embedding should never break"
+    embed = lambda x, y: EmbedHypergraphPlusPlus(x,
+                                         y,
+                                         num_neighbors=2,
+                                         pos_samples=2,
+                                         neg_samples=1,
+                                         batch_size=1,
+                                         epochs=1)
+    self.help_test_fuzz(embed, num_fuzz=10)
