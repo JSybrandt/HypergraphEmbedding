@@ -239,15 +239,22 @@ def _diff_type_sample(
   if source_is_edge is None:
     source_is_edge = _shared_info["source_is_edge"]
   results = []
-  pos_targets = set(source2targets[source_idx, :].nonzero()[1])
-  neg_targets = set(range(target2sources.shape[0])) - pos_targets
-  pos_samples = min(pos_samples, len(pos_targets))
-  neg_samples = min(neg_samples, len(neg_targets))
-  for target_idx in sample(pos_targets,
-                           pos_samples) + sample(neg_targets,
-                                                 neg_samples):
+  if pos_samples > 0:
+    pos_targets = set(source2targets[source_idx, :].nonzero()[1])
+    pos_samples = min(pos_samples, len(pos_targets))
+  else:
+    pos_targets = set()
+  if neg_samples > 0:
+    neg_targets = set(range(target2sources.nonzero()[0])) - pos_targets
+    neg_samples = min(neg_samples, len(neg_targets))
+  else:
+    neg_targets = set()
+  for target_idx in sample(pos_targets, pos_samples) \
+                  + sample(neg_targets, neg_samples):
     prob = jaccard(source2targets[source_idx], target2neighbors[target_idx]) \
          * jaccard(target2sources[target_idx], source2neighbors[source_idx])
+
+    # Make simpler variable names for assigment
     if source_is_edge:
       node_idx = target_idx
       edge_idx = source_idx
@@ -264,6 +271,7 @@ def _diff_type_sample(
         edges_containing_node,
         min(num_neighbors,
             len(edges_containing_node)))
+
     nodes_in_edge = list(edge2nodes[edge_idx, :].nonzero()[1])
     nodes_in_edge = sample(
         nodes_in_edge,
@@ -291,6 +299,20 @@ def PrecomputeSimilarities(
     num_pos_samples_per,
     num_neg_samples_per,
     run_in_parallel=True):
+  """
+  Precomputes node-node, node-edge, and edge-edge similarities for the
+  provided hypergraph. This acts as the "observed probabilties" for
+  hypergraph2vec.
+  input:
+    - hypergraph: a hypergraph proto message
+    - num_neighbors: the number of 1st degree neghbors to include in output
+    - num_pos_samples_per: the number of samples per node/edge in hypergraph
+                           where at least one output >0
+    - num_neg_samples_per: the number of samples per node/edge in hypergraph
+                           where all output is 0
+  output:
+    - tuple of ([input_features], [outputs]) to match keras model input
+  """
   num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
   # return value
   similarity_records = []
