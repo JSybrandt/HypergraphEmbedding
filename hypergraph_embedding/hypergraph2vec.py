@@ -321,7 +321,7 @@ def PrecomputeSimilarities(
               num_neg_samples_per, #neg_indices
               True #source_is_edge
             )) as pool:
-    with tqdm(total=len(hypergraph.node)) as pbar:
+    with tqdm(total=len(hypergraph.edge)) as pbar:
       for result in pool.imap(_same_type_sample, hypergraph.edge):
         similarity_records += result
         pbar.update(1)

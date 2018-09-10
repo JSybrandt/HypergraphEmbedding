@@ -224,11 +224,11 @@ if __name__ == "__main__":
           key = ExperimentKey(result, metric)
           if key not in experiment2metrics:
             experiment2metrics[key] = []
-          experiment2metrics[key].append(result.metrics)
+          experiment2metrics[key].append(metric)
 
       if args.picture:
         PrintPicture(result, picture_path, args.picture_samples)
 
   if args.cumulative:
-    for key, metrics in experiment2metrics.items():
-      PrintCumulativeResult(key, metrics)
+    for key, metric in experiment2metrics.items():
+      PrintCumulativeResult(key, metric)
