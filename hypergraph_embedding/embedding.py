@@ -225,37 +225,6 @@ def EmbedHypergraph(
   return embedding
 
 
-def EmbedHypergraphPP(
-    hypergraph,
-    dimension,
-    num_neighbors=5,
-    pos_samples=100,
-    neg_samples=0,
-    batch_size=256,
-    epochs=5):
-  input_features, output_probs = PrecomputeSimilaritiesPP(hypergraph,
-                                                          num_neighbors,
-                                                          pos_samples,
-                                                          neg_samples)
-  model = GetModel(hypergraph, dimension, num_neighbors)
-  model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
-
-  log.info("Recording Embeddings")
-
-  node_weights = model.get_layer("node_embedding").get_weights()[0]
-  edge_weights = model.get_layer("edge_embedding").get_weights()[0]
-
-  embedding = HypergraphEmbedding()
-  embedding.dim = dimension
-  embedding.method_name = "Hypergraph"
-
-  for node_idx in hypergraph.node:
-    embedding.node[node_idx].values.extend(node_weights[node_idx + 1])
-  for edge_idx in hypergraph.edge:
-    embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
-  return embedding
-
-
 EMBEDDING_OPTIONS = {
     "SVD": EmbedSvd,
     "RANDOM": EmbedRandom,

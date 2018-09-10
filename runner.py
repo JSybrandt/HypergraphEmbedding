@@ -79,13 +79,13 @@ def ParseArgs():
       "--experiment-result",
       type=str,
       help=(
-          "Path to store experiment data proto. If set --experiment"
+          "Path to store experiment data proto. If set --experiment "
           "must also be set."))
   parser.add_argument(
       "--experiment-lp-probability",
       type=float,
       help=(
-          "Used to determine the proportion of removed node-edge connections ",
+          "Used to determine the proportion of removed node-edge connections "
           "for LP_* experiments"),
       default=0.1)
 
