@@ -587,7 +587,7 @@ def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding):
 
   log.info("Training node-edge embedding classifier")
 
-  input_emb = Input((2*embedding.dim,), dtype=np.float32)
+  input_emb = Input((2 * embedding.dim,), dtype=np.float32)
   hidden = Dense(embedding.dim, activation="relu")(input_emb)
   out = Dense(1, activation="sigmoid")(hidden)
   model = Model(inputs=[input_emb], outputs=[out])

@@ -200,36 +200,3 @@ class EmbedHypergraphTest(EmbeddingTestCase):
                                          batch_size=1,
                                          epochs=1)
     self.help_test_fuzz(embed, num_fuzz=10)
-
-  def test_helper_get_node_neighbors(self):
-    _input = TestHypergraph()
-    num_nodes = len(_input.node)
-    actual = GetNodeNeighbors(_input)
-    expected = sp.sparse.csr_matrix((num_nodes, num_nodes), dtype=np.bool)
-    expected[0, 0] = 1
-    expected[0, 1] = 1
-    expected[1, 0] = 1
-    expected[1, 1] = 1
-    expected[1, 2] = 1
-    expected[2, 1] = 1
-    expected[2, 2] = 1
-    expected[2, 3] = 1
-    expected[3, 2] = 1
-    expected[3, 3] = 1
-    self.assertEqual(actual.shape, expected.shape)
-    self.assertEqual((actual != expected).nnz, 0)
-
-  def test_helper_get_edge_neighbors(self):
-    _input = TestHypergraph()
-    num_edges = len(_input.edge)
-    actual = GetEdgeNeighbors(_input)
-    expected = sp.sparse.csr_matrix((num_edges, num_edges), dtype=np.bool)
-    expected[0, 0] = 1
-    expected[0, 1] = 1
-    expected[1, 0] = 1
-    expected[1, 1] = 1
-    expected[1, 2] = 1
-    expected[2, 1] = 1
-    expected[2, 2] = 1
-    self.assertEqual(actual.shape, expected.shape)
-    self.assertEqual((actual != expected).nnz, 0)
