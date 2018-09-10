@@ -148,13 +148,20 @@ def _same_type_sample(
     source_is_edge = _shared_info["source_is_edge"]
 
   results = []
-  pos_targets = set(source2targets[source_idx, :].nonzero()[1])
-  neg_targets = set(range(idx2features.shape[0])) - pos_targets
-  pos_samples = min(pos_samples, len(pos_targets))
-  neg_samples = min(neg_samples, len(neg_targets))
-  for target_idx in sample(pos_targets,
-                           pos_samples) + sample(neg_targets,
-                                                 neg_samples):
+  if pos_samples > 0:
+    pos_targets = set(source2targets[source_idx, :].nonzero()[1])
+    pos_samples = min(pos_samples, len(pos_targets))
+  else:
+    pos_targets = set()
+
+  if neg_samples > 0:
+    neg_targets = set(idx2features.nonzero()[0]) - pos_targets
+    neg_samples = min(neg_samples, len(neg_targets))
+  else:
+    neg_targets = set()
+
+  for target_idx in sample(pos_targets, pos_samples) \
+                  + sample(neg_targets, neg_samples):
     prob = jaccard(idx2features[source_idx, :], idx2features[target_idx, :])
     if source_is_edge:
       results.append(
@@ -167,7 +174,7 @@ def _same_type_sample(
           SimilarityRecord(
               left_node_idx=source_idx,
               right_node_idx=target_idx,
-              node_edge_prob=prob))
+              node_node_prob=prob))
   return results
 
 
@@ -299,7 +306,7 @@ def PrecomputeSimilarities(
               node2edges, #idx2features
               node2node_neighbors, #source2targets
               num_pos_samples_per, #pos_samples
-              num_neg_samples_per, #neg_indices
+              num_neg_samples_per, #neg_samples
               False #source_is_edge
             )) as pool:
     with tqdm(total=len(hypergraph.node)) as pbar:
@@ -318,7 +325,7 @@ def PrecomputeSimilarities(
               edge2nodes, #idx2features
               edge2edge_neighbors, #source2targets
               num_pos_samples_per, #pos_samples
-              num_neg_samples_per, #neg_indices
+              num_neg_samples_per, #neg_samples
               True #source_is_edge
             )) as pool:
     with tqdm(total=len(hypergraph.edge)) as pbar:
