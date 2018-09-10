@@ -245,7 +245,7 @@ def _diff_type_sample(
   else:
     pos_targets = set()
   if neg_samples > 0:
-    neg_targets = set(range(target2sources.nonzero()[0])) - pos_targets
+    neg_targets = set(target2sources.nonzero()[0]) - pos_targets
     neg_samples = min(neg_samples, len(neg_targets))
   else:
     neg_targets = set()
@@ -363,6 +363,117 @@ def PrecomputeSimilarities(
               edge2nodes, #target2sources
               node2node_neighbors, #source2neighbors
               edge2edge_neighbors, #target2neighbors
+              num_neighbors, #num_neighbors
+              num_pos_samples_per, #pos_samples
+              num_neg_samples_per, #neg_samples
+              False #source_is_edge
+            )) as pool:
+    with tqdm(total=len(hypergraph.node)) as pbar:
+      for result in pool.imap(_diff_type_sample, hypergraph.node):
+        similarity_records += result
+        pbar.update(1)
+
+  log.info("Sampling edge-node probabilities")
+  with Pool(num_cores,
+            initializer=_init_diff_type_sample,
+            initargs=(
+              edge2nodes, #  source2targets
+              node2edges, #target2sources
+              edge2edge_neighbors, #source2neighbors
+              node2node_neighbors, #target2neighbors
+              num_neighbors, #num_neighbors
+              num_pos_samples_per, #pos_samples
+              num_neg_samples_per, #neg_samples
+              True #source_is_edge
+            )) as pool:
+    with tqdm(total=len(hypergraph.edge)) as pbar:
+      for result in pool.imap(_diff_type_sample, hypergraph.edge):
+        similarity_records += result
+        pbar.update(1)
+
+  log.info("Converting to input for Keras Model")
+  return _SimilarityValuesToResults(similarity_records, num_neighbors)
+
+
+################################################################################
+# Hypergraph2Vec++ Sampler                                                     #
+################################################################################
+
+
+def PrecomputeSimilaritiesPlusPlus(
+    hypergraph,
+    num_neighbors,
+    num_pos_samples_per,
+    num_neg_samples_per,
+    run_in_parallel=True):
+  """
+  Precomputes node-node, node-edge, and edge-edge similarities for the
+  provided hypergraph. This acts as the "observed probabilties" for
+  hypergraph2vec.
+  input:
+    - hypergraph: a hypergraph proto message
+    - num_neighbors: the number of 1st degree neghbors to include in output
+    - num_pos_samples_per: the number of samples per node/edge in hypergraph
+                           where at least one output >0
+    - num_neg_samples_per: the number of samples per node/edge in hypergraph
+                           where all output is 0
+  output:
+    - tuple of ([input_features], [outputs]) to match keras model input
+  """
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+  # return value
+  similarity_records = []
+
+  log.info("Converting hypergraph to node-major sparse matrix")
+  node2edges = ToCsrMatrix(hypergraph)
+  log.info("Getting 1st order node neighbors")
+  node2node_neighbors = node2edges * node2edges.T
+  log.info("Getting 2nd order node neighbors")
+  node2second_node_neighbors = node2node_neighbors * node2node_neighbors.T
+  log.info("Sampling node-node probabilities")
+  with Pool(num_cores,
+            initializer=_init_same_type_sample,
+            initargs=(
+              node2node_neighbors, #idx2features
+              node2second_node_neighbors, #source2targets
+              num_pos_samples_per, #pos_samples
+              num_neg_samples_per, #neg_samples
+              False #source_is_edge
+            )) as pool:
+    with tqdm(total=len(hypergraph.node)) as pbar:
+      for result in pool.imap(_same_type_sample, hypergraph.node):
+        similarity_records += result
+        pbar.update(1)
+
+  log.info("Converting hypergraph to edge-major sparse matrix")
+  edge2nodes = ToEdgeCsrMatrix(hypergraph)
+  log.info("Getting 1st order edge neighbors")
+  edge2edge_neighbors = edge2nodes * edge2nodes.T
+  log.info("Getting 2nd order edge neighbors")
+  edge2second_edge_neighbors = edge2edge_neighbors * edge2edge_neighbors.T
+  log.info("Sampling edge-edge probabilities")
+  with Pool(num_cores,
+            initializer=_init_same_type_sample,
+            initargs=(
+              edge2edge_neighbors, #idx2features
+              edge2second_edge_neighbors, #source2targets
+              num_pos_samples_per, #pos_samples
+              num_neg_samples_per, #neg_samples
+              True #source_is_edge
+            )) as pool:
+    with tqdm(total=len(hypergraph.edge)) as pbar:
+      for result in pool.imap(_same_type_sample, hypergraph.edge):
+        similarity_records += result
+        pbar.update(1)
+
+  log.info("Sampling node-edge probabilities")
+  with Pool(num_cores,
+            initializer=_init_diff_type_sample,
+            initargs=(
+              node2edges, #source2targets
+              edge2nodes, #target2sources
+              node2second_node_neighbors, #source2neighbors
+              edge2second_edge_neighbors, #target2neighbors
               num_neighbors, #num_neighbors
               num_pos_samples_per, #pos_samples
               num_neg_samples_per, #neg_samples
