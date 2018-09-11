@@ -9,7 +9,7 @@ import scipy as sp
 from scipy.spatial.distance import jaccard
 from scipy.sparse import csr_matrix
 
-from random import random, sample
+from random import random, sample, choice
 import logging
 import multiprocessing
 from multiprocessing import Pool
@@ -399,12 +399,72 @@ def PrecomputeSimilarities(
 # Hypergraph2Vec++ Sampler                                                     #
 ################################################################################
 
+def _init_get_walks(idx2features, source2target, num_walks, max_length, tolerance, source_is_edge):
+  _shared_info.clear()
+  assert idx2features.shape[0] == source2target.shape[0]
+  # walk matrix should be square
+  assert source2target.shape[0] == source2target.shape[1]
+  assert num_walks > 0
+  assert max_length > 0
+  assert tolerance > 0
+  _shared_info["idx2features"] = idx2features
+  _shared_info["source2target"] = source2target
+  _shared_info["num_walks"] = num_walks
+  _shared_info["max_length"] = max_length
+  _shared_info["tolerance"] = tolerance
+  _shared_info["source_is_edge"] = source_is_edge
+
+def _get_walks(start_idx,
+               idx2features=None,
+               source2target=None,
+               num_walks=None,
+               max_length=None,
+               tolerance=None,
+               source_is_edge=None):
+  if idx2features is None:
+    idx2features = _shared_info["idx2features"]
+  if source2target is None:
+    source2target = _shared_info["source2target"]
+  if num_walks is None:
+    num_walks = _shared_info["num_walks"]
+  if max_length is None:
+    max_length = _shared_info["max_length"]
+  if tolerance is None:
+    tolerance = _shared_info["tolerance"]
+  if source_is_edge is None:
+    source_is_edge = _shared_info["source_is_edge"]
+
+  results = []
+  for _ in range(num_walks):
+    current_idx = start_idx
+    cumulative_jaccard = 1
+    for _ in range(max_length):
+      neighbor_idx = choice(source2target[current_idx, :].nonzero()[1])
+      cumulative_jaccard *= jaccard(idx2features[current_idx, :],
+                                    idx2features[neighbor_idx, :])
+      if cumulative_jaccard < tolerance:
+        break
+      else:
+        if source_is_edge:
+          results.append(SimilarityRecord(
+            left_edge_idx=start_idx,
+            right_edge_idx=neighbor_idx,
+            edge_edge_prob=cumulative_jaccard))
+        else:
+          results.append(SimilarityRecord(
+            left_node_idx=start_idx,
+            right_node_idx=neighbor_idx,
+            node_node_prob=cumulative_jaccard))
+      neighbor_idx = current_idx
+  return results
+
 
 def PrecomputeSimilaritiesPlusPlus(
     hypergraph,
     num_neighbors,
-    num_pos_samples_per,
-    num_neg_samples_per,
+    walks_per_node,
+    max_length,
+    tolerance,
     run_in_parallel=True):
   """
   Precomputes node-node, node-edge, and edge-edge similarities for the
@@ -412,14 +472,13 @@ def PrecomputeSimilaritiesPlusPlus(
   hypergraph2vec.
   input:
     - hypergraph: a hypergraph proto message
-    - num_neighbors: the number of 1st degree neghbors to include in output
-    - num_pos_samples_per: the number of samples per node/edge in hypergraph
-                           where at least one output >0
-    - num_neg_samples_per: the number of samples per node/edge in hypergraph
-                           where all output is 0
   output:
     - tuple of ([input_features], [outputs]) to match keras model input
   """
+  assert num_neighbors > 0
+  assert walks_per_node > 0
+  assert max_length > 0
+  assert tolerance > 0
   num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
   # return value
   similarity_records = []
@@ -428,20 +487,20 @@ def PrecomputeSimilaritiesPlusPlus(
   node2edges = ToCsrMatrix(hypergraph)
   log.info("Getting 1st order node neighbors")
   node2node_neighbors = node2edges * node2edges.T
-  log.info("Getting 2nd order node neighbors")
-  node2second_node_neighbors = node2node_neighbors * node2node_neighbors.T
+
   log.info("Sampling node-node probabilities")
   with Pool(num_cores,
-            initializer=_init_same_type_sample,
+            initializer=_init_get_walks,
             initargs=(
-              node2node_neighbors, #idx2features
-              node2second_node_neighbors, #source2targets
-              num_pos_samples_per, #pos_samples
-              num_neg_samples_per, #neg_samples
+              node2edges, #idx2features
+              node2node_neighbors, #source2target
+              walks_per_node, #num_walks
+              max_length, #max_length
+              tolerance, #tolerance
               False #source_is_edge
             )) as pool:
     with tqdm(total=len(hypergraph.node)) as pbar:
-      for result in pool.imap(_same_type_sample, hypergraph.node):
+      for result in pool.imap(_get_walks, hypergraph.node):
         similarity_records += result
         pbar.update(1)
 
@@ -449,20 +508,19 @@ def PrecomputeSimilaritiesPlusPlus(
   edge2nodes = ToEdgeCsrMatrix(hypergraph)
   log.info("Getting 1st order edge neighbors")
   edge2edge_neighbors = edge2nodes * edge2nodes.T
-  log.info("Getting 2nd order edge neighbors")
-  edge2second_edge_neighbors = edge2edge_neighbors * edge2edge_neighbors.T
   log.info("Sampling edge-edge probabilities")
   with Pool(num_cores,
-            initializer=_init_same_type_sample,
+            initializer=_init_get_walks,
             initargs=(
-              edge2edge_neighbors, #idx2features
-              edge2second_edge_neighbors, #source2targets
-              num_pos_samples_per, #pos_samples
-              num_neg_samples_per, #neg_samples
+              edge2nodes, #idx2features
+              edge2edge_neighbors, #source2targets
+              walks_per_node, #num_walks
+              max_length, #max_length
+              tolerance, #tolerance
               True #source_is_edge
             )) as pool:
     with tqdm(total=len(hypergraph.edge)) as pbar:
-      for result in pool.imap(_same_type_sample, hypergraph.edge):
+      for result in pool.imap(_get_walks, hypergraph.edge):
         similarity_records += result
         pbar.update(1)
 
@@ -472,11 +530,11 @@ def PrecomputeSimilaritiesPlusPlus(
             initargs=(
               node2edges, #source2targets
               edge2nodes, #target2sources
-              node2second_node_neighbors, #source2neighbors
-              edge2second_edge_neighbors, #target2neighbors
+              node2node_neighbors, #source2neighbors
+              edge2edge_neighbors, #target2neighbors
               num_neighbors, #num_neighbors
-              num_pos_samples_per, #pos_samples
-              num_neg_samples_per, #neg_samples
+              walks_per_node, #pos_samples
+              0, #neg_samples
               False #source_is_edge
             )) as pool:
     with tqdm(total=len(hypergraph.node)) as pbar:
@@ -493,8 +551,8 @@ def PrecomputeSimilaritiesPlusPlus(
               edge2edge_neighbors, #source2neighbors
               node2node_neighbors, #target2neighbors
               num_neighbors, #num_neighbors
-              num_pos_samples_per, #pos_samples
-              num_neg_samples_per, #neg_samples
+              walks_per_node, #pos_samples
+              0, #neg_samples
               True #source_is_edge
             )) as pool:
     with tqdm(total=len(hypergraph.edge)) as pbar:

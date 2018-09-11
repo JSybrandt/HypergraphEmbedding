@@ -229,15 +229,17 @@ def EmbedHypergraphPlusPlus(
     hypergraph,
     dimension,
     num_neighbors=10,
-    pos_samples=200,
-    neg_samples=0,
+    num_walks_per_node=50,
+    max_walk_length=7,
+    walk_tolerance=0.001,
     batch_size=256,
     epochs=5):
   input_features, output_probs = PrecomputeSimilaritiesPlusPlus(
       hypergraph,
       num_neighbors,
-      pos_samples,
-      neg_samples)
+      num_walks_per_node,
+      max_walk_length,
+      walk_tolerance)
   model = GetModel(hypergraph, dimension, num_neighbors)
   model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
 

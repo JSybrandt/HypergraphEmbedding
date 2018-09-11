@@ -211,8 +211,8 @@ class EmbedHypergraphPlusPlusTest(EmbeddingTestCase):
         _input,
         dim,
         num_neighbors=2,
-        pos_samples=2,
-        neg_samples=1,
+        num_walks_per_node=2,
+        max_walk_length=3,
         batch_size=1,
         epochs=1)
     self.checkEmbedding(actual, _input, dim)
@@ -223,8 +223,8 @@ class EmbedHypergraphPlusPlusTest(EmbeddingTestCase):
     embed = lambda x, y: EmbedHypergraphPlusPlus(x,
                                          y,
                                          num_neighbors=2,
-                                         pos_samples=2,
-                                         neg_samples=1,
+                                         num_walks_per_node=2,
+                                         max_walk_length=3,
                                          batch_size=1,
                                          epochs=1)
     self.help_test_fuzz(embed, num_fuzz=10)
