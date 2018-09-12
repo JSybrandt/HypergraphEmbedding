@@ -70,10 +70,11 @@ def EmbedRandom(hypergraph, dimension):
   embedding.method_name = "Random"
 
   for node_idx in hypergraph.node:
-    embedding.node[node_idx].values.extend([random() for _ in range(dimension)])
+    embedding.node[node_idx].values.extend(
+        [random() for _ in range(dimension)])
   for edge_idx in hypergraph.edge:
-    embedding.edge[edge_idx].values.extend([random() for _ in range(dimension)])
-
+    embedding.edge[edge_idx].values.extend(
+        [random() for _ in range(dimension)])
   return embedding
 
 
@@ -282,6 +283,7 @@ def _init_update_alg_dist(A2B, B2A, A2emb, B2emb):
   _shared_info["A2emb"] = A2emb
   _shared_info["B2emb"] = B2emb
 
+
 def _update_alg_dist(a_idx,
                      A2B=None,
                      B2A=None,
@@ -302,6 +304,7 @@ def _update_alg_dist(a_idx,
   b_emb /= A2B[a_idx, :].nnz
 
   return a_idx, (a_emb + b_emb)/2
+
 
 def _helper_update_embeddings(hypergraph,
                               node_embeddings,
@@ -339,8 +342,7 @@ def _helper_update_embeddings(hypergraph,
         pbar.update(1)
   return new_node_embeddings, new_edge_embeddings
 
-
-## Helper functions to scale embeddings #######################################
+## Helper functions to scale embeddings ########################################
 
 def _init_scale_alg_dist(embedding, min_embedding, delta_embedding):
   _shared_info.clear()
@@ -350,15 +352,19 @@ def _init_scale_alg_dist(embedding, min_embedding, delta_embedding):
   _shared_info["min_embedding"] = min_embedding
   _shared_info["delta_embedding"] = delta_embedding
 
-def _scale_alg_dist(idx, embedding=None, min_embedding=None, delta_embedding=None):
+
+def _scale_alg_dist(idx,
+                    embedding=None,
+                    min_embedding=None,
+                    delta_embedding=None):
   if embedding is None:
     embedding = _shared_info["embedding"]
   if min_embedding is None:
     min_embedding = _shared_info["min_embedding"]
   if delta_embedding is None:
     delta_embedding = _shared_info["delta_embedding"]
-
   return idx, (embedding[idx,:] - min_embedding) / delta_embedding
+
 
 def _helper_scale_embeddings(hypergraph,
                              node_embeddings,
@@ -402,7 +408,6 @@ def _helper_scale_embeddings(hypergraph,
         edge_embeddings[idx, :] = emb
         pbar.update(1)
   return node_embeddings, edge_embeddings
-
 
 
 def EmbedAlgebraicDistance(
