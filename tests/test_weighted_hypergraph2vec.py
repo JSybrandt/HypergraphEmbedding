@@ -3,7 +3,10 @@ from hypergraph_embedding import Hypergraph
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.hypergraph_util import *
 from hypergraph_embedding.weighted_hypergraph2vec import *
+import hypergraph_embedding.weighted_hypergraph2vec as whg2v
 from hypergraph_embedding.embedding import *
+from random import random, randint, choice
+from scipy.sparse import lil_matrix
 
 
 class ComputeAlgebraicRadiusTest(unittest.TestCase):
@@ -87,3 +90,170 @@ class ComputeAlgebraicRadiusTest(unittest.TestCase):
       for edge_idx in hypergraph.edge:
         self.assertTrue(edge_idx in edge2rad)
         self.assertTrue(edge2rad[edge_idx] >= 0)
+
+
+class ZeroOneScaleKeysTest(unittest.TestCase):
+
+  def test_typical(self):
+    _input = {0: 5, 1: 10}
+    actual = ZeroOneScaleKeys(_input, run_in_parallel=False, disable_pbar=True)
+    expected = {0: 0, 1: 1}
+    self.assertEqual(actual, expected)
+
+  def test_no_range(self):
+    "in the case of only one element, set all values to 1"
+    _input = {0: 5}
+    actual = ZeroOneScaleKeys(_input, run_in_parallel=False, disable_pbar=True)
+    expected = {0: 1}
+    self.assertEqual(actual, expected)
+
+  def test_empty_range(self):
+    "Do nothing and don't crash if no input"
+    _input = {}
+    actual = ZeroOneScaleKeys(_input, run_in_parallel=False, disable_pbar=True)
+    expected = {}
+    self.assertEqual(actual, expected)
+
+  def test_fuzz(self):
+    for i in range(10):
+      _input = {}
+      for idx in range(randint(0, 20)):
+        _input[idx] = random() * 10
+      actual = ZeroOneScaleKeys(_input, disable_pbar=True)
+      self.assertEqual(set(_input.keys()), set(actual.keys()))
+      if len(_input) > 0:
+        self.assertEqual(max(actual.values()), 1)
+      if len(_input) > 1:
+        self.assertEqual(min(actual.values()), 0)
+
+
+class SameTypeProbabilityTest(unittest.TestCase):
+
+  def test_typical(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 1, 4)  # only 1 in 4
+    AddNodeToEdge(hypergraph, 1, 5)  # 1 & 2 in 5
+    AddNodeToEdge(hypergraph, 2, 5)
+    AddNodeToEdge(hypergraph, 1, 6)  # 1 & 2 in 6
+    AddNodeToEdge(hypergraph, 2, 6)
+    AddNodeToEdge(hypergraph, 2, 7)  # only 2 in 7
+    node2edges = ToCsrMatrix(hypergraph)
+    alpha = 0.25
+    edge2radius = {
+        4: 0.1,
+        5: 0.2,
+        6: 0.3,
+        7: 0.4,
+    }
+    """
+     (α + (1−α)(1−0.2))
+    +(α + (1−α)(1−0.3))
+     ------------------
+     (α + (1−α)(1−0.1))
+    +(α + (1−α)(1−0.2))
+    +(α + (1−α)(1−0.3))
+    +(α + (1−α)(1−0.4))
+    = 0.5
+    """
+    actual = whg2v._same_type_probability((1,
+                                           2),
+                                          node2edges,
+                                          alpha,
+                                          edge2radius)
+    self.assertAlmostEqual(actual, 0.5)
+
+  def test_zero(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 10)
+    AddNodeToEdge(hypergraph, 1, 20)
+    node2edges = ToCsrMatrix(hypergraph)
+    alpha = 0.25
+    edge2radius = {10: 0.4, 20: 0.8}
+    actual = whg2v._same_type_probability((0,
+                                           1),
+                                          node2edges,
+                                          alpha,
+                                          edge2radius)
+    # These two nodes don't share anything in common
+    self.assertAlmostEqual(actual, 0)
+
+  def test_self_prob(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 0, 1)
+    node2edges = ToCsrMatrix(hypergraph)
+    alpha = 0.25
+    edge2radius = {1: 0.4}
+    actual = whg2v._same_type_probability((0,
+                                           0),
+                                          node2edges,
+                                          alpha,
+                                          edge2radius)
+    # A thing should be equal to itself
+    self.assertAlmostEqual(actual, 1)
+
+
+class NodeEdgeProbabilityTest(unittest.TestCase):
+
+  def test_typical(self):
+    hypergraph = Hypergraph()
+    AddNodeToEdge(hypergraph, 1, 4)
+    AddNodeToEdge(hypergraph, 2, 4)
+    AddNodeToEdge(hypergraph, 2, 5)
+    AddNodeToEdge(hypergraph, 3, 5)
+
+    node2edge = ToCsrMatrix(hypergraph)
+    edge2node = ToEdgeCsrMatrix(hypergraph)
+    node2node = node2edge * node2edge.T
+    edge2edge = edge2node * edge2node.T
+    alpha = 0
+    node2radius = {1: 1, 2: 0, 3: 0.5}
+    edge2radius = {4: 0.5, 5: 0.5}
+    actual = whg2v._node_edge_probability((1,
+                                           5),
+                                          node2edge,
+                                          edge2node,
+                                          node2node,
+                                          edge2edge,
+                                          alpha,
+                                          node2radius,
+                                          edge2radius)
+    # it is almost too hard to explain how I got these numbers to come out
+    self.assertAlmostEqual(actual, 0.7)
+
+  def test_fuzz(self):
+    for _ in range(10):
+      hypergraph = Hypergraph()
+      while len(hypergraph.node) == 0 or len(hypergraph.edge) == 0:
+        hypergraph = CreateRandomHyperGraph(10, 10, 0.1)
+      node2edge = ToCsrMatrix(hypergraph)
+      edge2node = ToEdgeCsrMatrix(hypergraph)
+      node2node = node2edge * node2edge.T
+      edge2edge = edge2node * edge2node.T
+      alpha = random()
+      node2radius = {i: random() for i in hypergraph.node}
+      edge2radius = {i: random() for i in hypergraph.edge}
+      for _ in range(10):
+        actual = whg2v._node_edge_probability(
+            (choice(list(hypergraph.node)),
+             choice(list(hypergraph.edge))),
+            node2edge,
+            edge2node,
+            node2node,
+            edge2edge,
+            alpha,
+            node2radius,
+            edge2radius)
+        self.assertTrue(actual >= 0)
+        self.assertTrue(actual <= 1)
+
+
+# class GetWeightedModelTest(unittest.TestCase):
+
+# def test_no_break(self):
+# hypergraph = CreateRandomHyperGraph(10, 10, 0.5)
+# dimension = 100
+# num_neighbors = 5
+# model = GetWeightedModel(hypergraph, dimension, num_neighbors)
+# model.summary()
+# from keras.utils.vis_utils import plot_model
+# plot_model(model, "model.png")
