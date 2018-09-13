@@ -229,13 +229,12 @@ class EmbedHypergraphPlusPlusTest(EmbeddingTestCase):
                                          epochs=1)
     self.help_test_fuzz(embed, num_fuzz=10)
 
+
 class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
 
   def test_typical(self):
     dim = 2
     _input = TestHypergraph()
-    actual = EmbedAlgebraicDistance(
-        _input,
-        dim)
+    actual = EmbedAlgebraicDistance(_input, dim)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "AlgebraicDistance")

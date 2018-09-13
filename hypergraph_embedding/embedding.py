@@ -70,11 +70,9 @@ def EmbedRandom(hypergraph, dimension):
   embedding.method_name = "Random"
 
   for node_idx in hypergraph.node:
-    embedding.node[node_idx].values.extend(
-        [random() for _ in range(dimension)])
+    embedding.node[node_idx].values.extend([random() for _ in range(dimension)])
   for edge_idx in hypergraph.edge:
-    embedding.edge[edge_idx].values.extend(
-        [random() for _ in range(dimension)])
+    embedding.edge[edge_idx].values.extend([random() for _ in range(dimension)])
   return embedding
 
 
@@ -261,6 +259,7 @@ def EmbedHypergraphPlusPlus(
     embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
   return embedding
 
+
 ################################################################################
 # AlgebraicDistance - Helper and runner                                        #
 ################################################################################
@@ -268,6 +267,7 @@ def EmbedHypergraphPlusPlus(
 _shared_info = {}
 
 ## Helper functions to update embeddings ######################################
+
 
 def _init_update_alg_dist(A2B, B2A, A2emb, B2emb):
   _shared_info.clear()
@@ -284,11 +284,7 @@ def _init_update_alg_dist(A2B, B2A, A2emb, B2emb):
   _shared_info["B2emb"] = B2emb
 
 
-def _update_alg_dist(a_idx,
-                     A2B=None,
-                     B2A=None,
-                     A2emb=None,
-                     B2emb=None):
+def _update_alg_dist(a_idx, A2B=None, B2A=None, A2emb=None, B2emb=None):
   if A2B is None:
     A2B = _shared_info["A2B"]
   if B2A is None:
@@ -300,19 +296,20 @@ def _update_alg_dist(a_idx,
 
   a_emb = A2emb[a_idx, :]
 
-  b_emb = sum(B2emb[b_idx, :] for b_idx in A2B[a_idx,:].nonzero()[1])
+  b_emb = sum(B2emb[b_idx, :] for b_idx in A2B[a_idx, :].nonzero()[1])
   b_emb /= A2B[a_idx, :].nnz
 
-  return a_idx, (a_emb + b_emb)/2
+  return a_idx, (a_emb + b_emb) / 2
 
 
-def _helper_update_embeddings(hypergraph,
-                              node_embeddings,
-                              edge_embeddings,
-                              node2edges,
-                              edge2nodes,
-                              workers,
-                              disable_pbar):
+def _helper_update_embeddings(
+    hypergraph,
+    node_embeddings,
+    edge_embeddings,
+    node2edges,
+    edge2nodes,
+    workers,
+    disable_pbar):
   log.info("Placing nodes with respect to edges")
   new_node_embeddings = np.copy(node_embeddings)
   with Pool(workers,
@@ -342,7 +339,9 @@ def _helper_update_embeddings(hypergraph,
         pbar.update(1)
   return new_node_embeddings, new_edge_embeddings
 
+
 ## Helper functions to scale embeddings ########################################
+
 
 def _init_scale_alg_dist(embedding, min_embedding, delta_embedding):
   _shared_info.clear()
@@ -353,35 +352,39 @@ def _init_scale_alg_dist(embedding, min_embedding, delta_embedding):
   _shared_info["delta_embedding"] = delta_embedding
 
 
-def _scale_alg_dist(idx,
-                    embedding=None,
-                    min_embedding=None,
-                    delta_embedding=None):
+def _scale_alg_dist(
+    idx,
+    embedding=None,
+    min_embedding=None,
+    delta_embedding=None):
   if embedding is None:
     embedding = _shared_info["embedding"]
   if min_embedding is None:
     min_embedding = _shared_info["min_embedding"]
   if delta_embedding is None:
     delta_embedding = _shared_info["delta_embedding"]
-  return idx, (embedding[idx,:] - min_embedding) / delta_embedding
+  return idx, (embedding[idx, :] - min_embedding) / delta_embedding
 
 
-def _helper_scale_embeddings(hypergraph,
-                             node_embeddings,
-                             edge_embeddings,
-                             workers,
-                             disable_pbar):
+def _helper_scale_embeddings(
+    hypergraph,
+    node_embeddings,
+    edge_embeddings,
+    workers,
+    disable_pbar):
   log.info("Getting min-max embedding per dimension")
   min_edge_embedding = np.min(edge_embeddings, axis=0)
   min_node_embedding = np.min(node_embeddings, axis=0)
-  min_embedding = np.min(np.stack((min_node_embedding,
-                                   min_edge_embedding)),
-                         axis=0)
+  min_embedding = np.min(
+      np.stack((min_node_embedding,
+                min_edge_embedding)),
+      axis=0)
   max_edge_embedding = np.max(edge_embeddings, axis=0)
   max_node_embedding = np.max(node_embeddings, axis=0)
-  max_embedding = np.max(np.stack((max_node_embedding,
-                                   max_edge_embedding)),
-                         axis=0)
+  max_embedding = np.max(
+      np.stack((max_node_embedding,
+                max_edge_embedding)),
+      axis=0)
   delta_embedding = max_embedding - min_embedding
 
   log.info("Scaling nodes to 0-1 hypercube")
