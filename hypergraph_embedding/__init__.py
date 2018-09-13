@@ -11,6 +11,7 @@ from hypergraph_embedding.data_util import *
 from hypergraph_embedding.embedding import *
 from hypergraph_embedding.evaluation_util import *
 from hypergraph_embedding.hypergraph2vec import *
+from hypergraph_embedding.weighted_hypergraph2vec import *
 
 __all__ = [
     # proto

@@ -51,4 +51,3 @@ message ExperimentalResult {
   // One set of metrics per experiment
 	repeated EvaluationMetrics metrics = 3;
 }
-
