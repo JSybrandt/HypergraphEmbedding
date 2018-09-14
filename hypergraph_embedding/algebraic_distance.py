@@ -1,19 +1,10 @@
 from . import HypergraphEmbedding
 from .hypergraph_util import *
 import numpy as np
-
-import scipy as sp
-from scipy.spatial.distance import jaccard
-from scipy.sparse import csr_matrix
-
-from sklearn.decomposition import NMF
-from collections.abc import Mapping
-from random import random
-import logging
-from node2vec import Node2Vec
 import multiprocessing
 from multiprocessing import Pool
 from tqdm import tqdm
+import logging
 
 _shared_info = {}
 log = logging.getLogger()
