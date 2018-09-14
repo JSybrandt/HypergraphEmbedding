@@ -252,7 +252,8 @@ class EmbedWeightedHypergraphTest(EmbeddingTestCase):
         samples_per=2,
         alpha=0.2,
         batch_size=1,
-        epochs=1)
+        epochs=1,
+        disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "WeightedHypergraph")
 
