@@ -239,6 +239,7 @@ class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "AlgebraicDistance")
 
+
 class EmbedWeightedHypergraphTest(EmbeddingTestCase):
 
   def test_typical(self):

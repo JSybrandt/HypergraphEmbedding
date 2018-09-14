@@ -22,7 +22,6 @@ log = logging.getLogger()
 # AlgebraicDistance - Helper and runner                                        #
 ################################################################################
 
-
 ## Helper functions to update embeddings ######################################
 
 

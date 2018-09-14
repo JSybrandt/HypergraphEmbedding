@@ -190,11 +190,13 @@ WeightedSimilarityRecord = namedtuple(
 WeightedSimilarityRecord.__new__.__defaults__ = \
     (None,) * len(WeightedSimilarityRecord._fields)
 
+
 def IncOrZero(x):
-   if x is None:
-     return 0
-   else:
-     return x + 1
+  if x is None:
+    return 0
+  else:
+    return x + 1
+
 
 def ValOrZero(x):
   if x is None:
@@ -202,16 +204,19 @@ def ValOrZero(x):
   else:
     return x
 
+
 def ValOrOne(x):
   if x is None:
     return 1
   else:
     return x
 
+
 def PadWithZeros(arrOrNone, idx):
   if arrOrNone is None or idx >= len(arrOrNone):
     return 0
   return arrOrNone[idx]
+
 
 def _weighted_similarity_records_to_model_input(records, num_neighbors):
   "Converts the above named tuple into (input arrays, output arrays)"
@@ -234,7 +239,7 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
     right_node_idx.append(IncOrZero(r.right_node_idx))
     left_edge_idx.append(IncOrZero(r.left_edge_idx))
     right_edge_idx.append(IncOrZero(r.right_edge_idx))
-    left_radius.append(ValOrOne(r.left_radius)) # if not supplied, set to bad
+    left_radius.append(ValOrOne(r.left_radius))  # if not supplied, set to bad
     right_radius.append(ValOrOne(r.right_radius))
     for i in range(num_neighbors):
       neighbor_node_indices[i].append(PadWithZeros(r.neighbor_node_indices, i))
@@ -259,6 +264,7 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
       [node_node_prob,
        edge_edge_prob,
        node_node_prob])
+
 
 def _weight_by_radius(alpha, radius):
   """
@@ -631,8 +637,9 @@ def PrecomputeWeightedSimilarities(
         similarity_records.append(result)
         pbar.update(1)
 
-  return _weighted_similarity_records_to_model_input(similarity_records,
-                                                     num_neighbors)
+  return _weighted_similarity_records_to_model_input(
+      similarity_records,
+      num_neighbors)
 
 
 ################################################################################
