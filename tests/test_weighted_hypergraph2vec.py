@@ -258,3 +258,17 @@ class NodeEdgeProbabilityTest(unittest.TestCase):
 # model.summary()
 # from keras.utils.vis_utils import plot_model
 # plot_model(model, "model.png")
+
+
+class WriteDebugSummaryTest(unittest.TestCase):
+  def test_output(self):
+    sim_records = [WeightedSimilarityRecord(
+                     left_node_idx=i,
+                     right_edge_idx=i,
+                     left_span=i,
+                     right_span=10-i,
+                     node_node_prob=i/10,
+                     edge_edge_prob=i/20,
+                     node_edge_prob=i/5)
+                   for i in range(20)]
+    WriteDebugSummary("debug_summary_test.png", sim_records)

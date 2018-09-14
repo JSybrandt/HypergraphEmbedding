@@ -22,6 +22,10 @@ from keras.models import Model
 from keras.layers import Input, Embedding, Multiply, Dense
 from keras.layers import Dot, Flatten, Average
 
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 ################################################################################
 # Helper Data - Includes logger and Similarity Record                          #
 ################################################################################
@@ -46,7 +50,7 @@ SimilarityRecord = namedtuple(
 SimilarityRecord.__new__.__defaults__ = (None,) * len(SimilarityRecord._fields)
 
 
-def _SimilarityValuesToResults(similarity_records, num_neighbors):
+def _similarity_values_to_model_input(similarity_records, num_neighbors):
   "Converts a list of similarity_records to a tuple of "
   "(feature lists, output_lists)"
 
@@ -392,7 +396,7 @@ def PrecomputeSimilarities(
         pbar.update(1)
 
   log.info("Converting to input for Keras Model")
-  return _SimilarityValuesToResults(similarity_records, num_neighbors)
+  return similarity_records
 
 
 ################################################################################
@@ -572,7 +576,7 @@ def PrecomputeSimilaritiesPlusPlus(
         pbar.update(1)
 
   log.info("Converting to input for Keras Model")
-  return _SimilarityValuesToResults(similarity_records, num_neighbors)
+  return _similarity_values_to_model_input(similarity_records, num_neighbors)
 
 
 ################################################################################
@@ -663,3 +667,64 @@ def GetModel(hypergraph, dimension, num_neighbors):
 
   model.compile(optimizer="adagrad", loss="kullback_leibler_divergence")
   return model
+
+################################################################################
+# Hooks for runner                                                             #
+################################################################################
+
+def EmbedHypergraph(
+    hypergraph,
+    dimension,
+    num_neighbors=5,
+    pos_samples=100,
+    neg_samples=0,
+    batch_size=256,
+    epochs=5,
+    debug_summary_path=None):
+  similarity_records = PrecomputeSimilarities(hypergraph,
+                                              num_neighbors,
+                                              pos_samples,
+                                              neg_samples)
+  if debug_summary_path is not None:
+    WriteDebugSummary(debug_summary_path, similarity_records)
+  input_features, output_probs = _similarity_values_to_model_input(similarity_records, num_neighbors)
+  model = GetModel(hypergraph, dimension, num_neighbors)
+  model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
+
+  log.info("Recording Embeddings")
+
+  node_weights = model.get_layer("node_embedding").get_weights()[0]
+  edge_weights = model.get_layer("edge_embedding").get_weights()[0]
+
+  embedding = HypergraphEmbedding()
+  embedding.dim = dimension
+  embedding.method_name = "Hypergraph"
+
+  for node_idx in hypergraph.node:
+    embedding.node[node_idx].values.extend(node_weights[node_idx + 1])
+  for edge_idx in hypergraph.edge:
+    embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
+  return embedding
+
+def WriteDebugSummary(debug_summary_path, sim_records):
+
+  log.info("Writing Debug Summary to %s", debug_summary_path)
+
+  nn_probs = [r.node_node_prob for r in sim_records
+                            if r.node_node_prob is not None]
+  ee_probs = [r.edge_edge_prob for r in sim_records
+                            if r.edge_edge_prob is not None]
+  ne_probs = [r.node_edge_prob for r in sim_records
+                            if r.node_edge_prob is not None]
+  fig, (nn_ax, ee_ax, ne_ax) = plt.subplots(3, 1)
+  nn_ax.set_title("Node-Node Probability Distribution")
+  nn_ax.hist(nn_probs)
+  nn_ax.set_yscale("log")
+  ee_ax.set_title("Edge-Edge Probability Distribution")
+  ee_ax.hist(ee_probs)
+  ee_ax.set_yscale("log")
+  ne_ax.set_title("Node-Edge Probability Distribution")
+  ne_ax.hist(ne_probs)
+  ne_ax.set_yscale("log")
+  fig.tight_layout()
+  fig.savefig(debug_summary_path)

@@ -19,6 +19,10 @@ from keras.models import Model
 from keras.layers import Input, Embedding, Dense, Multiply, Concatenate
 from keras.layers import Dot, Flatten, Average
 
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 log = logging.getLogger()
 
 _shared_info = {}
@@ -639,10 +643,7 @@ def PrecomputeWeightedSimilarities(
                                               flip=True)):
         similarity_records.append(result)
         pbar.update(1)
-
-  return _weighted_similarity_records_to_model_input(
-      similarity_records,
-      num_neighbors)
+  return similarity_records
 
 
 ################################################################################
@@ -797,13 +798,22 @@ def EmbedWeightedHypergraph(
     samples_per=50,
     batch_size=256,
     epochs=5,
-    disable_pbar=False):
-  input_features, output_probs = PrecomputeWeightedSimilarities(
+    disable_pbar=False,
+    debug_summary_path=None):
+  similarity_records = PrecomputeWeightedSimilarities(
       hypergraph,
       num_neighbors,
       samples_per,
       alpha,
       disable_pbar=disable_pbar)
+
+  if debug_summary_path is not None:
+    WriteDebugSummary(debug_summary_path, similarity_records)
+
+  input_features, output_probs = _weighted_similarity_records_to_model_input(
+    similarity_records,
+    num_neighbors)
+
   model = GetWeightedModel(hypergraph, dimension, num_neighbors)
   model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
 
@@ -821,3 +831,48 @@ def EmbedWeightedHypergraph(
   for edge_idx in hypergraph.edge:
     embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
   return embedding
+
+
+def WriteDebugSummary(debug_summary_path, sim_records):
+
+  log.info("Writing Debug Summary to %s", debug_summary_path)
+  node2span = {}
+  edge2span = {}
+  for r in sim_records:
+    if r.left_node_idx is not None and r.left_node_idx not in node2span:
+      node2span[r.left_node_idx] = r.left_span
+    if r.right_node_idx is not None and r.right_node_idx not in node2span:
+      node2span[r.right_node_idx] = r.right_span
+    if r.left_edge_idx is not None and r.left_edge_idx not in edge2span:
+      edge2span[r.left_edge_idx] = r.left_span
+    if r.right_edge_idx is not None and r.right_edge_idx not in edge2span:
+      edge2span[r.right_edge_idx] = r.right_span
+
+  nn_probs = [r.node_node_prob for r in sim_records
+                            if r.node_node_prob is not None]
+  ee_probs = [r.edge_edge_prob for r in sim_records
+                            if r.edge_edge_prob is not None]
+  ne_probs = [r.node_edge_prob for r in sim_records
+                            if r.node_edge_prob is not None]
+  fig, (node_spans,
+        edge_spans,
+        nn_ax,
+        ee_ax,
+        ne_ax) = plt.subplots(5, 1, figsize=(8.5, 11))
+  node_spans.set_title("Node Spans")
+  node_spans.hist(list(node2span.values()))
+  node_spans.set_yscale("log")
+  edge_spans.set_title("Edge Spans")
+  edge_spans.hist(list(edge2span.values()))
+  edge_spans.set_yscale("log")
+  nn_ax.set_title("Node-Node Probability Distribution")
+  nn_ax.hist(nn_probs)
+  nn_ax.set_yscale("log")
+  ee_ax.set_title("Edge-Edge Probability Distribution")
+  ee_ax.hist(ee_probs)
+  ee_ax.set_yscale("log")
+  ne_ax.set_title("Node-Edge Probability Distribution")
+  ne_ax.hist(ne_probs)
+  ne_ax.set_yscale("log")
+  fig.tight_layout()
+  fig.savefig(debug_summary_path)
