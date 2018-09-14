@@ -399,7 +399,14 @@ def PrecomputeSimilarities(
 # Hypergraph2Vec++ Sampler                                                     #
 ################################################################################
 
-def _init_get_walks(idx2features, source2target, num_walks, max_length, tolerance, source_is_edge):
+
+def _init_get_walks(
+    idx2features,
+    source2target,
+    num_walks,
+    max_length,
+    tolerance,
+    source_is_edge):
   _shared_info.clear()
   assert idx2features.shape[0] == source2target.shape[0]
   # walk matrix should be square
@@ -414,13 +421,15 @@ def _init_get_walks(idx2features, source2target, num_walks, max_length, toleranc
   _shared_info["tolerance"] = tolerance
   _shared_info["source_is_edge"] = source_is_edge
 
-def _get_walks(start_idx,
-               idx2features=None,
-               source2target=None,
-               num_walks=None,
-               max_length=None,
-               tolerance=None,
-               source_is_edge=None):
+
+def _get_walks(
+    start_idx,
+    idx2features=None,
+    source2target=None,
+    num_walks=None,
+    max_length=None,
+    tolerance=None,
+    source_is_edge=None):
   if idx2features is None:
     idx2features = _shared_info["idx2features"]
   if source2target is None:
@@ -446,15 +455,17 @@ def _get_walks(start_idx,
         break
       else:
         if source_is_edge:
-          results.append(SimilarityRecord(
-            left_edge_idx=start_idx,
-            right_edge_idx=neighbor_idx,
-            edge_edge_prob=cumulative_jaccard))
+          results.append(
+              SimilarityRecord(
+                  left_edge_idx=start_idx,
+                  right_edge_idx=neighbor_idx,
+                  edge_edge_prob=cumulative_jaccard))
         else:
-          results.append(SimilarityRecord(
-            left_node_idx=start_idx,
-            right_node_idx=neighbor_idx,
-            node_node_prob=cumulative_jaccard))
+          results.append(
+              SimilarityRecord(
+                  left_node_idx=start_idx,
+                  right_node_idx=neighbor_idx,
+                  node_node_prob=cumulative_jaccard))
       neighbor_idx = current_idx
   return results
 
