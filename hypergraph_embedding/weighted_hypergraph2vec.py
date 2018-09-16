@@ -351,15 +351,7 @@ def _same_type_sample(ij, a2span=None, is_edge=None):
 ## Different Type Probabilities ################################################
 
 
-def _helper_diff_type_prob(
-    a_idx,
-    b_idx,
-    a2b,
-    b2a,
-    a2a,
-    alpha,
-    a2span,
-    b2span):
+def _helper_diff_type_prob(a_idx, b_idx, a2b, b2a, a2a, alpha, a2span, b2span):
   "Computes half of the node-edge probability function"
   a_second_neighbors = set(a2a[a_idx, :].nonzero()[1])
   b_neighbors = set(b2a[b_idx, :].nonzero()[1])
@@ -696,7 +688,6 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
       for i in range(num_neighbors)
   ]
 
-
   # Gets domain of nodes / edges
   max_node_idx = max([i for i in hypergraph.node])
   max_edge_idx = max([i for i in hypergraph.edge])
@@ -731,39 +722,52 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
   node_node_prediction = Dense(
       1,
       activation="sigmoid",
-      name="node_node_prob")(Concatenate(1)(
-          [Dot(1)([left_node_vec,
-                   right_node_vec]),
-           left_span,
-           right_span]))
+      name="node_node_prob")(
+          Concatenate(1)(
+              [Dot(1)([left_node_vec,
+                       right_node_vec]),
+               left_span,
+               right_span]))
 
   edge_edge_prediction = Dense(
       1,
       activation="sigmoid",
-      name="edge_edge_prob")(Concatenate(1)(
-          [Dot(1)([left_edge_vec,
-                   right_edge_vec]),
-           left_span,
-           right_span]))
+      name="edge_edge_prob")(
+          Concatenate(1)(
+              [Dot(1)([left_edge_vec,
+                       right_edge_vec]),
+               left_span,
+               right_span]))
 
   node_neighbor_dot_sigs = [
-      Dense(1, activation="sigmoid")(Concatenate(1)([
-            Dot(1)([n_vec, left_node_vec]),
-            left_span,
-            n_span]))
-      for n_vec, n_span in zip(neighbor_node_vecs, neighbor_node_spans)]
+      Dense(1,
+            activation="sigmoid")(
+                Concatenate(1)(
+                    [Dot(1)([n_vec,
+                             left_node_vec]),
+                     left_span,
+                     n_span])) for n_vec,
+      n_span in zip(neighbor_node_vecs,
+                    neighbor_node_spans)
+  ]
   node_neighbor_avg = Average()(node_neighbor_dot_sigs)
 
   edge_neighbor_dot_sigs = [
-      Dense(1, activation="sigmoid")(Concatenate(1)([
-            Dot(1)([n_vec, right_edge_vec]),
-            right_span,
-            n_span]))
-      for n_vec, n_span in zip(neighbor_edge_vecs, neighbor_edge_spans)]
+      Dense(1,
+            activation="sigmoid")(
+                Concatenate(1)(
+                    [Dot(1)([n_vec,
+                             right_edge_vec]),
+                     right_span,
+                     n_span])) for n_vec,
+      n_span in zip(neighbor_edge_vecs,
+                    neighbor_edge_spans)
+  ]
   edge_neighbor_avg = Average()(edge_neighbor_dot_sigs)
 
-  node_edge_prediction = Multiply(name="node_edge_prob")([node_neighbor_avg,
-                                                          edge_neighbor_avg])
+  node_edge_prediction = Multiply(name="node_edge_prob")(
+      [node_neighbor_avg,
+       edge_neighbor_avg])
 
   model = Model(
       # THESE MUST LINE UP EXACTLY WITH
@@ -833,6 +837,14 @@ def EmbedWeightedHypergraph(
   return embedding
 
 
+def _log_distribution_info(name, distribution):
+  log.info(name)
+  log.info(" > Size : %i", len(distribution))
+  log.info(" > Range: %f - %f", min(distribution), max(distribution))
+  log.info(" > Mean : %f", sum(distribution) / len(distribution))
+  log.info(" > Std. : %f", np.std(distribution))
+
+
 def WriteDebugSummary(debug_summary_path, sim_records):
 
   log.info("Writing Debug Summary to %s", debug_summary_path)
@@ -848,12 +860,15 @@ def WriteDebugSummary(debug_summary_path, sim_records):
     if r.right_edge_idx is not None and r.right_edge_idx not in edge2span:
       edge2span[r.right_edge_idx] = r.right_span
 
-  nn_probs = [r.node_node_prob for r in sim_records
-                            if r.node_node_prob is not None]
-  ee_probs = [r.edge_edge_prob for r in sim_records
-                            if r.edge_edge_prob is not None]
-  ne_probs = [r.node_edge_prob for r in sim_records
-                            if r.node_edge_prob is not None]
+  nn_probs = [
+      r.node_node_prob for r in sim_records if r.node_node_prob is not None
+  ]
+  ee_probs = [
+      r.edge_edge_prob for r in sim_records if r.edge_edge_prob is not None
+  ]
+  ne_probs = [
+      r.node_edge_prob for r in sim_records if r.node_edge_prob is not None
+  ]
   fig, (node_spans,
         edge_spans,
         nn_ax,
@@ -876,3 +891,10 @@ def WriteDebugSummary(debug_summary_path, sim_records):
   ne_ax.set_yscale("log")
   fig.tight_layout()
   fig.savefig(debug_summary_path)
+
+  log.info("Finished Writing")
+  _log_distribution_info("NodeSpans", node2span.values())
+  _log_distribution_info("EdgeSpans", edge2span.values())
+  _log_distribution_info("Node-Node Prob.", nn_probs)
+  _log_distribution_info("Edge-Edge Prob.", ee_probs)
+  _log_distribution_info("Node-Edge Prob.", ne_probs)
