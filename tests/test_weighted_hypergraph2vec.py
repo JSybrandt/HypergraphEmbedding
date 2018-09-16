@@ -9,7 +9,7 @@ from random import random, randint, choice
 from scipy.sparse import lil_matrix
 
 
-class ComputeAlgebraicRadiusTest(unittest.TestCase):
+class ComputeSpansTest(unittest.TestCase):
 
   def test_one_pair(self):
     "Given an embedding, find the distance to each node/edge first "
@@ -20,10 +20,10 @@ class ComputeAlgebraicRadiusTest(unittest.TestCase):
     embedding.node[3].values.extend([0])
     embedding.edge[7].values.extend([1])
 
-    node2radius, edge2radius = ComputeAlgebraicRadius(
+    node2span, edge2span = ComputeSpans(
         hypergraph, embedding, disable_pbar=True)
-    self.assertEqual(node2radius, {3: 1})
-    self.assertEqual(edge2radius, {7: 1})
+    self.assertEqual(node2span, {3: 1})
+    self.assertEqual(edge2span, {7: 1})
 
   def test_tripple(self):
     "Given an embedding, find the distance to each node/edge first "
@@ -36,13 +36,14 @@ class ComputeAlgebraicRadiusTest(unittest.TestCase):
     embedding.node[5].values.extend([3])
     embedding.edge[7].values.extend([1])
 
-    node2radius, edge2radius = ComputeAlgebraicRadius(
+    node2span, edge2span = ComputeSpans(
         hypergraph, embedding, disable_pbar=True)
-    self.assertEqual(node2radius, {3: 1, 5: 2})
-    self.assertEqual(edge2radius, {7: 2})
+    self.assertEqual(node2span, {3: 1, 5: 2})
+    # This span goes from 0 to 3
+    self.assertEqual(edge2span, {7: 3})
 
   def test_two_d(self):
-    "Given 2d embeddings, we should be using l2 norm"
+    "Given 2d embeddings, we should be using SUPREMUM norm"
 
     hypergraph = Hypergraph()
     AddNodeToEdge(hypergraph, 10, 20)
@@ -51,13 +52,13 @@ class ComputeAlgebraicRadiusTest(unittest.TestCase):
     embedding.edge[20].values.extend([3, 4])
 
     # Note the difference between 10 and 20 makes a 3-4-5 triangle
-    node2radius, edge2radius = ComputeAlgebraicRadius(
+    node2span, edge2span = ComputeSpans(
         hypergraph, embedding, disable_pbar=True)
-    self.assertEqual(node2radius, {10: 5})
-    self.assertEqual(edge2radius, {20: 5})
+    self.assertEqual(node2span, {10: 4})
+    self.assertEqual(edge2span, {20: 4})
 
   def test_no_link_zero(self):
-    "If we have a node without connections, treat its radius as 0"
+    "If we have a node without connections, treat its span as 0"
     hypergraph = Hypergraph()
     hypergraph.node[1].name = "I shouldn't mess stuff up"
     hypergraph.edge[2].name = "I shouldn't mess stuff up"
@@ -70,10 +71,10 @@ class ComputeAlgebraicRadiusTest(unittest.TestCase):
     embedding.node[0].values.extend([0, 0])
     embedding.edge[0].values.extend([3, 4])
 
-    node2radius, edge2radius = ComputeAlgebraicRadius(
+    node2span, edge2span = ComputeSpans(
         hypergraph, embedding, disable_pbar=True)
-    self.assertEqual(node2radius, {0: 5, 1: 0})
-    self.assertEqual(edge2radius, {0: 5, 2: 0})
+    self.assertEqual(node2span, {0: 4, 1: 0})
+    self.assertEqual(edge2span, {0: 4, 2: 0})
 
   def test_fuzz(self):
     "Needs to make its own embedding if I don't supply one"
@@ -82,7 +83,7 @@ class ComputeAlgebraicRadiusTest(unittest.TestCase):
       hypergraph = CreateRandomHyperGraph(10, 10, 0.1)
       embedding = EmbedRandom(hypergraph, 2)
       # make sure it doesn't break
-      node2rad, edge2rad = ComputeAlgebraicRadius(
+      node2rad, edge2rad = ComputeSpans(
           hypergraph, embedding, disable_pbar=True)
       for node_idx in hypergraph.node:
         self.assertTrue(node_idx in node2rad)
@@ -139,7 +140,7 @@ class SameTypeProbabilityTest(unittest.TestCase):
     AddNodeToEdge(hypergraph, 2, 7)  # only 2 in 7
     node2edges = ToCsrMatrix(hypergraph)
     alpha = 0.25
-    edge2radius = {
+    edge2span = {
         4: 0.1,
         5: 0.2,
         6: 0.3,
@@ -159,7 +160,7 @@ class SameTypeProbabilityTest(unittest.TestCase):
                                            2),
                                           node2edges,
                                           alpha,
-                                          edge2radius)
+                                          edge2span)
     self.assertAlmostEqual(actual, 0.5)
 
   def test_zero(self):
@@ -168,12 +169,12 @@ class SameTypeProbabilityTest(unittest.TestCase):
     AddNodeToEdge(hypergraph, 1, 20)
     node2edges = ToCsrMatrix(hypergraph)
     alpha = 0.25
-    edge2radius = {10: 0.4, 20: 0.8}
+    edge2span = {10: 0.4, 20: 0.8}
     actual = whg2v._same_type_probability((0,
                                            1),
                                           node2edges,
                                           alpha,
-                                          edge2radius)
+                                          edge2span)
     # These two nodes don't share anything in common
     self.assertAlmostEqual(actual, 0)
 
@@ -182,12 +183,12 @@ class SameTypeProbabilityTest(unittest.TestCase):
     AddNodeToEdge(hypergraph, 0, 1)
     node2edges = ToCsrMatrix(hypergraph)
     alpha = 0.25
-    edge2radius = {1: 0.4}
+    edge2span = {1: 0.4}
     actual = whg2v._same_type_probability((0,
                                            0),
                                           node2edges,
                                           alpha,
-                                          edge2radius)
+                                          edge2span)
     # A thing should be equal to itself
     self.assertAlmostEqual(actual, 1)
 
@@ -206,8 +207,8 @@ class NodeEdgeProbabilityTest(unittest.TestCase):
     node2node = node2edge * node2edge.T
     edge2edge = edge2node * edge2node.T
     alpha = 0
-    node2radius = {1: 1, 2: 0, 3: 0.5}
-    edge2radius = {4: 0.5, 5: 0.5}
+    node2span = {1: 1, 2: 0, 3: 0.5}
+    edge2span = {4: 0.5, 5: 0.5}
     actual = whg2v._node_edge_probability((1,
                                            5),
                                           node2edge,
@@ -215,8 +216,8 @@ class NodeEdgeProbabilityTest(unittest.TestCase):
                                           node2node,
                                           edge2edge,
                                           alpha,
-                                          node2radius,
-                                          edge2radius)
+                                          node2span,
+                                          edge2span)
     # it is almost too hard to explain how I got these numbers to come out
     self.assertAlmostEqual(actual, 0.7)
 
@@ -230,8 +231,8 @@ class NodeEdgeProbabilityTest(unittest.TestCase):
       node2node = node2edge * node2edge.T
       edge2edge = edge2node * edge2node.T
       alpha = random()
-      node2radius = {i: random() for i in hypergraph.node}
-      edge2radius = {i: random() for i in hypergraph.edge}
+      node2span = {i: random() for i in hypergraph.node}
+      edge2span = {i: random() for i in hypergraph.edge}
       for _ in range(10):
         actual = whg2v._node_edge_probability(
             (choice(list(hypergraph.node)),
@@ -241,8 +242,8 @@ class NodeEdgeProbabilityTest(unittest.TestCase):
             node2node,
             edge2edge,
             alpha,
-            node2radius,
-            edge2radius)
+            node2span,
+            edge2span)
         self.assertTrue(actual >= 0)
         self.assertTrue(actual <= 1)
 
@@ -257,3 +258,17 @@ class NodeEdgeProbabilityTest(unittest.TestCase):
 # model.summary()
 # from keras.utils.vis_utils import plot_model
 # plot_model(model, "model.png")
+
+
+class WriteDebugSummaryTest(unittest.TestCase):
+  def test_output(self):
+    sim_records = [WeightedSimilarityRecord(
+                     left_node_idx=i,
+                     right_edge_idx=i,
+                     left_span=i,
+                     right_span=10-i,
+                     node_node_prob=i/10,
+                     edge_edge_prob=i/20,
+                     node_edge_prob=i/5)
+                   for i in range(20)]
+    WriteDebugSummary("debug_summary_test.png", sim_records)

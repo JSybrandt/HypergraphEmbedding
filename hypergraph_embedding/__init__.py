@@ -27,6 +27,7 @@ __all__ = [
     # Embedding
     "Embed",
     "EMBEDDING_OPTIONS",
+    "DEBUG_SUMMARY_OPTIONS",
 
     # Experiments
     "EXPERIMENT_OPTIONS",

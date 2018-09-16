@@ -1,41 +1,46 @@
 # This file impliments the hypergraph 2 vec model wherein similarities are
-# weighted by each node / community's radius in algebraic distance
+# weighted by each node / community's span in algebraic distance
 
 from . import HypergraphEmbedding
 from .hypergraph_util import *
 from .algebraic_distance import EmbedAlgebraicDistance
 import numpy as np
 import scipy as sp
-from scipy.spatial.distance import euclidean
+from scipy.spatial.distance import minkowski
 import multiprocessing
 from multiprocessing import Pool
 from tqdm import tqdm
 import logging
 from random import sample
 from collections import namedtuple
+from statistics import stdev
 
 import keras
 from keras.models import Model
 from keras.layers import Input, Embedding, Dense, Multiply, Concatenate
 from keras.layers import Dot, Flatten, Average
 
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
+
 log = logging.getLogger()
 
 _shared_info = {}
 
 ################################################################################
-# ComputeAlgebraicRadius & Helper functions                                    #
+# ComputeSpans & Helper functions                                    #
 ################################################################################
 
 
-def _init_compute_radius(idx2neighbors, idx_emb, neigh_emb):
+def _init_compute_span(idx2neighbors, idx_emb, neigh_emb):
   _shared_info.clear()
   _shared_info["idx2neighbors"] = idx2neighbors
   _shared_info["idx_emb"] = idx_emb
   _shared_info["neigh_emb"] = neigh_emb
 
 
-def _compute_radius(idx, idx2neighbors=None, idx_emb=None, neigh_emb=None):
+def _compute_span(idx, idx2neighbors=None, idx_emb=None, neigh_emb=None):
   if idx2neighbors is None:
     idx2neighbors = _shared_info["idx2neighbors"]
   if idx_emb is None:
@@ -43,43 +48,46 @@ def _compute_radius(idx, idx2neighbors=None, idx_emb=None, neigh_emb=None):
   if neigh_emb is None:
     neigh_emb = _shared_info["neigh_emb"]
 
-  radius = 0
+  span_less_than = 0
+  span_greater_than = 0
   if idx in idx_emb and idx < idx2neighbors.shape[0]:
     my_emb = idx_emb[idx].values
     for neigh_idx in idx2neighbors[idx, :].nonzero()[1]:
       if neigh_idx in neigh_emb:
-        dist = euclidean(neigh_emb[neigh_idx].values, my_emb)
-        if radius < dist:
-          radius = dist
-  return idx, radius
+        diff = np.subtract(neigh_emb[neigh_idx].values, my_emb)
+        # Look for values that occur before the current node
+        span_less_than = min(span_less_than, min(diff))
+        # Look for values that occur _after_ the current node
+        span_greater_than = max(span_greater_than, max(diff))
+  return idx, span_greater_than - span_less_than
 
 
-def ComputeAlgebraicRadius(
+def ComputeSpans(
     hypergraph,
     embedding=None,
     run_in_parallel=True,
     disable_pbar=False):
   """
-  Computes the radius of each node / edge in the provided embedding.
+  Computes the span of each node / edge in the provided embedding.
   Radius is defined as the L2 norm of the distance between an entity's
   embedding and its furthest first-order neighbor.
   For instance, if a node is placed 2 units away from a community, then
-  its radius will be at least 2.
+  its span will be at least 2.
 
   inputs:
     - hypergraph: A hypergraph proto message
     - embedding: an optional pre-computed embedding, needed for tests.
                  if not supplied, performs Algebraic Distance in 3d
   outputs:
-    (node2radius, edge2radus): a tuple of dictionary's that maps each
-                               node/edge idx to a float radius
+    (node2span, edge2span): a tuple of dictionary's that maps each
+                            node/edge idx to a float span
   """
 
   if embedding is None:
     embedding = EmbedAlgebraicDistance(
         hypergraph,
-        dimension=1,
-        iterations=10,
+        dimension=10,
+        iterations=20,
         run_in_parallel=run_in_parallel,
         disable_pbar=disable_pbar)
 
@@ -88,37 +96,37 @@ def ComputeAlgebraicRadius(
 
   workers = multiprocessing.cpu_count() if run_in_parallel else 1
 
-  log.info("Computing radius per node wrt edge %s", embedding.method_name)
+  log.info("Computing span per node wrt edge %s", embedding.method_name)
 
   node2edge = ToCsrMatrix(hypergraph)
-  node2radius = {}
+  node2span = {}
   with Pool(workers,
-            initializer=_init_compute_radius,
+            initializer=_init_compute_span,
             initargs=(node2edge,
                       embedding.node,
                       embedding.edge)) as pool:
     with tqdm(total=len(hypergraph.node), disable=disable_pbar) as pbar:
-      for node_idx, radius in pool.imap(_compute_radius, hypergraph.node):
-        node2radius[node_idx] = radius
+      for node_idx, span in pool.imap(_compute_span, hypergraph.node):
+        node2span[node_idx] = span
         pbar.update(1)
 
-  log.info("Computing radius per edge wrt node %s", embedding.method_name)
+  log.info("Computing span per edge wrt node %s", embedding.method_name)
   edge2node = ToEdgeCsrMatrix(hypergraph)
-  edge2radius = {}
+  edge2span = {}
   with Pool(workers,
-            initializer=_init_compute_radius,
+            initializer=_init_compute_span,
             initargs=(edge2node,
                       embedding.edge,
                       embedding.node)) as pool:
     with tqdm(total=len(hypergraph.edge), disable=disable_pbar) as pbar:
-      for edge_idx, radius in pool.imap(_compute_radius, hypergraph.edge):
-        edge2radius[edge_idx] = radius
+      for edge_idx, span in pool.imap(_compute_span, hypergraph.edge):
+        edge2span[edge_idx] = span
         pbar.update(1)
-  return node2radius, edge2radius
+  return node2span, edge2span
 
 
 ################################################################################
-# Zero One Scale - Needs to scale radii                                        #
+# Zero One Scale - Needs to scale spans                                        #
 ################################################################################
 
 
@@ -152,8 +160,8 @@ def ZeroOneScaleKeys(idx2value, run_in_parallel=True, disable_pbar=False):
   workers = multiprocessing.cpu_count() if run_in_parallel else 1
   result = {}
   min_val = min(idx2value.values())
-  max_radius = max(idx2value.values())
-  delta_val = max_radius - min_val
+  max_val = max(idx2value.values())
+  delta_val = max_val - min_val
   with Pool(workers,
             initializer=_init_zero_one_scale_key,
             initargs=(idx2value,
@@ -177,12 +185,12 @@ WeightedSimilarityRecord = namedtuple(
         "left_edge_idx",
         "right_node_idx",
         "right_edge_idx",
-        "left_radius",
-        "right_radius",
+        "left_weight",
+        "right_weight",
         "neighbor_node_indices",
-        "neighbor_node_radii",
+        "neighbor_node_weights",
         "neighbor_edge_indices",
-        "neighbor_edge_radii",
+        "neighbor_edge_weights",
         "node_node_prob",
         "edge_edge_prob",
         "node_edge_prob"))
@@ -205,13 +213,6 @@ def ValOrZero(x):
     return x
 
 
-def ValOrOne(x):
-  if x is None:
-    return 1
-  else:
-    return x
-
-
 def PadWithZeros(arrOrNone, idx):
   if arrOrNone is None or idx >= len(arrOrNone):
     return 0
@@ -224,12 +225,12 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
   right_node_idx = []
   left_edge_idx = []
   right_edge_idx = []
-  left_radius = []
-  right_radius = []
+  left_weight = []
+  right_weight = []
   neighbor_node_indices = [[] for _ in range(num_neighbors)]
-  neighbor_node_radii = [[] for _ in range(num_neighbors)]
+  neighbor_node_weights = [[] for _ in range(num_neighbors)]
   neighbor_edge_indices = [[] for _ in range(num_neighbors)]
-  neighbor_edge_radii = [[] for _ in range(num_neighbors)]
+  neighbor_edge_weights = [[] for _ in range(num_neighbors)]
   node_node_prob = []
   edge_edge_prob = []
   node_edge_prob = []
@@ -239,13 +240,13 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
     right_node_idx.append(IncOrZero(r.right_node_idx))
     left_edge_idx.append(IncOrZero(r.left_edge_idx))
     right_edge_idx.append(IncOrZero(r.right_edge_idx))
-    left_radius.append(ValOrOne(r.left_radius))  # if not supplied, set to bad
-    right_radius.append(ValOrOne(r.right_radius))
+    left_weight.append(ValOrZero(r.left_weight))  # if not supplied, set to bad
+    right_weight.append(ValOrZero(r.right_weight))
     for i in range(num_neighbors):
       neighbor_node_indices[i].append(PadWithZeros(r.neighbor_node_indices, i))
-      neighbor_node_radii[i].append(PadWithZeros(r.neighbor_node_radii, i))
+      neighbor_node_weights[i].append(PadWithZeros(r.neighbor_node_weights, i))
       neighbor_edge_indices[i].append(PadWithZeros(r.neighbor_edge_indices, i))
-      neighbor_edge_radii[i].append(PadWithZeros(r.neighbor_edge_radii, i))
+      neighbor_edge_weights[i].append(PadWithZeros(r.neighbor_edge_weights, i))
     node_node_prob.append(ValOrZero(r.node_node_prob))
     edge_edge_prob.append(ValOrZero(r.edge_edge_prob))
     node_edge_prob.append(ValOrZero(r.node_edge_prob))
@@ -255,48 +256,48 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
        left_edge_idx,
        right_node_idx,
        right_edge_idx,
-       left_radius,
-       right_radius] \
+       left_weight,
+       right_weight] \
       + neighbor_node_indices \
-      + neighbor_node_radii \
+      + neighbor_node_weights \
       + neighbor_edge_indices \
-      + neighbor_edge_radii,
+      + neighbor_edge_weights,
       [node_node_prob,
        edge_edge_prob,
        node_node_prob])
 
 
-def _weight_by_radius(alpha, radius):
+def _weight_by_span(alpha, span):
   """
   calculates: (α + (1−α)(1−𝑟))
   where α and 𝑟 are in the 0-1 interval.
-  α - damping factor. Even the worst radius still contributes this much
-  𝑟 - radius in 0-1 scale. Larger represents a less important edge here
+  α - damping factor. Even the worst span still contributes this much
+  𝑟 - span in 0-1 scale. Larger represents a less important edge here
   """
-  return (alpha + (1 - alpha) * (1 - radius))
+  return (alpha + (1 - alpha) * (1 - span))
 
 
 ## Same Type Probabilities #####################################################
 
 
-def _init_same_type_probability(idx2neigh, alpha, a2radius, b2radius, is_edge):
+def _init_same_type_probability(idx2neigh, alpha, a2span, b2span, is_edge):
   _shared_info.clear()
   assert alpha >= 0
   assert alpha <= 1
   _shared_info["idx2neigh"] = idx2neigh
   _shared_info["alpha"] = alpha
-  _shared_info["a2radius"] = a2radius
-  _shared_info["b2radius"] = b2radius
+  _shared_info["a2span"] = a2span
+  _shared_info["b2span"] = b2span
   _shared_info["is_edge"] = is_edge
 
 
-def _same_type_probability(ij, idx2neigh=None, alpha=None, b2radius=None):
+def _same_type_probability(ij, idx2neigh=None, alpha=None, b2span=None):
   if idx2neigh is None:
     idx2neigh = _shared_info["idx2neigh"]
   if alpha is None:
     alpha = _shared_info["alpha"]
-  if b2radius is None:
-    b2radius = _shared_info["b2radius"]
+  if b2span is None:
+    b2span = _shared_info["b2span"]
 
   i, j = ij
   # A is always 1 to A
@@ -307,52 +308,47 @@ def _same_type_probability(ij, idx2neigh=None, alpha=None, b2radius=None):
   # Calculate weighted intersection
   numerator = 0
   for neigh_idx in a_neigh.intersection(b_neigh):
-    numerator += _weight_by_radius(alpha, b2radius[neigh_idx])
+    numerator += _weight_by_span(alpha, b2span[neigh_idx])
   if numerator == 0:
     return 0
   # Calculate weighted union
   denominator = 0
   for neigh_idx in a_neigh.union(b_neigh):
-    denominator += _weight_by_radius(alpha, b2radius[neigh_idx])
+    denominator += _weight_by_span(alpha, b2span[neigh_idx])
   if denominator == 0:
     return 0
   return numerator / denominator
 
 
-def _same_type_sample(ij, a2radius=None, is_edge=None):
-  if a2radius is None:
-    a2radius = _shared_info["a2radius"]
+def _same_type_sample(ij, a2span=None, is_edge=None, alpha=None):
+  if a2span is None:
+    a2span = _shared_info["a2span"]
   if is_edge is None:
     is_edge = _shared_info["is_edge"]
+  if alpha is None:
+    alpha = _shared_info["alpha"]
+
   i, j = ij
   if is_edge:
     return WeightedSimilarityRecord(
         left_edge_idx=i,
         right_edge_idx=j,
-        left_radius=a2radius[i],
-        right_radius=a2radius[j],
+        left_weight=_weight_by_span(alpha, a2span[i]),
+        right_weight=_weight_by_span(alpha, a2span[j]),
         edge_edge_prob=_same_type_probability(ij))
   else:
     return WeightedSimilarityRecord(
         left_node_idx=i,
         right_node_idx=j,
-        left_radius=a2radius[i],
-        right_radius=a2radius[j],
+        left_weight=_weight_by_span(alpha, a2span[i]),
+        right_weight=_weight_by_span(alpha, a2span[j]),
         node_node_prob=_same_type_probability(ij))
 
 
 ## Different Type Probabilities ################################################
 
 
-def _helper_diff_type_prob(
-    a_idx,
-    b_idx,
-    a2b,
-    b2a,
-    a2a,
-    alpha,
-    a2radius,
-    b2radius):
+def _helper_diff_type_prob(a_idx, b_idx, a2b, b2a, a2a, alpha, a2span, b2span):
   "Computes half of the node-edge probability function"
   a_second_neighbors = set(a2a[a_idx, :].nonzero()[1])
   b_neighbors = set(b2a[b_idx, :].nonzero()[1])
@@ -360,8 +356,8 @@ def _helper_diff_type_prob(
   denominator = 0
   # Computes weighted probability for all intersecting entities
   for neigh_idx in a_second_neighbors.intersection(b_neighbors):
-    prob = _same_type_probability((a_idx, neigh_idx), a2b, alpha, b2radius)
-    prob *= _weight_by_radius(alpha, a2radius[neigh_idx])
+    prob = _same_type_probability((a_idx, neigh_idx), a2b, alpha, b2span)
+    prob *= _weight_by_span(alpha, a2span[neigh_idx])
     numerator += prob
     denominator += prob
   if numerator == 0:
@@ -371,8 +367,8 @@ def _helper_diff_type_prob(
   # by definition the same_type_probability of b_neighbors - a_second_neighbors
   # to a_idx is zero (no shared edges)
   for neigh_idx in a_second_neighbors - b_neighbors:
-    prob = _same_type_probability((a_idx, neigh_idx), a2b, alpha, b2radius)
-    prob *= _weight_by_radius(alpha, a2radius[neigh_idx])
+    prob = _same_type_probability((a_idx, neigh_idx), a2b, alpha, b2span)
+    prob *= _weight_by_span(alpha, a2span[neigh_idx])
     denominator += prob
   if denominator == 0:
     return 0
@@ -385,8 +381,8 @@ def _init_node_edge_probability(
     node2node,
     edge2edge,
     alpha,
-    node2radius,
-    edge2radius,
+    node2span,
+    edge2span,
     num_neighbors):
   _shared_info.clear()
   _shared_info["node2edge"] = node2edge
@@ -394,8 +390,8 @@ def _init_node_edge_probability(
   _shared_info["node2node"] = node2node
   _shared_info["edge2edge"] = edge2edge
   _shared_info["alpha"] = alpha
-  _shared_info["node2radius"] = node2radius
-  _shared_info["edge2radius"] = edge2radius
+  _shared_info["node2span"] = node2span
+  _shared_info["edge2span"] = edge2span
   _shared_info["num_neighbors"] = num_neighbors
 
 
@@ -406,8 +402,8 @@ def _node_edge_probability(
     node2node=None,
     edge2edge=None,
     alpha=None,
-    node2radius=None,
-    edge2radius=None):
+    node2span=None,
+    edge2span=None):
   if node2edge is None:
     node2edge = _shared_info["node2edge"]
   if edge2node is None:
@@ -418,10 +414,10 @@ def _node_edge_probability(
     edge2edge = _shared_info["edge2edge"]
   if alpha is None:
     alpha = _shared_info["alpha"]
-  if node2radius is None:
-    node2radius = _shared_info["node2radius"]
-  if edge2radius is None:
-    edge2radius = _shared_info["edge2radius"]
+  if node2span is None:
+    node2span = _shared_info["node2span"]
+  if edge2span is None:
+    edge2span = _shared_info["edge2span"]
 
   node_idx, edge_idx = node_edge
   prob_node_edge = _helper_diff_type_prob(
@@ -431,8 +427,8 @@ def _node_edge_probability(
       edge2node,
       node2node,
       alpha,
-      node2radius,
-      edge2radius)
+      node2span,
+      edge2span)
   prob_edge_node = _helper_diff_type_prob(
       edge_idx,
       node_idx,
@@ -440,8 +436,8 @@ def _node_edge_probability(
       node2edge,
       edge2edge,
       alpha,
-      edge2radius,
-      node2radius)
+      edge2span,
+      node2span)
   return (prob_node_edge + prob_edge_node) / 2
 
 
@@ -450,8 +446,9 @@ def _node_edge_sample(
     num_neighbors=None,
     node2edge=None,
     edge2node=None,
-    node2radius=None,
-    edge2radius=None):
+    node2span=None,
+    edge2span=None,
+    alpha=None):
   "_init_node_edge_prob must have been run"
   if num_neighbors is None:
     num_neighbors = _shared_info["num_neighbors"]
@@ -459,10 +456,12 @@ def _node_edge_sample(
     node2edge = _shared_info["node2edge"]
   if edge2node is None:
     edge2node = _shared_info["edge2node"]
-  if node2radius is None:
-    node2radius = _shared_info["node2radius"]
-  if edge2radius is None:
-    edge2radius = _shared_info["edge2radius"]
+  if node2span is None:
+    node2span = _shared_info["node2span"]
+  if edge2span is None:
+    edge2span = _shared_info["edge2span"]
+  if alpha is None:
+    alpha = _shared_info["alpha"]
 
   node_idx, edge_idx = node_edge
   node_neighbors = list(edge2node[edge_idx, :].nonzero()[1])
@@ -475,20 +474,21 @@ def _node_edge_sample(
       edge_neighbors,
       min(len(edge_neighbors),
           num_neighbors))
-  node_radii = [node2radius[n] for n in node_neighbors_sample]
-  edge_radii = [edge2radius[e] for e in edge_neighbors_sample]
+  node_weights = [_weight_by_span(alpha, node2span[n]) for n in node_neighbors_sample]
+  edge_weights = [_weight_by_span(alpha, edge2span[e]) for e in edge_neighbors_sample]
 
   node_edge_prob = _node_edge_probability((node_idx, edge_idx))
 
   return WeightedSimilarityRecord(
       left_node_idx=node_idx,
       right_edge_idx=edge_idx,
-      left_radius=node2radius[node_idx],
-      right_radius=edge2radius[edge_idx],
+      left_weight=_weight_by_span(alpha, node2span[node_idx]),
+      right_weight=_weight_by_span(alpha, edge2span[edge_idx]),
       neighbor_node_indices=node_neighbors_sample,
-      neighbor_node_radii=node_radii,
+      neighbor_node_weights=node_weights,
       neighbor_edge_indices=edge_neighbors_sample,
-      neighbor_edge_radii=edge_radii)
+      neighbor_edge_weights=edge_weights,
+      node_edge_prob=node_edge_prob)
 
 
 ################################################################################
@@ -547,21 +547,21 @@ def PrecomputeWeightedSimilarities(
   log.info("Identifying edges sharing nodes")
   edge2edge = edge2node * edge2node.T
 
-  log.info("Calculating algebraic radius per point")
-  node2radius, edge2radius = ComputeAlgebraicRadius(
+  log.info("Calculating algebraic span per point")
+  node2span, edge2span = ComputeSpans(
       hypergraph,
       run_in_parallel=run_in_parallel,
       disable_pbar=disable_pbar)
 
   log.info("Scaling Node Radii")
-  node2radius = ZeroOneScaleKeys(
-      node2radius,
+  node2span = ZeroOneScaleKeys(
+      node2span,
       run_in_parallel=run_in_parallel,
       disable_pbar=disable_pbar)
 
   log.info("Scaling Edge Radii")
-  edge2radius = ZeroOneScaleKeys(
-      edge2radius,
+  edge2span = ZeroOneScaleKeys(
+      edge2span,
       run_in_parallel=run_in_parallel,
       disable_pbar=disable_pbar)
 
@@ -571,8 +571,8 @@ def PrecomputeWeightedSimilarities(
             initargs=(
               node2edge, #idx2neigh
               alpha, #alpha
-              node2radius, #a2radius
-              edge2radius, #b2radius
+              node2span, #a2span
+              edge2span, #b2span
               False #is_edge
             )) as pool:
     with tqdm(total=len(hypergraph.node) * samples_per,
@@ -589,8 +589,8 @@ def PrecomputeWeightedSimilarities(
             initargs=(
               edge2node, #idx2neigh
               alpha, #alpha
-              edge2radius, #a2radius
-              node2radius, #b2radius
+              edge2span, #a2span
+              node2span, #b2span
               True #is_edge
             )) as pool:
     with tqdm(total=len(hypergraph.edge) * samples_per,
@@ -610,8 +610,8 @@ def PrecomputeWeightedSimilarities(
               node2node, #node2node
               edge2edge, #edge2edge
               alpha, #alpha
-              node2radius, #node2radius
-              edge2radius, #edge2radius
+              node2span, #node2span
+              edge2span, #edge2span
               num_neighbors
             )) as pool:
     log.info("Identifying all second-order edges per node")
@@ -636,10 +636,7 @@ def PrecomputeWeightedSimilarities(
                                               flip=True)):
         similarity_records.append(result)
         pbar.update(1)
-
-  return _weighted_similarity_records_to_model_input(
-      similarity_records,
-      num_neighbors)
+  return similarity_records
 
 
 ################################################################################
@@ -657,23 +654,8 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
   left_edge_idx = Input((1,), name="left_edge_idx", dtype=np.int32)
   right_edge_idx = Input((1,), name="right_edge_idx", dtype=np.int32)
 
-  left_radius = Input((1,), name="left_radius", dtype=np.float32)
-  right_radius = Input((1,), name="right_radius", dtype=np.float32)
-
-  neighbor_edge_indices = [
-      Input((1,
-            ),
-            dtype=np.int32,
-            name="neighbor_edge_idx_{}".format(i))
-      for i in range(num_neighbors)
-  ]
-  neighbor_edge_radii = [
-      Input((1,
-            ),
-            dtype=np.float32,
-            name="neighbor_edge_radius_{}".format(i))
-      for i in range(num_neighbors)
-  ]
+  left_weight = Input((1,), name="left_weight", dtype=np.float32)
+  right_weight = Input((1,), name="right_weight", dtype=np.float32)
 
   neighbor_node_indices = [
       Input((1,
@@ -682,11 +664,28 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
             name="neighbor_node_idx_{}".format(i))
       for i in range(num_neighbors)
   ]
-  neighbor_node_radii = [
+
+  neighbor_node_weights = [
       Input((1,
             ),
             dtype=np.float32,
-            name="neighbor_node_radius_{}".format(i))
+            name="neighbor_node_weight_{}".format(i))
+      for i in range(num_neighbors)
+  ]
+
+  neighbor_edge_indices = [
+      Input((1,
+            ),
+            dtype=np.int32,
+            name="neighbor_edge_idx_{}".format(i))
+      for i in range(num_neighbors)
+  ]
+
+  neighbor_edge_weights = [
+      Input((1,
+            ),
+            dtype=np.float32,
+            name="neighbor_edge_weight_{}".format(i))
       for i in range(num_neighbors)
   ]
 
@@ -721,66 +720,55 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
       for neighbor_edge_idx in neighbor_edge_indices
   ]
 
-  node_node_prob = Dense(
+  node_node_prediction = Dense(
       1,
       activation="sigmoid",
-      input_shape=(3,
-                  ),
-      name="node_node_prob")
-  edge_edge_prob = Dense(
-      1,
-      activation="sigmoid",
-      input_shape=(3,
-                  ),
-      name="edge_edge_prob")
+      name="node_node_prob")(
+          Concatenate(1)(
+              [Dot(1)([left_node_vec,
+                       right_node_vec]),
+               left_weight,
+               right_weight]))
 
-  node_node_prediction = node_node_prob(
-      Concatenate(1)(
-          [Dot(1)([left_node_vec,
-                   right_node_vec]),
-           left_radius,
-           right_radius]))
-  edge_edge_prediction = edge_edge_prob(
-      Concatenate(1)(
-          [Dot(1)([left_edge_vec,
-                   right_edge_vec]),
-           left_radius,
-           right_radius]))
+  edge_edge_prediction = Dense(
+      1,
+      activation="sigmoid",
+      name="edge_edge_prob")(
+          Concatenate(1)(
+              [Dot(1)([left_edge_vec,
+                       right_edge_vec]),
+               left_weight,
+               right_weight]))
 
-  node_neighbor_pred = Dense(
-      1,
-      activation="sigmoid",
-      name="node_neighbor_pred")(
-          Concatenate(1)([
-              node_node_prob(
-                  Concatenate(1)(
-                      [Dot(1)([n_vec,
-                               left_node_vec]),
-                       left_radius,
-                       n_rad])) for n_vec,
-              n_rad in zip(neighbor_node_vecs,
-                           neighbor_node_radii)
-          ]))
-  edge_neighbor_pred = Dense(
-      1,
-      activation="sigmoid",
-      name="edge_neighbor_pred")(
-          Concatenate(1)([
-              edge_edge_prob(
-                  Concatenate(1)(
-                      [Dot(1)([n_vec,
-                               right_edge_vec]),
-                       right_radius,
-                       n_rad])) for n_vec,
-              n_rad in zip(neighbor_edge_vecs,
-                           neighbor_edge_radii)
-          ]))
-  node_edge_prediction = Dense(
-      1,
-      activation="sigmoid",
-      name="node_edge_prediction")(
-          Concatenate(1)([node_neighbor_pred,
-                          edge_neighbor_pred]))
+  node_neighbor_dot_sigs = [
+      Dense(1,
+            activation="sigmoid")(
+                Concatenate(1)(
+                    [Dot(1)([n_vec,
+                             left_node_vec]),
+                     left_weight,
+                     n_weight])) for n_vec,
+      n_weight in zip(neighbor_node_vecs,
+                    neighbor_node_weights)
+  ]
+  node_neighbor_avg = Average()(node_neighbor_dot_sigs)
+
+  edge_neighbor_dot_sigs = [
+      Dense(1,
+            activation="sigmoid")(
+                Concatenate(1)(
+                    [Dot(1)([n_vec,
+                             right_edge_vec]),
+                     right_weight,
+                     n_weight])) for n_vec,
+      n_weight in zip(neighbor_edge_vecs,
+                    neighbor_edge_weights)
+  ]
+  edge_neighbor_avg = Average()(edge_neighbor_dot_sigs)
+
+  node_edge_prediction = Multiply(name="node_edge_prob")(
+      [node_neighbor_avg,
+       edge_neighbor_avg])
 
   model = Model(
       # THESE MUST LINE UP EXACTLY WITH
@@ -789,12 +777,12 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
               left_edge_idx,
               right_node_idx,
               right_edge_idx,
-              left_radius,
-              right_radius] \
+              left_weight,
+              right_weight] \
              + neighbor_node_indices \
-             + neighbor_node_radii \
+             + neighbor_node_weights \
              + neighbor_edge_indices \
-             + neighbor_edge_radii,
+             + neighbor_edge_weights,
       outputs=[node_node_prediction,
                edge_edge_prediction,
                node_edge_prediction])
@@ -812,14 +800,25 @@ def EmbedWeightedHypergraph(
     dimension,
     num_neighbors=10,
     alpha=0.25,
-    samples_per=50,
+    samples_per=250,
     batch_size=256,
-    epochs=5):
-  input_features, output_probs = PrecomputeWeightedSimilarities(
+    epochs=5,
+    disable_pbar=False,
+    debug_summary_path=None):
+  similarity_records = PrecomputeWeightedSimilarities(
       hypergraph,
       num_neighbors,
       samples_per,
-      alpha)
+      alpha,
+      disable_pbar=disable_pbar)
+
+  if debug_summary_path is not None:
+    WriteDebugSummary(debug_summary_path, similarity_records)
+
+  input_features, output_probs = _weighted_similarity_records_to_model_input(
+    similarity_records,
+    num_neighbors)
+
   model = GetWeightedModel(hypergraph, dimension, num_neighbors)
   model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
 
@@ -837,3 +836,66 @@ def EmbedWeightedHypergraph(
   for edge_idx in hypergraph.edge:
     embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
   return embedding
+
+
+def _log_distribution_info(name, distribution):
+  log.info(name)
+  log.info(" > Size : %i", len(distribution))
+  log.info(" > Range: %f - %f", min(distribution), max(distribution))
+  log.info(" > Mean : %f", sum(distribution) / len(distribution))
+  log.info(" > Std. : %f", stdev(distribution))
+
+
+def WriteDebugSummary(debug_summary_path, sim_records):
+
+  log.info("Writing Debug Summary to %s", debug_summary_path)
+  node2span = {}
+  edge2span = {}
+  for r in sim_records:
+    if r.left_node_idx is not None and r.left_node_idx not in node2span:
+      node2span[r.left_node_idx] = r.left_weight
+    if r.right_node_idx is not None and r.right_node_idx not in node2span:
+      node2span[r.right_node_idx] = r.right_weight
+    if r.left_edge_idx is not None and r.left_edge_idx not in edge2span:
+      edge2span[r.left_edge_idx] = r.left_weight
+    if r.right_edge_idx is not None and r.right_edge_idx not in edge2span:
+      edge2span[r.right_edge_idx] = r.right_weight
+
+  nn_probs = [
+      r.node_node_prob for r in sim_records if r.node_node_prob is not None
+  ]
+  ee_probs = [
+      r.edge_edge_prob for r in sim_records if r.edge_edge_prob is not None
+  ]
+  ne_probs = [
+      r.node_edge_prob for r in sim_records if r.node_edge_prob is not None
+  ]
+  fig, (node_spans,
+        edge_spans,
+        nn_ax,
+        ee_ax,
+        ne_ax) = plt.subplots(5, 1, figsize=(8.5, 11))
+  node_spans.set_title("Node Spans")
+  node_spans.hist(list(node2span.values()))
+  node_spans.set_yscale("log")
+  edge_spans.set_title("Edge Spans")
+  edge_spans.hist(list(edge2span.values()))
+  edge_spans.set_yscale("log")
+  nn_ax.set_title("Node-Node Probability Distribution")
+  nn_ax.hist(nn_probs)
+  nn_ax.set_yscale("log")
+  ee_ax.set_title("Edge-Edge Probability Distribution")
+  ee_ax.hist(ee_probs)
+  ee_ax.set_yscale("log")
+  ne_ax.set_title("Node-Edge Probability Distribution")
+  ne_ax.hist(ne_probs)
+  ne_ax.set_yscale("log")
+  fig.tight_layout()
+  fig.savefig(debug_summary_path)
+
+  log.info("Finished Writing")
+  _log_distribution_info("NodeSpans", list(node2span.values()))
+  _log_distribution_info("EdgeSpans", list(edge2span.values()))
+  _log_distribution_info("Node-Node Prob.", nn_probs)
+  _log_distribution_info("Edge-Edge Prob.", ee_probs)
+  _log_distribution_info("Node-Edge Prob.", ne_probs)

@@ -3,7 +3,7 @@
 
 from . import HypergraphEmbedding
 from .hypergraph_util import *
-from .hypergraph2vec import *
+from .hypergraph2vec import EmbedHypergraph
 from .weighted_hypergraph2vec import EmbedWeightedHypergraph
 from .algebraic_distance import EmbedAlgebraicDistance
 
@@ -14,6 +14,7 @@ from scipy.sparse import csr_matrix
 
 from sklearn.decomposition import NMF
 from collections.abc import Mapping
+from pathlib import Path
 from random import random
 import logging
 from node2vec import Node2Vec
@@ -24,20 +25,28 @@ from tqdm import tqdm
 log = logging.getLogger()
 
 global EMBEDDING_OPTIONS
+global DEBUG_SUMMARY_OPTIONS
 
 
 def Embed(args, hypergraph):
   log.info("Checking embedding dimensionality is smaller than # nodes/edges")
   assert min(len(hypergraph.node),
              len(hypergraph.edge)) > args.embedding_dimension
-
   log.info(
       "Embedding using method %s with %i dim",
       args.embedding_method,
       args.embedding_dimension)
-  embedding = EMBEDDING_OPTIONS[args.embedding_method](
-      hypergraph,
-      args.embedding_dimension)
+  if args.embedding_debug_summary:
+    debug_summary_path = Path(args.embedding_debug_summary)
+    log.info("... and writing summary to %s", debug_summary_path)
+    embedding = EMBEDDING_OPTIONS[args.embedding_method](
+        hypergraph,
+        args.embedding_dimension,
+        debug_summary_path=debug_summary_path)
+  else:
+    embedding = EMBEDDING_OPTIONS[args.embedding_method](
+        hypergraph,
+        args.embedding_dimension)
   log.info(
       "Embedding contains %i node and %i edge vectors",
       len(embedding.node),
@@ -197,35 +206,6 @@ def EmbedNode2VecClique(
   return embedding
 
 
-def EmbedHypergraph(
-    hypergraph,
-    dimension,
-    num_neighbors=5,
-    pos_samples=100,
-    neg_samples=0,
-    batch_size=256,
-    epochs=5):
-  input_features, output_probs = PrecomputeSimilarities(hypergraph,
-                                                        num_neighbors,
-                                                        pos_samples,
-                                                        neg_samples)
-  model = GetModel(hypergraph, dimension, num_neighbors)
-  model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
-
-  log.info("Recording Embeddings")
-
-  node_weights = model.get_layer("node_embedding").get_weights()[0]
-  edge_weights = model.get_layer("edge_embedding").get_weights()[0]
-
-  embedding = HypergraphEmbedding()
-  embedding.dim = dimension
-  embedding.method_name = "Hypergraph"
-
-  for node_idx in hypergraph.node:
-    embedding.node[node_idx].values.extend(node_weights[node_idx + 1])
-  for edge_idx in hypergraph.edge:
-    embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
-  return embedding
 
 
 def EmbedHypergraphPlusPlus(
@@ -276,4 +256,11 @@ EMBEDDING_OPTIONS = {
     "HYPERGRAPH++": EmbedHypergraphPlusPlus,
     "ALG_DIST": EmbedAlgebraicDistance,
     "WEIGHTED_HG": EmbedWeightedHypergraph,
+}
+
+# Only include here if the embedding function supports the keyword argument
+# debug_summary_path
+DEBUG_SUMMARY_OPTIONS = {
+    "WEIGHTED_HG",
+    "HYPERGRAPH"
 }

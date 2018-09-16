@@ -57,7 +57,8 @@ def _helper_update_embeddings(
     edge2nodes,
     workers,
     disable_pbar):
-  log.info("Placing nodes with respect to edges")
+  if not disable_pbar:
+    log.info("Placing nodes with respect to edges")
   new_node_embeddings = np.copy(node_embeddings)
   with Pool(workers,
             initializer=_init_update_alg_dist,
@@ -71,7 +72,8 @@ def _helper_update_embeddings(
         new_node_embeddings[idx, :] = emb
         pbar.update(1)
 
-  log.info("Placing edges with respect to nodes")
+  if not disable_pbar:
+    log.info("Placing edges with respect to nodes")
   new_edge_embeddings = np.copy(edge_embeddings)
   with Pool(workers,
             initializer=_init_update_alg_dist,
@@ -119,7 +121,8 @@ def _helper_scale_embeddings(
     edge_embeddings,
     workers,
     disable_pbar):
-  log.info("Getting min-max embedding per dimension")
+  if not disable_pbar:
+    log.info("Getting min-max embedding per dimension")
   min_edge_embedding = np.min(edge_embeddings, axis=0)
   min_node_embedding = np.min(node_embeddings, axis=0)
   min_embedding = np.min(
@@ -134,7 +137,8 @@ def _helper_scale_embeddings(
       axis=0)
   delta_embedding = max_embedding - min_embedding
 
-  log.info("Scaling nodes to 0-1 hypercube")
+  if not disable_pbar:
+    log.info("Scaling nodes to 0-1 hypercube")
   with Pool(workers,
             initializer=_init_scale_alg_dist,
             initargs=(node_embeddings, #embedding
@@ -146,7 +150,8 @@ def _helper_scale_embeddings(
         node_embeddings[idx, :] = emb
         pbar.update(1)
 
-  log.info("Scaling edges to 0-1 hypercube")
+  if not disable_pbar:
+    log.info("Scaling edges to 0-1 hypercube")
   with Pool(workers,
             initializer=_init_scale_alg_dist,
             initargs=(edge_embeddings, #embedding
@@ -181,8 +186,8 @@ def EmbedAlgebraicDistance(
   log.info("Getting edge-node matrix")
   edge2nodes = ToEdgeCsrMatrix(hypergraph)
 
-  for iteration in range(iterations):
-    log.info("Iteration %i/%i", iteration, iterations)
+  log.info("Performing iterations of Algebraic Distance Calculations")
+  for iteration in tqdm(range(iterations), disable=disable_pbar):
 
     node_embeddings, edge_embeddings = _helper_update_embeddings(
         hypergraph,
@@ -191,13 +196,13 @@ def EmbedAlgebraicDistance(
         node2edges,
         edge2nodes,
         workers,
-        disable_pbar)
+        disable_pbar=True)
     node_embeddings, edge_embeddings = _helper_scale_embeddings(
         hypergraph,
         node_embeddings,
         edge_embeddings,
         workers,
-        disable_pbar)
+        disable_pbar=True)
 
   embedding = HypergraphEmbedding()
   embedding.dim = dimension

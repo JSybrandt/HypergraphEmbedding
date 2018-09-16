@@ -65,6 +65,13 @@ def ParseArgs():
       help=(
           "Dimensonality of output embeddings. "
           "Should be positive and less than #nodes and #edges."))
+  parser.add_argument(
+      "--embedding-debug-summary",
+      type=str,
+      help=(
+        "If set, in combination with an appropriate embedding-method we will "
+        "write a summary of our embedding information. For instance, we may "
+        "provided a histogram of each sampled probabilities"))
 
   # experiment options
   parser.add_argument(
@@ -88,6 +95,8 @@ def ParseArgs():
           "Used to determine the proportion of removed node-edge connections "
           "for LP_* experiments"),
       default=0.1)
+
+
 
   # Required hypergraph argument
   parser.add_argument(
@@ -168,6 +177,14 @@ if __name__ == "__main__":
     log.info("Checking that experiment is valid")
     for experiment in args.experiment:
       assert experiment in EXPERIMENT_OPTIONS
+
+  if args.embedding_debug_summary:
+    log.info("--embedding_debug_summary set, checking for appropriate method")
+    assert args.embedding_method in DEBUG_SUMMARY_OPTIONS
+    log.info("Ensuring that its safe to write debug summary")
+    embedding_debug_summary_path = Path(args.embedding_debug_summary)
+    assert not embedding_debug_summary_path.exists()
+    assert embedding_debug_summary_path.parent.is_dir()
 
   log.info("Finished checking, lgtm")
 
