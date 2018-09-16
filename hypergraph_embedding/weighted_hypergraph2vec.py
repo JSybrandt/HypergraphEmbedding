@@ -13,6 +13,7 @@ from tqdm import tqdm
 import logging
 from random import sample
 from collections import namedtuple
+from statistics import stdev
 
 import keras
 from keras.models import Model
@@ -184,12 +185,12 @@ WeightedSimilarityRecord = namedtuple(
         "left_edge_idx",
         "right_node_idx",
         "right_edge_idx",
-        "left_span",
-        "right_span",
+        "left_weight",
+        "right_weight",
         "neighbor_node_indices",
-        "neighbor_node_spans",
+        "neighbor_node_weights",
         "neighbor_edge_indices",
-        "neighbor_edge_spans",
+        "neighbor_edge_weights",
         "node_node_prob",
         "edge_edge_prob",
         "node_edge_prob"))
@@ -212,13 +213,6 @@ def ValOrZero(x):
     return x
 
 
-def ValOrOne(x):
-  if x is None:
-    return 1
-  else:
-    return x
-
-
 def PadWithZeros(arrOrNone, idx):
   if arrOrNone is None or idx >= len(arrOrNone):
     return 0
@@ -231,12 +225,12 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
   right_node_idx = []
   left_edge_idx = []
   right_edge_idx = []
-  left_span = []
-  right_span = []
+  left_weight = []
+  right_weight = []
   neighbor_node_indices = [[] for _ in range(num_neighbors)]
-  neighbor_node_spans = [[] for _ in range(num_neighbors)]
+  neighbor_node_weights = [[] for _ in range(num_neighbors)]
   neighbor_edge_indices = [[] for _ in range(num_neighbors)]
-  neighbor_edge_spans = [[] for _ in range(num_neighbors)]
+  neighbor_edge_weights = [[] for _ in range(num_neighbors)]
   node_node_prob = []
   edge_edge_prob = []
   node_edge_prob = []
@@ -246,13 +240,13 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
     right_node_idx.append(IncOrZero(r.right_node_idx))
     left_edge_idx.append(IncOrZero(r.left_edge_idx))
     right_edge_idx.append(IncOrZero(r.right_edge_idx))
-    left_span.append(ValOrOne(r.left_span))  # if not supplied, set to bad
-    right_span.append(ValOrOne(r.right_span))
+    left_weight.append(ValOrZero(r.left_weight))  # if not supplied, set to bad
+    right_weight.append(ValOrZero(r.right_weight))
     for i in range(num_neighbors):
       neighbor_node_indices[i].append(PadWithZeros(r.neighbor_node_indices, i))
-      neighbor_node_spans[i].append(PadWithZeros(r.neighbor_node_spans, i))
+      neighbor_node_weights[i].append(PadWithZeros(r.neighbor_node_weights, i))
       neighbor_edge_indices[i].append(PadWithZeros(r.neighbor_edge_indices, i))
-      neighbor_edge_spans[i].append(PadWithZeros(r.neighbor_edge_spans, i))
+      neighbor_edge_weights[i].append(PadWithZeros(r.neighbor_edge_weights, i))
     node_node_prob.append(ValOrZero(r.node_node_prob))
     edge_edge_prob.append(ValOrZero(r.edge_edge_prob))
     node_edge_prob.append(ValOrZero(r.node_edge_prob))
@@ -262,12 +256,12 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
        left_edge_idx,
        right_node_idx,
        right_edge_idx,
-       left_span,
-       right_span] \
+       left_weight,
+       right_weight] \
       + neighbor_node_indices \
-      + neighbor_node_spans \
+      + neighbor_node_weights \
       + neighbor_edge_indices \
-      + neighbor_edge_spans,
+      + neighbor_edge_weights,
       [node_node_prob,
        edge_edge_prob,
        node_node_prob])
@@ -326,25 +320,28 @@ def _same_type_probability(ij, idx2neigh=None, alpha=None, b2span=None):
   return numerator / denominator
 
 
-def _same_type_sample(ij, a2span=None, is_edge=None):
+def _same_type_sample(ij, a2span=None, is_edge=None, alpha=None):
   if a2span is None:
     a2span = _shared_info["a2span"]
   if is_edge is None:
     is_edge = _shared_info["is_edge"]
+  if alpha is None:
+    alpha = _shared_info["alpha"]
+
   i, j = ij
   if is_edge:
     return WeightedSimilarityRecord(
         left_edge_idx=i,
         right_edge_idx=j,
-        left_span=a2span[i],
-        right_span=a2span[j],
+        left_weight=_weight_by_span(alpha, a2span[i]),
+        right_weight=_weight_by_span(alpha, a2span[j]),
         edge_edge_prob=_same_type_probability(ij))
   else:
     return WeightedSimilarityRecord(
         left_node_idx=i,
         right_node_idx=j,
-        left_span=a2span[i],
-        right_span=a2span[j],
+        left_weight=_weight_by_span(alpha, a2span[i]),
+        right_weight=_weight_by_span(alpha, a2span[j]),
         node_node_prob=_same_type_probability(ij))
 
 
@@ -450,7 +447,8 @@ def _node_edge_sample(
     node2edge=None,
     edge2node=None,
     node2span=None,
-    edge2span=None):
+    edge2span=None,
+    alpha=None):
   "_init_node_edge_prob must have been run"
   if num_neighbors is None:
     num_neighbors = _shared_info["num_neighbors"]
@@ -462,6 +460,8 @@ def _node_edge_sample(
     node2span = _shared_info["node2span"]
   if edge2span is None:
     edge2span = _shared_info["edge2span"]
+  if alpha is None:
+    alpha = _shared_info["alpha"]
 
   node_idx, edge_idx = node_edge
   node_neighbors = list(edge2node[edge_idx, :].nonzero()[1])
@@ -474,20 +474,21 @@ def _node_edge_sample(
       edge_neighbors,
       min(len(edge_neighbors),
           num_neighbors))
-  node_spans = [node2span[n] for n in node_neighbors_sample]
-  edge_spans = [edge2span[e] for e in edge_neighbors_sample]
+  node_weights = [_weight_by_span(alpha, node2span[n]) for n in node_neighbors_sample]
+  edge_weights = [_weight_by_span(alpha, edge2span[e]) for e in edge_neighbors_sample]
 
   node_edge_prob = _node_edge_probability((node_idx, edge_idx))
 
   return WeightedSimilarityRecord(
       left_node_idx=node_idx,
       right_edge_idx=edge_idx,
-      left_span=node2span[node_idx],
-      right_span=edge2span[edge_idx],
+      left_weight=_weight_by_span(alpha, node2span[node_idx]),
+      right_weight=_weight_by_span(alpha, edge2span[edge_idx]),
       neighbor_node_indices=node_neighbors_sample,
-      neighbor_node_spans=node_spans,
+      neighbor_node_weights=node_weights,
       neighbor_edge_indices=edge_neighbors_sample,
-      neighbor_edge_spans=edge_spans)
+      neighbor_edge_weights=edge_weights,
+      node_edge_prob=node_edge_prob)
 
 
 ################################################################################
@@ -653,8 +654,8 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
   left_edge_idx = Input((1,), name="left_edge_idx", dtype=np.int32)
   right_edge_idx = Input((1,), name="right_edge_idx", dtype=np.int32)
 
-  left_span = Input((1,), name="left_span", dtype=np.float32)
-  right_span = Input((1,), name="right_span", dtype=np.float32)
+  left_weight = Input((1,), name="left_weight", dtype=np.float32)
+  right_weight = Input((1,), name="right_weight", dtype=np.float32)
 
   neighbor_node_indices = [
       Input((1,
@@ -664,11 +665,11 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
       for i in range(num_neighbors)
   ]
 
-  neighbor_node_spans = [
+  neighbor_node_weights = [
       Input((1,
             ),
             dtype=np.float32,
-            name="neighbor_node_span_{}".format(i))
+            name="neighbor_node_weight_{}".format(i))
       for i in range(num_neighbors)
   ]
 
@@ -680,11 +681,11 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
       for i in range(num_neighbors)
   ]
 
-  neighbor_edge_spans = [
+  neighbor_edge_weights = [
       Input((1,
             ),
             dtype=np.float32,
-            name="neighbor_edge_span_{}".format(i))
+            name="neighbor_edge_weight_{}".format(i))
       for i in range(num_neighbors)
   ]
 
@@ -726,8 +727,8 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
           Concatenate(1)(
               [Dot(1)([left_node_vec,
                        right_node_vec]),
-               left_span,
-               right_span]))
+               left_weight,
+               right_weight]))
 
   edge_edge_prediction = Dense(
       1,
@@ -736,8 +737,8 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
           Concatenate(1)(
               [Dot(1)([left_edge_vec,
                        right_edge_vec]),
-               left_span,
-               right_span]))
+               left_weight,
+               right_weight]))
 
   node_neighbor_dot_sigs = [
       Dense(1,
@@ -745,10 +746,10 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
                 Concatenate(1)(
                     [Dot(1)([n_vec,
                              left_node_vec]),
-                     left_span,
-                     n_span])) for n_vec,
-      n_span in zip(neighbor_node_vecs,
-                    neighbor_node_spans)
+                     left_weight,
+                     n_weight])) for n_vec,
+      n_weight in zip(neighbor_node_vecs,
+                    neighbor_node_weights)
   ]
   node_neighbor_avg = Average()(node_neighbor_dot_sigs)
 
@@ -758,10 +759,10 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
                 Concatenate(1)(
                     [Dot(1)([n_vec,
                              right_edge_vec]),
-                     right_span,
-                     n_span])) for n_vec,
-      n_span in zip(neighbor_edge_vecs,
-                    neighbor_edge_spans)
+                     right_weight,
+                     n_weight])) for n_vec,
+      n_weight in zip(neighbor_edge_vecs,
+                    neighbor_edge_weights)
   ]
   edge_neighbor_avg = Average()(edge_neighbor_dot_sigs)
 
@@ -776,12 +777,12 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
               left_edge_idx,
               right_node_idx,
               right_edge_idx,
-              left_span,
-              right_span] \
+              left_weight,
+              right_weight] \
              + neighbor_node_indices \
-             + neighbor_node_spans \
+             + neighbor_node_weights \
              + neighbor_edge_indices \
-             + neighbor_edge_spans,
+             + neighbor_edge_weights,
       outputs=[node_node_prediction,
                edge_edge_prediction,
                node_edge_prediction])
@@ -799,7 +800,7 @@ def EmbedWeightedHypergraph(
     dimension,
     num_neighbors=10,
     alpha=0.25,
-    samples_per=50,
+    samples_per=250,
     batch_size=256,
     epochs=5,
     disable_pbar=False,
@@ -842,7 +843,7 @@ def _log_distribution_info(name, distribution):
   log.info(" > Size : %i", len(distribution))
   log.info(" > Range: %f - %f", min(distribution), max(distribution))
   log.info(" > Mean : %f", sum(distribution) / len(distribution))
-  log.info(" > Std. : %f", np.std(distribution))
+  log.info(" > Std. : %f", stdev(distribution))
 
 
 def WriteDebugSummary(debug_summary_path, sim_records):
@@ -852,13 +853,13 @@ def WriteDebugSummary(debug_summary_path, sim_records):
   edge2span = {}
   for r in sim_records:
     if r.left_node_idx is not None and r.left_node_idx not in node2span:
-      node2span[r.left_node_idx] = r.left_span
+      node2span[r.left_node_idx] = r.left_weight
     if r.right_node_idx is not None and r.right_node_idx not in node2span:
-      node2span[r.right_node_idx] = r.right_span
+      node2span[r.right_node_idx] = r.right_weight
     if r.left_edge_idx is not None and r.left_edge_idx not in edge2span:
-      edge2span[r.left_edge_idx] = r.left_span
+      edge2span[r.left_edge_idx] = r.left_weight
     if r.right_edge_idx is not None and r.right_edge_idx not in edge2span:
-      edge2span[r.right_edge_idx] = r.right_span
+      edge2span[r.right_edge_idx] = r.right_weight
 
   nn_probs = [
       r.node_node_prob for r in sim_records if r.node_node_prob is not None
@@ -893,8 +894,8 @@ def WriteDebugSummary(debug_summary_path, sim_records):
   fig.savefig(debug_summary_path)
 
   log.info("Finished Writing")
-  _log_distribution_info("NodeSpans", node2span.values())
-  _log_distribution_info("EdgeSpans", edge2span.values())
+  _log_distribution_info("NodeSpans", list(node2span.values()))
+  _log_distribution_info("EdgeSpans", list(edge2span.values()))
   _log_distribution_info("Node-Node Prob.", nn_probs)
   _log_distribution_info("Edge-Edge Prob.", ee_probs)
   _log_distribution_info("Node-Edge Prob.", ne_probs)
