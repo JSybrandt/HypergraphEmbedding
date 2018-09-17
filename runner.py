@@ -69,9 +69,9 @@ def ParseArgs():
       "--embedding-debug-summary",
       type=str,
       help=(
-        "If set, in combination with an appropriate embedding-method we will "
-        "write a summary of our embedding information. For instance, we may "
-        "provided a histogram of each sampled probabilities"))
+          "If set, in combination with an appropriate embedding-method we will "
+          "write a summary of our embedding information. For instance, we may "
+          "provided a histogram of each sampled probabilities"))
 
   # experiment options
   parser.add_argument(
@@ -95,8 +95,6 @@ def ParseArgs():
           "Used to determine the proportion of removed node-edge connections "
           "for LP_* experiments"),
       default=0.1)
-
-
 
   # Required hypergraph argument
   parser.add_argument(

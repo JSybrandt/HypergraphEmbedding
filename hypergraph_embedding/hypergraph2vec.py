@@ -3,6 +3,7 @@
 # Are used in the "embedding" module to actually perform this task
 
 from .hypergraph_util import *
+from . import HypergraphEmbedding
 
 import numpy as np
 import scipy as sp
@@ -14,6 +15,7 @@ import logging
 import multiprocessing
 from multiprocessing import Pool
 from itertools import combinations, permutations, product
+from time import time
 from tqdm import tqdm
 from collections import namedtuple
 
@@ -21,6 +23,7 @@ import keras
 from keras.models import Model
 from keras.layers import Input, Embedding, Multiply, Dense
 from keras.layers import Dot, Flatten, Average
+from keras.callbacks import TensorBoard
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -55,8 +58,8 @@ def _similarity_values_to_model_input(similarity_records, num_neighbors):
   "(feature lists, output_lists)"
 
   left_node_idx = []
-  right_node_idx = []
   left_edge_idx = []
+  right_node_idx = []
   right_edge_idx = []
   edges_containing_node = [[] for _ in range(num_neighbors)]
   nodes_in_edge = [[] for _ in range(num_neighbors)]
@@ -104,7 +107,9 @@ def _similarity_values_to_model_input(similarity_records, num_neighbors):
   return ([left_node_idx,
            left_edge_idx,
            right_node_idx,
-           right_edge_idx] + edges_containing_node + nodes_in_edge,
+           right_edge_idx] \
+          + edges_containing_node \
+          + nodes_in_edge,
           [node_node_prob,
            edge_edge_prob,
            node_edge_prob])
@@ -164,9 +169,12 @@ def _same_type_sample(
   else:
     neg_targets = set()
 
+  source_dense = idx2features[source_idx, :].todense()
+
   for target_idx in sample(pos_targets, pos_samples) \
                   + sample(neg_targets, neg_samples):
-    prob = jaccard(idx2features[source_idx, :], idx2features[target_idx, :])
+    target_dense = idx2features[target_idx, :].todense()
+    prob = jaccard(source_dense, target_dense)
     if source_is_edge:
       results.append(
           SimilarityRecord(
@@ -253,10 +261,14 @@ def _diff_type_sample(
     neg_samples = min(neg_samples, len(neg_targets))
   else:
     neg_targets = set()
+  source_targets_dense = source2targets[source_idx, :].todense()
+  source_neighbors_dense = source2neighbors[source_idx, :].todense()
   for target_idx in sample(pos_targets, pos_samples) \
                   + sample(neg_targets, neg_samples):
-    prob = jaccard(source2targets[source_idx], target2neighbors[target_idx]) \
-         * jaccard(target2sources[target_idx], source2neighbors[source_idx])
+    prob = jaccard(source_targets_dense,
+                   target2neighbors[target_idx].todense()) \
+         * jaccard(target2sources[target_idx].todense(),
+                   source_neighbors_dense)
 
     # Make simpler variable names for assigment
     if source_is_edge:
@@ -625,32 +637,21 @@ def GetModel(hypergraph, dimension, num_neighbors):
   right_node_vec = Flatten()(node_emb(right_node_idx))
   right_edge_vec = Flatten()(edge_emb(right_edge_idx))
 
+  node_sim = Dense(1, activation="relu", name="node_node_prob")
+  edge_sim = Dense(1, activation="relu", name="edge_edge_prob")
+
   # calculate expected probabilities
-  node_node_prob = Dense(
-      1,
-      activation="sigmoid",
-      name="node_node_prob")(
-          Dot(1)([left_node_vec,
-                  right_node_vec]))
-  edge_edge_prob = Dense(
-      1,
-      activation="sigmoid",
-      name="edge_edge_prob")(
-          Dot(1)([left_edge_vec,
-                  right_edge_vec]))
+  node_node_prob = node_sim(Dot(1)([left_node_vec, right_node_vec]))
+  edge_edge_prob = edge_sim(Dot(1)([left_edge_vec, right_edge_vec]))
 
   # Get neighborhood embeddings
   nodes_dot_sigs = [
-      Dense(1,
-            activation="sigmoid")(
-                Dot(1)([Flatten()(node_emb(node)),
-                        left_node_vec])) for node in nodes_in_edge
+      node_sim(Dot(1)([Flatten()(node_emb(node)),
+                       left_node_vec])) for node in nodes_in_edge
   ]
   edges_dot_sigs = [
-      Dense(1,
-            activation="sigmoid")(
-                Dot(1)([Flatten()(edge_emb(edge)),
-                        right_edge_vec])) for edge in edges_containing_node
+      edge_sim(Dot(1)([Flatten()(edge_emb(edge)),
+                       right_edge_vec])) for edge in edges_containing_node
   ]
 
   node_sig_avg = Average()(nodes_dot_sigs)
@@ -664,32 +665,44 @@ def GetModel(hypergraph, dimension, num_neighbors):
       outputs=[node_node_prob,
                edge_edge_prob,
                node_edge_prob])
-
-  model.compile(optimizer="adagrad", loss="kullback_leibler_divergence")
+  model.compile(optimizer="adagrad", loss="mean_squared_error")
   return model
+
 
 ################################################################################
 # Hooks for runner                                                             #
 ################################################################################
 
+
 def EmbedHypergraph(
     hypergraph,
     dimension,
-    num_neighbors=5,
-    pos_samples=100,
+    num_neighbors=10,
+    pos_samples=300,
     neg_samples=0,
     batch_size=256,
     epochs=5,
     debug_summary_path=None):
-  similarity_records = PrecomputeSimilarities(hypergraph,
-                                              num_neighbors,
-                                              pos_samples,
-                                              neg_samples)
+  similarity_records = PrecomputeSimilarities(
+      hypergraph,
+      num_neighbors,
+      pos_samples,
+      neg_samples)
   if debug_summary_path is not None:
     WriteDebugSummary(debug_summary_path, similarity_records)
   input_features, output_probs = _similarity_values_to_model_input(similarity_records, num_neighbors)
   model = GetModel(hypergraph, dimension, num_neighbors)
-  model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
+
+  tb_log = "/tmp/logs/{}".format(time())
+  log.info("Follow along at %s", tb_log)
+  tensorboard = TensorBoard(log_dir=tb_log)
+
+  model.fit(
+      input_features,
+      output_probs,
+      batch_size=batch_size,
+      epochs=epochs,
+      callbacks=[tensorboard])
 
   log.info("Recording Embeddings")
 
@@ -706,16 +719,20 @@ def EmbedHypergraph(
     embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
   return embedding
 
+
 def WriteDebugSummary(debug_summary_path, sim_records):
 
   log.info("Writing Debug Summary to %s", debug_summary_path)
 
-  nn_probs = [r.node_node_prob for r in sim_records
-                            if r.node_node_prob is not None]
-  ee_probs = [r.edge_edge_prob for r in sim_records
-                            if r.edge_edge_prob is not None]
-  ne_probs = [r.node_edge_prob for r in sim_records
-                            if r.node_edge_prob is not None]
+  nn_probs = [
+      r.node_node_prob for r in sim_records if r.node_node_prob is not None
+  ]
+  ee_probs = [
+      r.edge_edge_prob for r in sim_records if r.edge_edge_prob is not None
+  ]
+  ne_probs = [
+      r.node_edge_prob for r in sim_records if r.node_edge_prob is not None
+  ]
   fig, (nn_ax, ee_ax, ne_ax) = plt.subplots(3, 1)
   nn_ax.set_title("Node-Node Probability Distribution")
   nn_ax.hist(nn_probs)

@@ -156,11 +156,7 @@ class SameTypeProbabilityTest(unittest.TestCase):
     +(α + (1−α)(1−0.4))
     = 0.5
     """
-    actual = whg2v._same_type_probability((1,
-                                           2),
-                                          node2edges,
-                                          alpha,
-                                          edge2span)
+    actual = whg2v._same_type_probability((1, 2), node2edges, alpha, edge2span)
     self.assertAlmostEqual(actual, 0.5)
 
   def test_zero(self):
@@ -170,11 +166,7 @@ class SameTypeProbabilityTest(unittest.TestCase):
     node2edges = ToCsrMatrix(hypergraph)
     alpha = 0.25
     edge2span = {10: 0.4, 20: 0.8}
-    actual = whg2v._same_type_probability((0,
-                                           1),
-                                          node2edges,
-                                          alpha,
-                                          edge2span)
+    actual = whg2v._same_type_probability((0, 1), node2edges, alpha, edge2span)
     # These two nodes don't share anything in common
     self.assertAlmostEqual(actual, 0)
 
@@ -184,11 +176,7 @@ class SameTypeProbabilityTest(unittest.TestCase):
     node2edges = ToCsrMatrix(hypergraph)
     alpha = 0.25
     edge2span = {1: 0.4}
-    actual = whg2v._same_type_probability((0,
-                                           0),
-                                          node2edges,
-                                          alpha,
-                                          edge2span)
+    actual = whg2v._same_type_probability((0, 0), node2edges, alpha, edge2span)
     # A thing should be equal to itself
     self.assertAlmostEqual(actual, 1)
 
@@ -261,14 +249,16 @@ class NodeEdgeProbabilityTest(unittest.TestCase):
 
 
 class WriteDebugSummaryTest(unittest.TestCase):
+
   def test_output(self):
-    sim_records = [WeightedSimilarityRecord(
-                     left_node_idx=i,
-                     right_edge_idx=i,
-                     left_span=i,
-                     right_span=10-i,
-                     node_node_prob=i/10,
-                     edge_edge_prob=i/20,
-                     node_edge_prob=i/5)
-                   for i in range(20)]
+    sim_records = [
+        WeightedSimilarityRecord(
+            left_node_idx=i,
+            right_edge_idx=i,
+            left_span=i,
+            right_span=10 - i,
+            node_node_prob=i / 10,
+            edge_edge_prob=i / 20,
+            node_edge_prob=i / 5) for i in range(20)
+    ]
     WriteDebugSummary("debug_summary_test.png", sim_records)

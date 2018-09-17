@@ -19,6 +19,7 @@ import keras
 from keras.models import Model
 from keras.layers import Input, Embedding, Dense, Multiply, Concatenate
 from keras.layers import Dot, Flatten, Average
+from keras.callbacks import TensorBoard
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -86,8 +87,8 @@ def ComputeSpans(
   if embedding is None:
     embedding = EmbedAlgebraicDistance(
         hypergraph,
-        dimension=10,
-        iterations=20,
+        dimension=5,
+        iterations=10,
         run_in_parallel=run_in_parallel,
         disable_pbar=disable_pbar)
 
@@ -222,8 +223,8 @@ def PadWithZeros(arrOrNone, idx):
 def _weighted_similarity_records_to_model_input(records, num_neighbors):
   "Converts the above named tuple into (input arrays, output arrays)"
   left_node_idx = []
-  right_node_idx = []
   left_edge_idx = []
+  right_node_idx = []
   right_edge_idx = []
   left_weight = []
   right_weight = []
@@ -250,6 +251,21 @@ def _weighted_similarity_records_to_model_input(records, num_neighbors):
     node_node_prob.append(ValOrZero(r.node_node_prob))
     edge_edge_prob.append(ValOrZero(r.edge_edge_prob))
     node_edge_prob.append(ValOrZero(r.node_edge_prob))
+
+  assert len(left_node_idx) == len(records)
+  assert len(left_edge_idx) == len(records)
+  assert len(right_node_idx) == len(records)
+  assert len(right_edge_idx) == len(records)
+  assert len(left_weight) == len(records)
+  assert len(right_weight) == len(records)
+  for i in range(num_neighbors):
+    assert len(neighbor_node_indices[i]) == len(records)
+    assert len(neighbor_node_weights[i]) == len(records)
+    assert len(neighbor_edge_indices[i]) == len(records)
+    assert len(neighbor_edge_weights[i]) == len(records)
+  assert len(node_node_prob) == len(records)
+  assert len(edge_edge_prob) == len(records)
+  assert len(node_edge_prob) == len(records)
 
   return (
       [left_node_idx,
@@ -333,15 +349,19 @@ def _same_type_sample(ij, a2span=None, is_edge=None, alpha=None):
     return WeightedSimilarityRecord(
         left_edge_idx=i,
         right_edge_idx=j,
-        left_weight=_weight_by_span(alpha, a2span[i]),
-        right_weight=_weight_by_span(alpha, a2span[j]),
+        left_weight=_weight_by_span(alpha,
+                                    a2span[i]),
+        right_weight=_weight_by_span(alpha,
+                                     a2span[j]),
         edge_edge_prob=_same_type_probability(ij))
   else:
     return WeightedSimilarityRecord(
         left_node_idx=i,
         right_node_idx=j,
-        left_weight=_weight_by_span(alpha, a2span[i]),
-        right_weight=_weight_by_span(alpha, a2span[j]),
+        left_weight=_weight_by_span(alpha,
+                                    a2span[i]),
+        right_weight=_weight_by_span(alpha,
+                                     a2span[j]),
         node_node_prob=_same_type_probability(ij))
 
 
@@ -474,16 +494,24 @@ def _node_edge_sample(
       edge_neighbors,
       min(len(edge_neighbors),
           num_neighbors))
-  node_weights = [_weight_by_span(alpha, node2span[n]) for n in node_neighbors_sample]
-  edge_weights = [_weight_by_span(alpha, edge2span[e]) for e in edge_neighbors_sample]
+  node_weights = [
+      _weight_by_span(alpha,
+                      node2span[n]) for n in node_neighbors_sample
+  ]
+  edge_weights = [
+      _weight_by_span(alpha,
+                      edge2span[e]) for e in edge_neighbors_sample
+  ]
 
   node_edge_prob = _node_edge_probability((node_idx, edge_idx))
 
   return WeightedSimilarityRecord(
       left_node_idx=node_idx,
       right_edge_idx=edge_idx,
-      left_weight=_weight_by_span(alpha, node2span[node_idx]),
-      right_weight=_weight_by_span(alpha, edge2span[edge_idx]),
+      left_weight=_weight_by_span(alpha,
+                                  node2span[node_idx]),
+      right_weight=_weight_by_span(alpha,
+                                   edge2span[edge_idx]),
       neighbor_node_indices=node_neighbors_sample,
       neighbor_node_weights=node_weights,
       neighbor_edge_indices=edge_neighbors_sample,
@@ -494,6 +522,25 @@ def _node_edge_sample(
 ################################################################################
 # Collect Samples and Compute Observed Probabilities                           #
 ################################################################################
+
+
+def _total_samples_per_row_helper(row_idx, adj_matrix, num_samples_per_row):
+  return min(num_samples_per_row, adj_matrix[row_idx, :].nnz)
+
+
+def _total_samples_per_row(
+    adj_matrix,
+    num_samples_per_row,
+    run_in_parallel=True):
+  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
+  with Pool(num_cores) as pool:
+    result = sum(
+        pool.starmap(
+            _total_samples_per_row_helper,
+            [(row_idx,
+              adj_matrix,
+              num_samples_per_row) for row_idx in range(adj_matrix.shape[0])]))
+  return result
 
 
 def _sample_per_row(adj_matrix, num_samples_per_row, flip=False):
@@ -575,11 +622,12 @@ def PrecomputeWeightedSimilarities(
               edge2span, #b2span
               False #is_edge
             )) as pool:
-    with tqdm(total=len(hypergraph.node) * samples_per,
+    with tqdm(total=_total_samples_per_row(node2node,
+                                           samples_per),
               disable=disable_pbar) as pbar:
       for result in pool.imap(_same_type_sample,
                               _sample_per_row(node2node,
-                                              num_neighbors)):
+                                              samples_per)):
         similarity_records.append(result)
         pbar.update(1)
 
@@ -593,11 +641,12 @@ def PrecomputeWeightedSimilarities(
               node2span, #b2span
               True #is_edge
             )) as pool:
-    with tqdm(total=len(hypergraph.edge) * samples_per,
+    with tqdm(total=_total_samples_per_row(edge2edge,
+                                           samples_per),
               disable=disable_pbar) as pbar:
       for result in pool.imap(_same_type_sample,
                               _sample_per_row(edge2edge,
-                                              num_neighbors)):
+                                              samples_per)):
         similarity_records.append(result)
         pbar.update(1)
 
@@ -617,22 +666,24 @@ def PrecomputeWeightedSimilarities(
     log.info("Identifying all second-order edges per node")
     node2second_edge = node2node * node2edge
     log.info("Sampling second-order edges per node")
-    with tqdm(total=len(hypergraph.node) * samples_per,
+    with tqdm(total=_total_samples_per_row(node2second_edge,
+                                           samples_per),
               disable=disable_pbar) as pbar:
       for result in pool.imap(_node_edge_sample,
                               _sample_per_row(node2second_edge,
-                                              num_neighbors)):
+                                              samples_per)):
         similarity_records.append(result)
         pbar.update(1)
 
     log.info("Identifying all second-order nodes per edge")
     edge2second_node = edge2edge * edge2node
     log.info("Sampling second-order nodes per edge")
-    with tqdm(total=len(hypergraph.edge) * samples_per,
+    with tqdm(total=_total_samples_per_row(edge2second_node,
+                                           samples_per),
               disable=disable_pbar) as pbar:
       for result in pool.imap(_node_edge_sample,
                               _sample_per_row(edge2second_node,
-                                              num_neighbors,
+                                              samples_per,
                                               flip=True)):
         similarity_records.append(result)
         pbar.update(1)
@@ -720,49 +771,44 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
       for neighbor_edge_idx in neighbor_edge_indices
   ]
 
-  node_node_prediction = Dense(
-      1,
-      activation="sigmoid",
-      name="node_node_prob")(
-          Concatenate(1)(
-              [Dot(1)([left_node_vec,
-                       right_node_vec]),
-               left_weight,
-               right_weight]))
+  node_node_prob = Dense(1, activation="relu", name="node_node_prob")
+  edge_edge_prob = Dense(1, activation="relu", name="edge_edge_prob")
 
-  edge_edge_prediction = Dense(
-      1,
-      activation="sigmoid",
-      name="edge_edge_prob")(
-          Concatenate(1)(
-              [Dot(1)([left_edge_vec,
-                       right_edge_vec]),
-               left_weight,
-               right_weight]))
+  node_node_prediction = node_node_prob(
+      Concatenate(1)(
+          [Dot(1)([left_node_vec,
+                   right_node_vec]),
+           left_weight,
+           right_weight]))
+
+  edge_edge_prediction = edge_edge_prob(
+      Concatenate(1)(
+          [Dot(1)([left_edge_vec,
+                   right_edge_vec]),
+           left_weight,
+           right_weight]))
 
   node_neighbor_dot_sigs = [
-      Dense(1,
-            activation="sigmoid")(
-                Concatenate(1)(
-                    [Dot(1)([n_vec,
-                             left_node_vec]),
-                     left_weight,
-                     n_weight])) for n_vec,
+      node_node_prob(
+          Concatenate(1)(
+              [Dot(1)([left_node_vec,
+                       n_vec]),
+               left_weight,
+               n_weight])) for n_vec,
       n_weight in zip(neighbor_node_vecs,
-                    neighbor_node_weights)
+                      neighbor_node_weights)
   ]
   node_neighbor_avg = Average()(node_neighbor_dot_sigs)
 
   edge_neighbor_dot_sigs = [
-      Dense(1,
-            activation="sigmoid")(
-                Concatenate(1)(
-                    [Dot(1)([n_vec,
-                             right_edge_vec]),
-                     right_weight,
-                     n_weight])) for n_vec,
+      edge_edge_prob(
+          Concatenate(1)(
+              [Dot(1)([n_vec,
+                       right_edge_vec]),
+               n_weight,
+               right_weight])) for n_vec,
       n_weight in zip(neighbor_edge_vecs,
-                    neighbor_edge_weights)
+                      neighbor_edge_weights)
   ]
   edge_neighbor_avg = Average()(edge_neighbor_dot_sigs)
 
@@ -786,7 +832,7 @@ def GetWeightedModel(hypergraph, dimension, num_neighbors):
       outputs=[node_node_prediction,
                edge_edge_prediction,
                node_edge_prediction])
-  model.compile(optimizer="adagrad", loss="kullback_leibler_divergence")
+  model.compile(optimizer="adagrad", loss="mean_squared_error")
   return model
 
 
@@ -799,8 +845,8 @@ def EmbedWeightedHypergraph(
     hypergraph,
     dimension,
     num_neighbors=10,
-    alpha=0.25,
-    samples_per=250,
+    alpha=0.15,
+    samples_per=100,
     batch_size=256,
     epochs=5,
     disable_pbar=False,
@@ -820,7 +866,17 @@ def EmbedWeightedHypergraph(
     num_neighbors)
 
   model = GetWeightedModel(hypergraph, dimension, num_neighbors)
-  model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
+
+  tb_log = "/tmp/logs/{}".format(time())
+  log.info("Follow along at %s", tb_log)
+  tensorboard = TensorBoard(log_dir=tb_log)
+
+  model.fit(
+      input_features,
+      output_probs,
+      batch_size=batch_size,
+      epochs=epochs,
+      callbacks=[tensorboard])
 
   log.info("Recording Embeddings")
 

@@ -6,6 +6,7 @@ from .hypergraph_util import *
 from .hypergraph2vec import EmbedHypergraph
 from .weighted_hypergraph2vec import EmbedWeightedHypergraph
 from .algebraic_distance import EmbedAlgebraicDistance
+from .hypergraph2vec_binary import EmbedHypergraphBinary
 
 import numpy as np
 import scipy as sp
@@ -206,8 +207,6 @@ def EmbedNode2VecClique(
   return embedding
 
 
-
-
 def EmbedHypergraphPlusPlus(
     hypergraph,
     dimension,
@@ -256,11 +255,9 @@ EMBEDDING_OPTIONS = {
     "HYPERGRAPH++": EmbedHypergraphPlusPlus,
     "ALG_DIST": EmbedAlgebraicDistance,
     "WEIGHTED_HG": EmbedWeightedHypergraph,
+    "BINARY_HG": EmbedHypergraphBinary,
 }
 
 # Only include here if the embedding function supports the keyword argument
 # debug_summary_path
-DEBUG_SUMMARY_OPTIONS = {
-    "WEIGHTED_HG",
-    "HYPERGRAPH"
-}
+DEBUG_SUMMARY_OPTIONS = {"WEIGHTED_HG", "HYPERGRAPH"}
