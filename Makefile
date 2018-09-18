@@ -11,12 +11,10 @@ proto:
 pip:
 	$(PIP) install --user -r requirements.txt
 
-test: unittest apptest
+test: unittest
 
 unittest:
 	$(PYTHON) -W ignore::DeprecationWarning -m unittest discover -v
-apptest:
-	./tests/test_runner.sh
 
 clean:
 	rm -f $(MODULE)/hypergraph_pb2.py
