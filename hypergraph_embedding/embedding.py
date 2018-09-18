@@ -22,6 +22,7 @@ from node2vec import Node2Vec
 import multiprocessing
 from multiprocessing import Pool
 from tqdm import tqdm
+from time import time
 
 log = logging.getLogger()
 
