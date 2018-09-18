@@ -3,7 +3,6 @@ from hypergraph_embedding import Hypergraph
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.hypergraph_util import *
 from hypergraph_embedding.embedding import *
-from hypergraph_embedding.hypergraph2vec import *
 import scipy as sp
 import itertools
 from random import random, randint
@@ -174,62 +173,6 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
     self.assertEqual(actual.method_name, "Node2VecClique(5)")
 
 
-class EmbedHypergraphTest(EmbeddingTestCase):
-
-  def test_typical(self):
-    dim = 2
-    _input = TestHypergraph()
-    actual = EmbedHypergraph(
-        _input,
-        dim,
-        num_neighbors=2,
-        pos_samples=2,
-        neg_samples=1,
-        batch_size=1,
-        epochs=1)
-    self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Hypergraph")
-
-  def test_fuzz(self):
-    "Random embedding should never break"
-    embed = lambda x, y: EmbedHypergraph(x,
-                                         y,
-                                         num_neighbors=2,
-                                         pos_samples=2,
-                                         neg_samples=1,
-                                         batch_size=1,
-                                         epochs=1)
-    self.help_test_fuzz(embed, num_fuzz=10)
-
-
-class EmbedHypergraphPlusPlusTest(EmbeddingTestCase):
-
-  def test_typical(self):
-    dim = 2
-    _input = TestHypergraph()
-    actual = EmbedHypergraphPlusPlus(
-        _input,
-        dim,
-        num_neighbors=2,
-        num_walks_per_node=2,
-        max_walk_length=3,
-        batch_size=1,
-        epochs=1)
-    self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Hypergraph++")
-
-  def test_fuzz(self):
-    "Random embedding should never break"
-    embed = lambda x, y: EmbedHypergraphPlusPlus(x,
-                                         y,
-                                         num_neighbors=2,
-                                         num_walks_per_node=2,
-                                         max_walk_length=3,
-                                         batch_size=1,
-                                         epochs=1)
-    self.help_test_fuzz(embed, num_fuzz=10)
-
-
 class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
 
   def test_typical(self):
@@ -240,30 +183,53 @@ class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
     self.assertEqual(actual.method_name, "AlgebraicDistance")
 
 
-class EmbedWeightedHypergraphTest(EmbeddingTestCase):
+class EmbedHg2vBooleanTest(EmbeddingTestCase):
 
   def test_typical(self):
     dim = 2
     _input = TestHypergraph()
-    actual = EmbedWeightedHypergraph(
+    actual = EmbedHg2vBoolean(
         _input,
         dim,
         num_neighbors=2,
-        samples_per=2,
-        alpha=0.2,
+        num_samples=2,
         batch_size=1,
-        epochs=1,
-        disable_pbar=True)
+        epochs=1)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "WeightedHypergraph")
+    self.assertEqual(actual.method_name, "Hypergraph2Vec Boolean")
 
   def test_fuzz(self):
     "Random embedding should never break"
-    embed = lambda x, y: EmbedWeightedHypergraph(x,
-                                                 y,
-                                                 num_neighbors=2,
-                                                 samples_per=2,
-                                                 alpha=0.25,
-                                                 batch_size=1,
-                                                 epochs=1)
+    embed = lambda x, y: EmbedHg2vBoolean(x,
+                                         y,
+                                         num_neighbors=2,
+                                         num_samples=2,
+                                         batch_size=1,
+                                         epochs=1)
+    self.help_test_fuzz(embed, num_fuzz=10)
+
+
+class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
+
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedHg2vAdjJaccard(
+        _input,
+        dim,
+        num_neighbors=2,
+        num_samples=2,
+        batch_size=1,
+        epochs=1)
+    self.checkEmbedding(actual, _input, dim)
+    self.assertEqual(actual.method_name, "Hypergraph2Vec AdjJaccard")
+
+  def test_fuzz(self):
+    "Random embedding should never break"
+    embed = lambda x, y: EmbedHg2vAdjJaccard(x,
+                                         y,
+                                         num_neighbors=2,
+                                         num_samples=2,
+                                         batch_size=1,
+                                         epochs=1)
     self.help_test_fuzz(embed, num_fuzz=10)
