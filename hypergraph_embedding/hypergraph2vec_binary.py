@@ -33,9 +33,8 @@ log = logging.getLogger()
 def PrecomputeBinarySimilarities(
     hypergraph,
     num_neighbors,
-    run_in_parallel=True):
+    num_samples):
 
-  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
   # return value
   similarity_records = []
 
@@ -45,70 +44,73 @@ def PrecomputeBinarySimilarities(
   node2node_neighbors = node2edge * node2edge.T
 
   log.info("Sampling node-node probabilities")
-  rows, cols = node2node_neighbors.nonzero()
-  for row_idx, col_idx in tqdm(zip(rows, cols), total=len(rows)):
-    similarity_records.append(
-        SimilarityRecord(
-            left_node_idx=row_idx,
-            right_node_idx=col_idx,
-            node_node_prob=1))
+  for row_idx in tqdm(hypergraph.node):
+    cols = list(node2node_neighbors[row_idx, :].nonzero()[1])
+    for col_idx in sample(cols, min(num_neighbors, len(cols))):
+      similarity_records.append(
+          SimilarityRecord(
+              left_node_idx=row_idx,
+              right_node_idx=col_idx,
+              node_node_prob=1))
 
   log.info("Converting hypergraph to edge-major sparse matrix")
   edge2node = ToEdgeCsrMatrix(hypergraph)
   log.info("Getting 1st order edge neighbors")
   edge2edge_neighbors = edge2node * edge2node.T
+
   log.info("Sampling edge-edge probabilities")
-  rows, cols = edge2edge_neighbors.nonzero()
-  for row_idx, col_idx in tqdm(zip(rows, cols), total=len(rows)):
-    similarity_records.append(
-        SimilarityRecord(
-            left_edge_idx=row_idx,
-            right_edge_idx=col_idx,
-            edge_edge_prob=1))
+  for row_idx in tqdm(hypergraph.edge):
+    cols = list(edge2edge_neighbors[row_idx, :].nonzero()[1])
+    for col_idx in sample(cols, min(num_neighbors, len(cols))):
+      similarity_records.append(
+          SimilarityRecord(
+              left_edge_idx=row_idx,
+              right_edge_idx=col_idx,
+              edge_edge_prob=1))
 
   log.info("Getting node-edge relationships")
-  node2second_edge = node2node_neighbors * node2edge
-  rows, cols = node2second_edge.nonzero()
-  for node_idx, edge_idx in tqdm(zip(rows, cols), total=len(rows)):
-    neighbor_edges = list(node2edge[node_idx, :].nonzero()[1])
-    neighbor_edges = sample(
-        neighbor_edges,
-        min(num_neighbors,
-            len(neighbor_edges)))
-    neighbor_nodes = list(edge2node[edge_idx, :].nonzero()[1])
-    neighbor_nodes = sample(
-        neighbor_nodes,
-        min(num_neighbors,
-            len(neighbor_nodes)))
-    similarity_records.append(
-        SimilarityRecord(
-            left_node_idx=node_idx,
-            right_edge_idx=edge_idx,
-            edges_containing_node=neighbor_edges,
-            nodes_in_edge=neighbor_nodes,
-            node_edge_prob=1))
+  for node_idx in tqdm(hypergraph.node):
+    edges = list(node2edge[node_idx, :].nonzero()[1])
+    for edge_idx in sample(edges, min(num_neighbors, len(edges))):
+      neighbor_edges = list(node2edge[node_idx, :].nonzero()[1])
+      neighbor_edges = sample(
+          neighbor_edges,
+          min(num_neighbors,
+              len(neighbor_edges)))
+      neighbor_nodes = list(edge2node[edge_idx, :].nonzero()[1])
+      neighbor_nodes = sample(
+          neighbor_nodes,
+          min(num_neighbors,
+              len(neighbor_nodes)))
+      similarity_records.append(
+          SimilarityRecord(
+              left_node_idx=node_idx,
+              right_edge_idx=edge_idx,
+              edges_containing_node=neighbor_edges,
+              nodes_in_edge=neighbor_nodes,
+              node_edge_prob=1))
 
   log.info("Getting edge-node relationships")
-  edge2second_node = edge2edge_neighbors * edge2node
-  rows, cols = edge2second_node.nonzero()
-  for edge_idx, node_idx in tqdm(zip(rows, cols), total=len(rows)):
-    neighbor_edges = list(node2edge[node_idx, :].nonzero()[1])
-    neighbor_edges = sample(
-        neighbor_edges,
-        min(num_neighbors,
-            len(neighbor_edges)))
-    neighbor_nodes = list(edge2node[edge_idx, :].nonzero()[1])
-    neighbor_nodes = sample(
-        neighbor_nodes,
-        min(num_neighbors,
-            len(neighbor_nodes)))
-    similarity_records.append(
-        SimilarityRecord(
-            left_node_idx=node_idx,
-            right_edge_idx=edge_idx,
-            edges_containing_node=neighbor_edges,
-            nodes_in_edge=neighbor_nodes,
-            node_edge_prob=1))
+  for edge_idx in tqdm(hypergraph.edge):
+    nodes = list(edge2node[edge_idx, :].nonzero()[1])
+    for node_idx in sample(nodes, min(num_neighbors, len(nodes))):
+      neighbor_edges = list(node2edge[node_idx, :].nonzero()[1])
+      neighbor_edges = sample(
+          neighbor_edges,
+          min(num_neighbors,
+              len(neighbor_edges)))
+      neighbor_nodes = list(edge2node[edge_idx, :].nonzero()[1])
+      neighbor_nodes = sample(
+          neighbor_nodes,
+          min(num_neighbors,
+              len(neighbor_nodes)))
+      similarity_records.append(
+          SimilarityRecord(
+              left_node_idx=node_idx,
+              right_edge_idx=edge_idx,
+              edges_containing_node=neighbor_edges,
+              nodes_in_edge=neighbor_nodes,
+              node_edge_prob=1))
 
   return similarity_records
 
@@ -200,10 +202,11 @@ def GetModel(hypergraph, dimension, num_neighbors):
 def EmbedHypergraphBinary(
     hypergraph,
     dimension,
-    num_neighbors=10,
+    num_neighbors=5,
+    num_samples=250,
     batch_size=256,
-    epochs=15):
-  similarity_records = PrecomputeBinarySimilarities(hypergraph, num_neighbors)
+    epochs=10):
+  similarity_records = PrecomputeBinarySimilarities(hypergraph, num_neighbors, num_samples)
   input_features, output_probs = _similarity_values_to_model_input(similarity_records, num_neighbors)
   model = GetModel(hypergraph, dimension, num_neighbors)
 
