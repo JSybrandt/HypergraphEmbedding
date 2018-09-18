@@ -10,8 +10,8 @@ from hypergraph_embedding.hypergraph_util import *
 from hypergraph_embedding.data_util import *
 from hypergraph_embedding.embedding import *
 from hypergraph_embedding.evaluation_util import *
-from hypergraph_embedding.hypergraph2vec import *
-from hypergraph_embedding.weighted_hypergraph2vec import *
+from hypergraph_embedding.hg2v_model import *
+from hypergraph_embedding.hg2v_sample import *
 
 __all__ = [
     # proto

@@ -234,31 +234,3 @@ class NodeEdgeProbabilityTest(unittest.TestCase):
             edge2span)
         self.assertTrue(actual >= 0)
         self.assertTrue(actual <= 1)
-
-
-# class GetWeightedModelTest(unittest.TestCase):
-
-# def test_no_break(self):
-# hypergraph = CreateRandomHyperGraph(10, 10, 0.5)
-# dimension = 100
-# num_neighbors = 5
-# model = GetWeightedModel(hypergraph, dimension, num_neighbors)
-# model.summary()
-# from keras.utils.vis_utils import plot_model
-# plot_model(model, "model.png")
-
-
-class WriteDebugSummaryTest(unittest.TestCase):
-
-  def test_output(self):
-    sim_records = [
-        WeightedSimilarityRecord(
-            left_node_idx=i,
-            right_edge_idx=i,
-            left_span=i,
-            right_span=10 - i,
-            node_node_prob=i / 10,
-            edge_edge_prob=i / 20,
-            node_edge_prob=i / 5) for i in range(20)
-    ]
-    WriteDebugSummary("debug_summary_test.png", sim_records)

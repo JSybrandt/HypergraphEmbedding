@@ -3,10 +3,10 @@
 
 from . import HypergraphEmbedding
 from .hypergraph_util import *
-from .hypergraph2vec import EmbedHypergraph
-from .weighted_hypergraph2vec import EmbedWeightedHypergraph
 from .algebraic_distance import EmbedAlgebraicDistance
-from .hypergraph2vec_binary import EmbedHypergraphBinary
+
+from .hg2v_model import *
+from .hg2v_sample import *
 
 import numpy as np
 import scipy as sp
@@ -207,37 +207,99 @@ def EmbedNode2VecClique(
   return embedding
 
 
-def EmbedHypergraphPlusPlus(
+################################################################################
+# Hypergraph2Vec Combinations                                                  #
+################################################################################
+
+
+def _hypergraph2vec_skeleton(
     hypergraph,
     dimension,
-    num_neighbors=10,
-    num_walks_per_node=50,
-    max_walk_length=7,
-    walk_tolerance=0.001,
+    sampler_fn,
+    samples_to_input_fn,
+    model_fn,
+    fit_batch_size,
+    fit_epochs,
+    visualization_fn=None):
+  log.info("Sampling")
+  samples = sampler_fn(hypergraph)
+  if visualization_fn is not None:
+    visualization_fn(samples)
+  log.info("Converting samples to model input")
+  input_features, output_probs = samples_to_input_fn(samples)
+  log.info("Getting model")
+  model = model_fn(hypergraph)
+
+  tb_log = "/tmp/logs/{}".format(time())
+  log.info("Follow along at %s", tb_log)
+  tensorboard = TensorBoard(log_dir=tb_log)
+
+  model.fit(
+      input_features,
+      output_probs,
+      batch_size=fit_batch_size,
+      epochs=fit_epochs,
+      callbacks=[tensorboard])
+
+  log.info("Recording embeddings.")
+  return KerasModelToEmbedding(hypergraph, model)
+
+
+def EmbedHg2vBoolean(
+    hypergraph,
+    dimension,
+    num_neighbors=5,
+    num_samples=250,
     batch_size=256,
-    epochs=5):
-  input_features, output_probs = PrecomputeSimilaritiesPlusPlus(
+    epochs=10):
+  sampler_fn = lambda hg: BooleanSamples(hg,
+                                         num_neighbors=num_neighbors,
+                                         num_samples=num_samples)
+  samples_to_input_fn = lambda samples: SamplesToModelInput(
+      samples,
+      num_neighbors=num_neighbors,
+      weighted=False)
+  model_fn = lambda hg: BooleanModel(hg,
+                                     dimension=dimension,
+                                     num_neighbors=num_neighbors)
+  embedding = _hypergraph2vec_skeleton(
       hypergraph,
-      num_neighbors,
-      num_walks_per_node,
-      max_walk_length,
-      walk_tolerance)
-  model = GetModel(hypergraph, dimension, num_neighbors)
-  model.fit(input_features, output_probs, batch_size=batch_size, epochs=epochs)
+      dimension,
+      sampler_fn,
+      samples_to_input_fn,
+      model_fn,
+      batch_size,
+      epochs)
+  embedding.method_name = "Hypergraph2Vec Boolean"
+  return embedding
 
-  log.info("Recording Embeddings")
 
-  node_weights = model.get_layer("node_embedding").get_weights()[0]
-  edge_weights = model.get_layer("edge_embedding").get_weights()[0]
-
-  embedding = HypergraphEmbedding()
-  embedding.dim = dimension
-  embedding.method_name = "Hypergraph++"
-
-  for node_idx in hypergraph.node:
-    embedding.node[node_idx].values.extend(node_weights[node_idx + 1])
-  for edge_idx in hypergraph.edge:
-    embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
+def EmbedHg2vAdjJaccard(
+    hypergraph,
+    dimension,
+    num_neighbors=5,
+    num_samples=250,
+    batch_size=256,
+    epochs=10):
+  sampler_fn = lambda hg: AdjJaccardSamples(hg,
+                                            num_neighbors=num_neighbors,
+                                            num_samples=num_samples)
+  samples_to_input_fn = lambda samples: SamplesToModelInput(
+      samples,
+      num_neighbors=num_neighbors,
+      weighted=False)
+  model_fn = lambda hg: UnweightedFloatModel(hg,
+                                             dimension=dimension,
+                                             num_neighbors=num_neighbors)
+  embedding = _hypergraph2vec_skeleton(
+      hypergraph,
+      dimension,
+      sampler_fn,
+      samples_to_input_fn,
+      model_fn,
+      batch_size,
+      epochs)
+  embedding.method_name = "Hypergraph2Vec AdjJaccard"
   return embedding
 
 
@@ -251,13 +313,11 @@ EMBEDDING_OPTIONS = {
     "N2V5_CLIQUE": EmbedNode2VecClique,
     "N2V7_BIPARTIDE": lambda h, d:EmbedNode2VecBipartide(h, d, walk_length=7),
     "N2V7_CLIQUE": lambda h, d: EmbedNode2VecClique(h, d, walk_length=7),
-    "HYPERGRAPH": EmbedHypergraph,
-    "HYPERGRAPH++": EmbedHypergraphPlusPlus,
     "ALG_DIST": EmbedAlgebraicDistance,
-    "WEIGHTED_HG": EmbedWeightedHypergraph,
-    "BINARY_HG": EmbedHypergraphBinary,
+    "HG2V_BOOLEAN": EmbedHg2vBoolean,
+    "HG2V_ADJ_JAC": EmbedHg2vAdjJaccard,
 }
 
 # Only include here if the embedding function supports the keyword argument
 # debug_summary_path
-DEBUG_SUMMARY_OPTIONS = {"WEIGHTED_HG", "HYPERGRAPH"}
+DEBUG_SUMMARY_OPTIONS = {}
