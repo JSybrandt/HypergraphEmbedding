@@ -3,6 +3,9 @@
 import unittest
 from hypergraph_embedding.hg2v_sample import SimilarityRecord
 from hypergraph_embedding.hg2v_sample import SamplesToModelInput
+from hypergraph_embedding.hg2v_sample import SparseBooleanJaccard
+from scipy.sparse import csr_matrix
+import numpy as np
 
 
 class SamplesToModelInputTest(unittest.TestCase):
@@ -143,5 +146,15 @@ class SamplesToModelInputTest(unittest.TestCase):
     self.assertEqual(actual, expected)
 
 
-if __name__ == "__main__":
-  unittest.main()
+class SparseBooleanJaccardTest(unittest.TestCase):
+
+  def test_typical(self):
+    row_i = csr_matrix([0, 1, 1, 0, 1], dtype=np.bool)
+    row_j = csr_matrix([1, 0, 1, 0, 1], dtype=np.bool)
+    actual = SparseBooleanJaccard(row_i, row_j)
+    self.assertEqual(actual, 0.5)
+
+  def test_select_from_matrix(self):
+    mat = csr_matrix([[0, 1, 1, 0, 1], [1, 0, 1, 0, 1]], dtype=np.bool)
+    actual = SparseBooleanJaccard(mat[0], mat[1])
+    self.assertEqual(actual, 0.5)

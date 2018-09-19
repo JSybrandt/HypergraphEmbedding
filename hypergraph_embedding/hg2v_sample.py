@@ -11,7 +11,6 @@ import logging
 import multiprocessing
 from multiprocessing import Pool
 from random import sample
-from scipy.spatial.distance import jaccard
 from tqdm import tqdm
 
 log = logging.getLogger()
@@ -124,6 +123,17 @@ def BooleanSamples(hypergraph, num_neighbors=5, num_samples=250):
   return similarity_records
 
 
+################################################################################
+# AdjJaccardSamples - Helper functions and sampler                             #
+################################################################################
+
+
+def SparseBooleanJaccard(sparse_a, sparse_b):
+  set_a = set(sparse_a.nonzero()[1])
+  set_b = set(sparse_b.nonzero()[1])
+  return len(set_a.intersection(set_b)) / len(set_a.union(set_b))
+
+
 def AdjJaccardSamples(hypergraph, num_neighbors=5, num_samples=250):
   """
   This function samples num_samples times (at most) for each node-node,
@@ -148,8 +158,7 @@ def AdjJaccardSamples(hypergraph, num_neighbors=5, num_samples=250):
   for row_idx in tqdm(hypergraph.node):
     cols = list(node2node_neighbors[row_idx, :].nonzero()[1])
     for col_idx in sample(cols, min(num_neighbors, len(cols))):
-      prob = jaccard(node2edge[row_idx, :].todense(),
-                     node2edge[col_idx, :].todense())
+      prob = SparseBooleanJaccard(node2edge[row_idx], node2edge[col_idx])
       similarity_records.append(
           SimilarityRecord(
               left_node_idx=row_idx,
@@ -165,8 +174,7 @@ def AdjJaccardSamples(hypergraph, num_neighbors=5, num_samples=250):
   for row_idx in tqdm(hypergraph.edge):
     cols = list(edge2edge_neighbors[row_idx, :].nonzero()[1])
     for col_idx in sample(cols, min(num_neighbors, len(cols))):
-      prob = jaccard(edge2node[row_idx, :].todense(),
-                     edge2node[col_idx, :].todense())
+      prob = SparseBooleanJaccard(edge2node[row_idx], edge2node[col_idx])
       similarity_records.append(
           SimilarityRecord(
               left_edge_idx=row_idx,
@@ -187,10 +195,12 @@ def AdjJaccardSamples(hypergraph, num_neighbors=5, num_samples=250):
           neighbor_node_indices,
           min(num_neighbors,
               len(neighbor_node_indices)))
-      prob_by_node = jaccard(edge2node[edge_idx, :].todense(),
-                             node2node_neighbors[node_idx, :].todense())
-      prob_by_edge = jaccard(node2edge[node_idx, :].todense(),
-                             edge2edge_neighbors[edge_idx, :].todense())
+      prob_by_node = SparseBooleanJaccard(
+          edge2node[edge_idx],
+          node2node_neighbors[node_idx])
+      prob_by_edge = SparseBooleanJaccard(
+          node2edge[node_idx],
+          edge2edge_neighbors[edge_idx])
       similarity_records.append(
           SimilarityRecord(
               left_node_idx=node_idx,
@@ -213,10 +223,12 @@ def AdjJaccardSamples(hypergraph, num_neighbors=5, num_samples=250):
           neighbor_node_indices,
           min(num_neighbors,
               len(neighbor_node_indices)))
-      prob_by_node = jaccard(edge2node[edge_idx, :].todense(),
-                             node2node_neighbors[node_idx, :].todense())
-      prob_by_edge = jaccard(node2edge[node_idx, :].todense(),
-                             edge2edge_neighbors[edge_idx, :].todense())
+      prob_by_node = SparseBooleanJaccard(
+          edge2node[edge_idx],
+          node2node_neighbors[node_idx])
+      prob_by_edge = SparseBooleanJaccard(
+          node2edge[node_idx],
+          edge2edge_neighbors[edge_idx])
       similarity_records.append(
           SimilarityRecord(
               left_node_idx=node_idx,
