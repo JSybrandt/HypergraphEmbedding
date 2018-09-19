@@ -282,9 +282,13 @@ def EmbedHg2vAdjJaccard(
     num_samples=500,
     batch_size=256,
     epochs=10):
-  sampler_fn = lambda hg: AdjJaccardSamples(hg,
-                                            num_neighbors=num_neighbors,
-                                            num_samples=num_samples)
+  node2weight = {node_idx:1 for node_idx in hypergraph.node}
+  edge2weight = {edge_idx:1 for edge_idx in hypergraph.edge}
+  sampler_fn = lambda hg: WeightedJaccardSamples(hg,
+                                                 node2weight,
+                                                 edge2weight,
+                                                 num_neighbors=num_neighbors,
+                                                 num_samples=num_samples)
   samples_to_input_fn = lambda samples: SamplesToModelInput(
       samples,
       num_neighbors=num_neighbors,
