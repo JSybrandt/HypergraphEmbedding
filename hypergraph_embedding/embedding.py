@@ -279,7 +279,7 @@ def EmbedHg2vAdjJaccard(
     hypergraph,
     dimension,
     num_neighbors=5,
-    num_samples=250,
+    num_samples=500,
     batch_size=256,
     epochs=10):
   sampler_fn = lambda hg: AdjJaccardSamples(hg,

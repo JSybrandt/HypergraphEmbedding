@@ -182,8 +182,9 @@ def AdjJaccardSamples(hypergraph, num_neighbors=5, num_samples=250):
               edge_edge_prob=prob))
 
   log.info("Getting node-edge relationships")
+  node2second_edge = node2node_neighbors * node2edge
   for node_idx in tqdm(hypergraph.node):
-    edges = list(node2edge[node_idx, :].nonzero()[1])
+    edges = list(node2second_edge[node_idx].nonzero()[1])
     for edge_idx in sample(edges, min(num_neighbors, len(edges))):
       neighbor_edge_indices = list(node2edge[node_idx, :].nonzero()[1])
       neighbor_edge_indices = sample(
@@ -210,8 +211,9 @@ def AdjJaccardSamples(hypergraph, num_neighbors=5, num_samples=250):
               node_edge_prob=prob_by_node * prob_by_edge))
 
   log.info("Getting edge-node relationships")
+  edge2second_node = edge2edge_neighbors * edge2node
   for edge_idx in tqdm(hypergraph.edge):
-    nodes = list(edge2node[edge_idx, :].nonzero()[1])
+    nodes = list(edge2second_node[edge_idx].nonzero()[1])
     for node_idx in sample(nodes, min(num_neighbors, len(nodes))):
       neighbor_edge_indices = list(node2edge[node_idx, :].nonzero()[1])
       neighbor_edge_indices = sample(
