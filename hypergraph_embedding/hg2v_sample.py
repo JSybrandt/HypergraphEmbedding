@@ -164,6 +164,13 @@ def SparseVecToWeights(vec, idx2weight):
 
 ## Parallel Helper Functions ###################################################
 
+def _alpha_scale(val, alpha=0.5):
+  assert alpha >= 0
+  assert alpha <= 1
+  assert val <= 1
+  assert val >= 0
+  return alpha + (1-alpha) * (val)
+
 
 def _init_same_type_sample(
     idx2neighbors,
@@ -209,13 +216,13 @@ def SameTypeSample(
           SimilarityRecord(
               left_edge_idx=idx,
               right_edge_idx=neighbor_idx,
-              edge_edge_prob=prob))
+              edge_edge_prob=_alpha_scale(prob)))
     else:
       records.append(
           SimilarityRecord(
               left_node_idx=idx,
               right_node_idx=neighbor_idx,
-              node_node_prob=prob))
+              node_node_prob=_alpha_scale(prob)))
   return records
 
 
@@ -282,7 +289,7 @@ def _node_edge_sample(node_idx, edge_idx):
       right_weight=edge2weight[edge_idx],
       neighbor_node_indices=neighbor_node_indices,
       neighbor_edge_indices=neighbor_edge_indices,
-      node_edge_prob=prob_by_node * prob_by_edge)
+      node_edge_prob=_alpha_scale(prob_by_node * prob_by_edge))
 
 
 def SampleNodeEdgePerNode(node_idx):
@@ -311,8 +318,8 @@ def WeightedJaccardSamples(
     hypergraph,
     node2weight,
     edge2weight,
-    num_neighbors=5,
-    num_samples=250,
+    num_neighbors,
+    num_samples,
     run_in_parallel=True,
     disable_pbar=False):
   """

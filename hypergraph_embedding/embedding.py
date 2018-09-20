@@ -323,12 +323,13 @@ def EmbedHg2vAdjJaccard(
 def EmbedHg2vNeighborhoodWeightedJaccard(
     hypergraph,
     dimension,
+    alpha=0,
     num_neighbors=5,
     num_samples=200,
     batch_size=256,
     epochs=10,
     debug_summary_path=None):
-  node2weight, edge2weight = WeightByNeighborhood(hypergraph, 0.25)
+  node2weight, edge2weight = WeightByNeighborhood(hypergraph, alpha)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
                                                  edge2weight,
@@ -361,12 +362,13 @@ def EmbedHg2vNeighborhoodWeightedJaccard(
 def EmbedHg2vSpanWeightedJaccard(
     hypergraph,
     dimension,
+    alpha=0,
     num_neighbors=5,
     num_samples=200,
     batch_size=256,
     epochs=10,
     debug_summary_path=None):
-  node2weight, edge2weight = WeightByAlgebraicSpan(hypergraph, 0.25)
+  node2weight, edge2weight = WeightByAlgebraicSpan(hypergraph, alpha)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
                                                  edge2weight,
