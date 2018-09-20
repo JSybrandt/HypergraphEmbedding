@@ -93,7 +93,7 @@ class TestRemoveRandomConnections(unittest.TestCase):
     self.assertEqual(actual_hg.name, "KEEP_ME")
 
   def test_fuzz(self):
-    for i in range(100):
+    for i in range(10):
       num_nodes = randint(0, 10)
       num_edges = randint(0, 10)
       edge_prob = random()
@@ -304,7 +304,7 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
 class TestSampleMissingConnections(unittest.TestCase):
 
   def test_fuzz(self):
-    for i in range(100):
+    for i in range(10):
       _input = CreateRandomHyperGraph(50, 50, 0.1)
       num_nodes = len(_input.node)
       num_edges = len(_input.edge)
@@ -505,7 +505,7 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
 
   def test_fuzz(self):
     "NodeEdgeEmbeddingPrediction shouldn't break on random input"
-    for i in range(10):
+    for i in range(1):
       hypergraph = CreateRandomHyperGraph(10, 10, 0.25)
       embedding = EmbedRandom(hypergraph, 2)
       all_pairs = list(product(hypergraph.node, hypergraph.edge))

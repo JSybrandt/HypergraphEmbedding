@@ -13,6 +13,12 @@ from multiprocessing import Pool
 from random import sample
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
+from scipy.sparse import lil_matrix
+from scipy.sparse import vstack
+
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 
 log = logging.getLogger()
 
@@ -132,40 +138,39 @@ def BooleanSamples(hypergraph, num_neighbors=5, num_samples=250):
 
 # Note that the unweighted case is simply wherein node2weight, edge2weight = 1
 
+
 def SparseWeightedJaccard(row_i, row_j):
   "row_i and row_j are sparse vectors of numbers"
   assert row_i.shape[0] == 1
   assert row_j.shape[0] == 1
   assert row_i.shape[1] == row_j.shape[1]
 
-  numerator = 0
-  denominator = 0
-  for col_idx in set(row_i.nonzero()[1]).union(set(row_j.nonzero()[1])):
-    numerator += min(row_i[0, col_idx], row_j[0, col_idx])
-    denominator += max(row_i[0, col_idx], row_j[0, col_idx])
+  stack = vstack([row_i, row_j])
+  numerator = np.sum(np.min(stack, axis=0))
+  denominator = np.sum(np.max(stack, axis=0))
   if denominator == 0:
     return 0
   return numerator / denominator
 
+
 def SparseVecToWeights(vec, idx2weight):
   "vec is a sparse boolean vector, idx2weight has a weight for each col"
   assert vec.shape[0] == 1
-  rows = []
-  cols = []
-  vals = []
-  for col_idx in vec.nonzero()[1]:
-    rows.append(0)
-    cols.append(col_idx)
-    vals.append(idx2weight[col_idx])
-  return csr_matrix((vals, (rows, cols)), shape=vec.shape)
+  tmp = lil_matrix(vec.shape, dtype=np.float32)
+  for col in vec.nonzero()[1]:
+    tmp[0, col] = idx2weight[col]
+  return csr_matrix(tmp)
+
 
 ## Parallel Helper Functions ###################################################
 
-def _init_same_type_sample(idx2neighbors,
-                           num_samples,
-                           idx2target,
-                           target2weight,
-                           is_edge):
+
+def _init_same_type_sample(
+    idx2neighbors,
+    num_samples,
+    idx2target,
+    target2weight,
+    is_edge):
   _shared_info.clear()
   _shared_info["idx2neighbors"] = idx2neighbors
   _shared_info["num_samples"] = num_samples
@@ -173,12 +178,14 @@ def _init_same_type_sample(idx2neighbors,
   _shared_info["target2weight"] = target2weight
   _shared_info["is_edge"] = is_edge
 
-def SameTypeSample(idx,
-                   idx2neighbors=None,
-                   num_samples=None,
-                   idx2target=None,
-                   target2weight=None,
-                   is_edge=None):
+
+def SameTypeSample(
+    idx,
+    idx2neighbors=None,
+    num_samples=None,
+    idx2target=None,
+    target2weight=None,
+    is_edge=None):
   if idx2neighbors is None:
     idx2neighbors = _shared_info["idx2neighbors"]
   if num_samples is None:
@@ -195,32 +202,37 @@ def SameTypeSample(idx,
   for neighbor_idx in sample(neighbors, min(num_samples, len(neighbors))):
     prob = SparseWeightedJaccard(
         vec,
-        SparseVecToWeights(idx2target[neighbor_idx], target2weight))
+        SparseVecToWeights(idx2target[neighbor_idx],
+                           target2weight))
     if is_edge:
-      records.append(SimilarityRecord(
-        left_edge_idx=idx,
-        right_edge_idx=neighbor_idx,
-        edge_edge_prob=prob))
+      records.append(
+          SimilarityRecord(
+              left_edge_idx=idx,
+              right_edge_idx=neighbor_idx,
+              edge_edge_prob=prob))
     else:
-      records.append(SimilarityRecord(
-        left_node_idx=idx,
-        right_node_idx=neighbor_idx,
-        node_node_prob=prob))
+      records.append(
+          SimilarityRecord(
+              left_node_idx=idx,
+              right_node_idx=neighbor_idx,
+              node_node_prob=prob))
   return records
+
 
 ## Different Type Sample #######################################################
 
 
-def _init_node_edge_sample(node2edge,
-                           edge2node,
-                           node2node_neighbors,
-                           edge2edge_neighbors,
-                           node2second_edge,
-                           edge2second_node,
-                           num_neighbors,
-                           num_samples,
-                           node2weight,
-                           edge2weight):
+def _init_node_edge_sample(
+    node2edge,
+    edge2node,
+    node2node_neighbors,
+    edge2edge_neighbors,
+    node2second_edge,
+    edge2second_node,
+    num_neighbors,
+    num_samples,
+    node2weight,
+    edge2weight):
   _shared_info.clear()
   _shared_info["node2edge"] = node2edge
   _shared_info["edge2node"] = edge2node
@@ -232,6 +244,7 @@ def _init_node_edge_sample(node2edge,
   _shared_info["num_samples"] = num_samples
   _shared_info["node2weight"] = node2weight
   _shared_info["edge2weight"] = edge2weight
+
 
 def _node_edge_sample(node_idx, edge_idx):
   "Calculates exactly one sample. REQUIRES INIT"
@@ -251,19 +264,26 @@ def _node_edge_sample(node_idx, edge_idx):
   neighbor_node_indices = sample(nodes, min(num_neighbors, len(nodes)))
 
   prob_by_node = SparseWeightedJaccard(
-      SparseVecToWeights(edge2node[edge_idx], node2weight),
-      SparseVecToWeights(node2node_neighbors[node_idx], node2weight))
+      SparseVecToWeights(edge2node[edge_idx],
+                         node2weight),
+      SparseVecToWeights(node2node_neighbors[node_idx],
+                         node2weight))
 
   prob_by_edge = SparseWeightedJaccard(
-      SparseVecToWeights(node2edge[node_idx], edge2weight),
-      SparseVecToWeights(edge2edge_neighbors[edge_idx], edge2weight))
+      SparseVecToWeights(node2edge[node_idx],
+                         edge2weight),
+      SparseVecToWeights(edge2edge_neighbors[edge_idx],
+                         edge2weight))
 
   return SimilarityRecord(
-          left_node_idx=node_idx,
-          right_edge_idx=edge_idx,
-          neighbor_node_indices=neighbor_node_indices,
-          neighbor_edge_indices=neighbor_edge_indices,
-          node_edge_prob=prob_by_node * prob_by_edge)
+      left_node_idx=node_idx,
+      right_edge_idx=edge_idx,
+      left_weight=node2weight[node_idx],
+      right_weight=edge2weight[edge_idx],
+      neighbor_node_indices=neighbor_node_indices,
+      neighbor_edge_indices=neighbor_edge_indices,
+      node_edge_prob=prob_by_node * prob_by_edge)
+
 
 def SampleNodeEdgePerNode(node_idx):
   node2second_edge = _shared_info["node2second_edge"]
@@ -274,6 +294,7 @@ def SampleNodeEdgePerNode(node_idx):
   for edge_idx in sample(edges, min(num_samples, len(edges))):
     records.append(_node_edge_sample(node_idx, edge_idx))
   return records
+
 
 def SampleNodeEdgePerEdge(edge_idx):
   edge2second_node = _shared_info["edge2second_node"]
@@ -286,13 +307,14 @@ def SampleNodeEdgePerEdge(edge_idx):
   return records
 
 
-def WeightedJaccardSamples(hypergraph,
-                           node2weight,
-                           edge2weight,
-                           num_neighbors=5,
-                           num_samples=250,
-                           run_in_parallel=True,
-                           disable_pbar=False):
+def WeightedJaccardSamples(
+    hypergraph,
+    node2weight,
+    edge2weight,
+    num_neighbors=5,
+    num_samples=250,
+    run_in_parallel=True,
+    disable_pbar=False):
   """
   This function performs samples wherein the node-node, node-edge, and
   edge-edge jaccard calculations are weighted by node2weight, and edge2weight
@@ -330,7 +352,8 @@ def WeightedJaccardSamples(hypergraph,
                       edge2weight, # target2weight
                       False  # is_edge
                      )) as pool:
-    for records in tqdm(pool.imap(SameTypeSample, hypergraph.node),
+    for records in tqdm(pool.imap(SameTypeSample,
+                                  hypergraph.node),
                         total=len(hypergraph.node),
                         disable=disable_pbar):
       similarity_records.extend(records)
@@ -349,7 +372,8 @@ def WeightedJaccardSamples(hypergraph,
                       node2weight, # target2weight
                       True  # is_edge
                      )) as pool:
-    for records in tqdm(pool.imap(SameTypeSample, hypergraph.edge),
+    for records in tqdm(pool.imap(SameTypeSample,
+                                  hypergraph.edge),
                         total=len(hypergraph.edge),
                         disable=disable_pbar):
       similarity_records.extend(records)
@@ -370,12 +394,14 @@ def WeightedJaccardSamples(hypergraph,
                       node2weight,
                       edge2weight)) as pool:
     log.info("Getting node-edge relationships")
-    for records in tqdm(pool.imap(SampleNodeEdgePerNode, hypergraph.node),
+    for records in tqdm(pool.imap(SampleNodeEdgePerNode,
+                                  hypergraph.node),
                         total=len(hypergraph.node),
                         disable=disable_pbar):
       similarity_records.extend(records)
     log.info("Getting edge-node relationships")
-    for records in tqdm(pool.imap(SampleNodeEdgePerEdge, hypergraph.edge),
+    for records in tqdm(pool.imap(SampleNodeEdgePerEdge,
+                                  hypergraph.edge),
                         total=len(hypergraph.edge),
                         disable=disable_pbar):
       similarity_records.extend(records)
@@ -461,3 +487,60 @@ def SamplesToModelInput(similarity_records, num_neighbors, weighted=True):
   targets = [node_node_prob, edge_edge_prob, node_edge_prob]
 
   return (features, targets)
+
+
+################################################################################
+# Visualization - Plot out the distribution of weights and samples             #
+################################################################################
+
+
+def PlotDistributions(debug_summary_path, sim_records):
+
+  log.info("Writing Debug Summary to %s", debug_summary_path)
+  node2weight = {}
+  edge2weight = {}
+  for r in sim_records:
+    if r.left_weight is not None:
+      if r.left_node_idx is not None and r.left_node_idx not in node2weight:
+        node2weight[r.left_node_idx] = r.left_weight
+      if r.left_edge_idx is not None and r.left_edge_idx not in edge2weight:
+        edge2weight[r.left_edge_idx] = r.left_weight
+    if r.right_weight is not None:
+      if r.right_node_idx is not None and r.right_node_idx not in node2weight:
+        node2weight[r.right_node_idx] = r.right_weight
+      if r.right_edge_idx is not None and r.right_edge_idx not in edge2weight:
+        edge2weight[r.right_edge_idx] = r.right_weight
+
+  nn_probs = [
+      r.node_node_prob for r in sim_records if r.node_node_prob is not None
+  ]
+  ee_probs = [
+      r.edge_edge_prob for r in sim_records if r.edge_edge_prob is not None
+  ]
+  ne_probs = [
+      r.node_edge_prob for r in sim_records if r.node_edge_prob is not None
+  ]
+  fig, (node_spans,
+        edge_spans,
+        nn_ax,
+        ee_ax,
+        ne_ax) = plt.subplots(5, 1, figsize=(8.5, 11))
+  node_spans.set_title("Node Weights")
+  node_spans.hist(list(node2weight.values()))
+  node_spans.set_yscale("log")
+  edge_spans.set_title("Edge Weights")
+  edge_spans.hist(list(edge2weight.values()))
+  edge_spans.set_yscale("log")
+  nn_ax.set_title("Node-Node Probability Distribution")
+  nn_ax.hist(nn_probs)
+  nn_ax.set_yscale("log")
+  ee_ax.set_title("Edge-Edge Probability Distribution")
+  ee_ax.hist(ee_probs)
+  ee_ax.set_yscale("log")
+  ne_ax.set_title("Node-Edge Probability Distribution")
+  ne_ax.hist(ne_probs)
+  ne_ax.set_yscale("log")
+  fig.tight_layout()
+  fig.savefig(debug_summary_path)
+
+  log.info("Finished Writing")

@@ -49,7 +49,7 @@ class EmbeddingTestCase(unittest.TestCase):
     # self.assertNonZero(embedding.node)
     # self.assertNonZero(embedding.edge)
 
-  def help_test_fuzz(self, embedding_function, num_fuzz=100):
+  def help_test_fuzz(self, embedding_function, num_fuzz=1):
     "Random embedding should never break"
     for i in range(num_fuzz):
       hypergraph = CreateRandomHyperGraph(
@@ -206,7 +206,7 @@ class EmbedHg2vBooleanTest(EmbeddingTestCase):
                                          num_samples=2,
                                          batch_size=1,
                                          epochs=1)
-    self.help_test_fuzz(embed, num_fuzz=10)
+    self.help_test_fuzz(embed)
 
 
 class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
@@ -232,4 +232,4 @@ class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
                                          num_samples=2,
                                          batch_size=1,
                                          epochs=1)
-    self.help_test_fuzz(embed, num_fuzz=10)
+    self.help_test_fuzz(embed)
