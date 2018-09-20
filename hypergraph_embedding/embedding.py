@@ -420,4 +420,4 @@ DEBUG_SUMMARY_OPTIONS = {
     "HG2V_ADJ_JAC",
     "HG2V_NEIGH_JAC",
     "HG2V_SPAN_JAC",
-    }
+}
