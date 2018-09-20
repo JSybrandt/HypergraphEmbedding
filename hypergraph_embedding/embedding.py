@@ -7,6 +7,7 @@ from .algebraic_distance import EmbedAlgebraicDistance
 
 from .hg2v_model import *
 from .hg2v_sample import *
+from .hg2v_weighting import *
 
 import numpy as np
 import scipy as sp
@@ -282,8 +283,7 @@ def EmbedHg2vAdjJaccard(
     num_samples=500,
     batch_size=256,
     epochs=10):
-  node2weight = {node_idx:1 for node_idx in hypergraph.node}
-  edge2weight = {edge_idx:1 for edge_idx in hypergraph.edge}
+  node2weight, edge2weight = UniformWeight(hypergraph)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
                                                  edge2weight,
@@ -308,6 +308,70 @@ def EmbedHg2vAdjJaccard(
   return embedding
 
 
+def EmbedHg2vNeighborhoodWeightedJaccard(
+    hypergraph,
+    dimension,
+    num_neighbors=5,
+    num_samples=500,
+    batch_size=256,
+    epochs=10):
+  node2weight, edge2weight = WeightByNeighborhood(hypergraph, 0.25)
+  sampler_fn = lambda hg: WeightedJaccardSamples(hg,
+                                                 node2weight,
+                                                 edge2weight,
+                                                 num_neighbors=num_neighbors,
+                                                 num_samples=num_samples)
+  samples_to_input_fn = lambda samples: SamplesToModelInput(
+      samples,
+      num_neighbors=num_neighbors,
+      weighted=False)
+  model_fn = lambda hg: UnweightedFloatModel(hg,
+                                             dimension=dimension,
+                                             num_neighbors=num_neighbors)
+  embedding = _hypergraph2vec_skeleton(
+      hypergraph,
+      dimension,
+      sampler_fn,
+      samples_to_input_fn,
+      model_fn,
+      batch_size,
+      epochs)
+  embedding.method_name = "Hypergraph2Vec Neighborhood Weighted Jaccard"
+  return embedding
+
+
+def EmbedHg2vSpanWeightedJaccard(
+    hypergraph,
+    dimension,
+    num_neighbors=5,
+    num_samples=500,
+    batch_size=256,
+    epochs=10):
+  node2weight, edge2weight = WeightByAlgebraicSpan(hypergraph, 0.25)
+  sampler_fn = lambda hg: WeightedJaccardSamples(hg,
+                                                 node2weight,
+                                                 edge2weight,
+                                                 num_neighbors=num_neighbors,
+                                                 num_samples=num_samples)
+  samples_to_input_fn = lambda samples: SamplesToModelInput(
+      samples,
+      num_neighbors=num_neighbors,
+      weighted=False)
+  model_fn = lambda hg: UnweightedFloatModel(hg,
+                                             dimension=dimension,
+                                             num_neighbors=num_neighbors)
+  embedding = _hypergraph2vec_skeleton(
+      hypergraph,
+      dimension,
+      sampler_fn,
+      samples_to_input_fn,
+      model_fn,
+      batch_size,
+      epochs)
+  embedding.method_name = "Hypergraph2Vec Span Weighted Jaccard"
+  return embedding
+
+
 EMBEDDING_OPTIONS = {
     "SVD": EmbedSvd,
     "RANDOM": EmbedRandom,
@@ -321,6 +385,8 @@ EMBEDDING_OPTIONS = {
     "ALG_DIST": EmbedAlgebraicDistance,
     "HG2V_BOOLEAN": EmbedHg2vBoolean,
     "HG2V_ADJ_JAC": EmbedHg2vAdjJaccard,
+    "HG2V_NEIGH_JAC": EmbedHg2vNeighborhoodWeightedJaccard,
+    "HG2V_SPAN_JAC": EmbedHg2vSpanWeightedJaccard,
 }
 
 # Only include here if the embedding function supports the keyword argument
