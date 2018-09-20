@@ -251,7 +251,7 @@ def EmbedHg2vBoolean(
     hypergraph,
     dimension,
     num_neighbors=5,
-    num_samples=250,
+    num_samples=200,
     batch_size=256,
     epochs=10,
     debug_summary_path=None):
@@ -286,7 +286,7 @@ def EmbedHg2vAdjJaccard(
     hypergraph,
     dimension,
     num_neighbors=5,
-    num_samples=500,
+    num_samples=200,
     batch_size=256,
     epochs=10,
     debug_summary_path=None):
@@ -324,7 +324,7 @@ def EmbedHg2vNeighborhoodWeightedJaccard(
     hypergraph,
     dimension,
     num_neighbors=5,
-    num_samples=500,
+    num_samples=200,
     batch_size=256,
     epochs=10,
     debug_summary_path=None):
@@ -362,7 +362,7 @@ def EmbedHg2vSpanWeightedJaccard(
     hypergraph,
     dimension,
     num_neighbors=5,
-    num_samples=500,
+    num_samples=200,
     batch_size=256,
     epochs=10,
     debug_summary_path=None):

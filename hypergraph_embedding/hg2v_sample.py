@@ -15,7 +15,6 @@ from tqdm import tqdm
 from scipy.sparse import csr_matrix
 from scipy.sparse import lil_matrix
 from scipy.sparse import vstack
-from statistics import stdev
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -262,6 +261,8 @@ def _node_edge_sample(node_idx, edge_idx):
   return SimilarityRecord(
           left_node_idx=node_idx,
           right_edge_idx=edge_idx,
+          left_weight=node2weight[node_idx],
+          right_weight=edge2weight[edge_idx],
           neighbor_node_indices=neighbor_node_indices,
           neighbor_edge_indices=neighbor_edge_indices,
           node_edge_prob=prob_by_node * prob_by_edge)
@@ -468,17 +469,6 @@ def SamplesToModelInput(similarity_records, num_neighbors, weighted=True):
 # Visualization - Plot out the distribution of weights and samples             #
 ################################################################################
 
-def _log_distribution_info(name, distribution):
-  log.info(name)
-  if len(distribution) == 0:
-    log.info(" > Empty")
-  else:
-    log.info(" > Size : %i", len(distribution))
-    log.info(" > Range: %f - %f", min(distribution), max(distribution))
-    log.info(" > Mean : %f", sum(distribution) / len(distribution))
-    log.info(" > Std. : %f", stdev(distribution))
-
-
 def PlotDistributions(debug_summary_path, sim_records):
 
   log.info("Writing Debug Summary to %s", debug_summary_path)
@@ -510,10 +500,10 @@ def PlotDistributions(debug_summary_path, sim_records):
         nn_ax,
         ee_ax,
         ne_ax) = plt.subplots(5, 1, figsize=(8.5, 11))
-  node_spans.set_title("Node Spans")
+  node_spans.set_title("Node Weights")
   node_spans.hist(list(node2weight.values()))
   node_spans.set_yscale("log")
-  edge_spans.set_title("Edge Spans")
+  edge_spans.set_title("Edge Weights")
   edge_spans.hist(list(edge2weight.values()))
   edge_spans.set_yscale("log")
   nn_ax.set_title("Node-Node Probability Distribution")
@@ -529,8 +519,3 @@ def PlotDistributions(debug_summary_path, sim_records):
   fig.savefig(debug_summary_path)
 
   log.info("Finished Writing")
-  _log_distribution_info("Node Weights", list(node2weight.values()))
-  _log_distribution_info("Edge Weights", list(edge2weight.values()))
-  _log_distribution_info("Node-Node Prob.", nn_probs)
-  _log_distribution_info("Edge-Edge Prob.", ee_probs)
-  _log_distribution_info("Node-Edge Prob.", ne_probs)
