@@ -13,6 +13,8 @@ from multiprocessing import Pool
 from random import sample
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
+from scipy.sparse import lil_matrix
+from scipy.sparse import vstack
 from statistics import stdev
 
 import matplotlib as mpl
@@ -143,11 +145,9 @@ def SparseWeightedJaccard(row_i, row_j):
   assert row_j.shape[0] == 1
   assert row_i.shape[1] == row_j.shape[1]
 
-  numerator = 0
-  denominator = 0
-  for col_idx in set(row_i.nonzero()[1]).union(set(row_j.nonzero()[1])):
-    numerator += min(row_i[0, col_idx], row_j[0, col_idx])
-    denominator += max(row_i[0, col_idx], row_j[0, col_idx])
+  stack = vstack([row_i, row_j])
+  numerator = np.sum(np.min(stack, axis=0))
+  denominator = np.sum(np.max(stack, axis=0))
   if denominator == 0:
     return 0
   return numerator / denominator
@@ -155,14 +155,10 @@ def SparseWeightedJaccard(row_i, row_j):
 def SparseVecToWeights(vec, idx2weight):
   "vec is a sparse boolean vector, idx2weight has a weight for each col"
   assert vec.shape[0] == 1
-  rows = []
-  cols = []
-  vals = []
-  for col_idx in vec.nonzero()[1]:
-    rows.append(0)
-    cols.append(col_idx)
-    vals.append(idx2weight[col_idx])
-  return csr_matrix((vals, (rows, cols)), shape=vec.shape)
+  tmp = lil_matrix(vec.shape, dtype=np.float32)
+  for col in vec.nonzero()[1]:
+    tmp[0, col] = idx2weight[col]
+  return csr_matrix(tmp)
 
 ## Parallel Helper Functions ###################################################
 
