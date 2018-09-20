@@ -253,7 +253,8 @@ def EmbedHg2vBoolean(
     num_neighbors=5,
     num_samples=250,
     batch_size=256,
-    epochs=10):
+    epochs=10,
+    debug_summary_path=None):
   sampler_fn = lambda hg: BooleanSamples(hg,
                                          num_neighbors=num_neighbors,
                                          num_samples=num_samples)
@@ -261,6 +262,10 @@ def EmbedHg2vBoolean(
       samples,
       num_neighbors=num_neighbors,
       weighted=False)
+  if debug_summary_path:
+    vis_fn = lambda samples: PlotDistributions(debug_summary_path, samples)
+  else:
+    vis_fn = None
   model_fn = lambda hg: BooleanModel(hg,
                                      dimension=dimension,
                                      num_neighbors=num_neighbors)
@@ -271,7 +276,8 @@ def EmbedHg2vBoolean(
       samples_to_input_fn,
       model_fn,
       batch_size,
-      epochs)
+      epochs,
+      vis_fn)
   embedding.method_name = "Hypergraph2Vec Boolean"
   return embedding
 
@@ -282,7 +288,8 @@ def EmbedHg2vAdjJaccard(
     num_neighbors=5,
     num_samples=500,
     batch_size=256,
-    epochs=10):
+    epochs=10,
+    debug_summary_path=None):
   node2weight, edge2weight = UniformWeight(hypergraph)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
@@ -293,6 +300,10 @@ def EmbedHg2vAdjJaccard(
       samples,
       num_neighbors=num_neighbors,
       weighted=False)
+  if debug_summary_path:
+    vis_fn = lambda samples: PlotDistributions(debug_summary_path, samples)
+  else:
+    vis_fn = None
   model_fn = lambda hg: UnweightedFloatModel(hg,
                                              dimension=dimension,
                                              num_neighbors=num_neighbors)
@@ -303,7 +314,8 @@ def EmbedHg2vAdjJaccard(
       samples_to_input_fn,
       model_fn,
       batch_size,
-      epochs)
+      epochs,
+      vis_fn)
   embedding.method_name = "Hypergraph2Vec AdjJaccard"
   return embedding
 
@@ -314,7 +326,8 @@ def EmbedHg2vNeighborhoodWeightedJaccard(
     num_neighbors=5,
     num_samples=500,
     batch_size=256,
-    epochs=10):
+    epochs=10,
+    debug_summary_path=None):
   node2weight, edge2weight = WeightByNeighborhood(hypergraph, 0.25)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
@@ -325,6 +338,10 @@ def EmbedHg2vNeighborhoodWeightedJaccard(
       samples,
       num_neighbors=num_neighbors,
       weighted=False)
+  if debug_summary_path:
+    vis_fn = lambda samples: PlotDistributions(debug_summary_path, samples)
+  else:
+    vis_fn = None
   model_fn = lambda hg: UnweightedFloatModel(hg,
                                              dimension=dimension,
                                              num_neighbors=num_neighbors)
@@ -335,7 +352,8 @@ def EmbedHg2vNeighborhoodWeightedJaccard(
       samples_to_input_fn,
       model_fn,
       batch_size,
-      epochs)
+      epochs,
+      vis_fn)
   embedding.method_name = "Hypergraph2Vec Neighborhood Weighted Jaccard"
   return embedding
 
@@ -346,7 +364,8 @@ def EmbedHg2vSpanWeightedJaccard(
     num_neighbors=5,
     num_samples=500,
     batch_size=256,
-    epochs=10):
+    epochs=10,
+    debug_summary_path=None):
   node2weight, edge2weight = WeightByAlgebraicSpan(hypergraph, 0.25)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
@@ -357,6 +376,10 @@ def EmbedHg2vSpanWeightedJaccard(
       samples,
       num_neighbors=num_neighbors,
       weighted=False)
+  if debug_summary_path:
+    vis_fn = lambda samples: PlotDistributions(debug_summary_path, samples)
+  else:
+    vis_fn = None
   model_fn = lambda hg: UnweightedFloatModel(hg,
                                              dimension=dimension,
                                              num_neighbors=num_neighbors)
@@ -367,7 +390,8 @@ def EmbedHg2vSpanWeightedJaccard(
       samples_to_input_fn,
       model_fn,
       batch_size,
-      epochs)
+      epochs,
+      vis_fn)
   embedding.method_name = "Hypergraph2Vec Span Weighted Jaccard"
   return embedding
 
@@ -391,4 +415,9 @@ EMBEDDING_OPTIONS = {
 
 # Only include here if the embedding function supports the keyword argument
 # debug_summary_path
-DEBUG_SUMMARY_OPTIONS = {}
+DEBUG_SUMMARY_OPTIONS = {
+    "HG2V_BOOLEAN",
+    "HG2V_ADJ_JAC",
+    "HG2V_NEIGH_JAC",
+    "HG2V_SPAN_JAC",
+    }
