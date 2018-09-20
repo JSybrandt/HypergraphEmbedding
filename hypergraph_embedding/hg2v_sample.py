@@ -13,6 +13,11 @@ from multiprocessing import Pool
 from random import sample
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
+from statistics import stdev
+
+import matplotlib as mpl
+mpl.use('Agg')
+import matplotlib.pyplot as plt
 
 log = logging.getLogger()
 
@@ -461,3 +466,75 @@ def SamplesToModelInput(similarity_records, num_neighbors, weighted=True):
   targets = [node_node_prob, edge_edge_prob, node_edge_prob]
 
   return (features, targets)
+
+
+################################################################################
+# Visualization - Plot out the distribution of weights and samples             #
+################################################################################
+
+def _log_distribution_info(name, distribution):
+  log.info(name)
+  if len(distribution) == 0:
+    log.info(" > Empty")
+  else:
+    log.info(" > Size : %i", len(distribution))
+    log.info(" > Range: %f - %f", min(distribution), max(distribution))
+    log.info(" > Mean : %f", sum(distribution) / len(distribution))
+    log.info(" > Std. : %f", stdev(distribution))
+
+
+def PlotDistributions(debug_summary_path, sim_records):
+
+  log.info("Writing Debug Summary to %s", debug_summary_path)
+  node2weight = {}
+  edge2weight = {}
+  for r in sim_records:
+    if r.left_weight is not None:
+      if r.left_node_idx is not None and r.left_node_idx not in node2weight:
+        node2weight[r.left_node_idx] = r.left_weight
+      if r.left_edge_idx is not None and r.left_edge_idx not in edge2weight:
+        edge2weight[r.left_edge_idx] = r.left_weight
+    if r.right_weight is not None:
+      if r.right_node_idx is not None and r.right_node_idx not in node2weight:
+        node2weight[r.right_node_idx] = r.right_weight
+      if r.right_edge_idx is not None and r.right_edge_idx not in edge2weight:
+        edge2weight[r.right_edge_idx] = r.right_weight
+
+  nn_probs = [
+      r.node_node_prob for r in sim_records if r.node_node_prob is not None
+  ]
+  ee_probs = [
+      r.edge_edge_prob for r in sim_records if r.edge_edge_prob is not None
+  ]
+  ne_probs = [
+      r.node_edge_prob for r in sim_records if r.node_edge_prob is not None
+  ]
+  fig, (node_spans,
+        edge_spans,
+        nn_ax,
+        ee_ax,
+        ne_ax) = plt.subplots(5, 1, figsize=(8.5, 11))
+  node_spans.set_title("Node Spans")
+  node_spans.hist(list(node2weight.values()))
+  node_spans.set_yscale("log")
+  edge_spans.set_title("Edge Spans")
+  edge_spans.hist(list(edge2weight.values()))
+  edge_spans.set_yscale("log")
+  nn_ax.set_title("Node-Node Probability Distribution")
+  nn_ax.hist(nn_probs)
+  nn_ax.set_yscale("log")
+  ee_ax.set_title("Edge-Edge Probability Distribution")
+  ee_ax.hist(ee_probs)
+  ee_ax.set_yscale("log")
+  ne_ax.set_title("Node-Edge Probability Distribution")
+  ne_ax.hist(ne_probs)
+  ne_ax.set_yscale("log")
+  fig.tight_layout()
+  fig.savefig(debug_summary_path)
+
+  log.info("Finished Writing")
+  _log_distribution_info("Node Weights", list(node2weight.values()))
+  _log_distribution_info("Edge Weights", list(edge2weight.values()))
+  _log_distribution_info("Node-Node Prob.", nn_probs)
+  _log_distribution_info("Edge-Edge Prob.", ee_probs)
+  _log_distribution_info("Node-Edge Prob.", ne_probs)

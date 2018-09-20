@@ -252,7 +252,8 @@ def EmbedHg2vBoolean(
     num_neighbors=5,
     num_samples=250,
     batch_size=256,
-    epochs=10):
+    epochs=10,
+    debug_summary_path=None):
   sampler_fn = lambda hg: BooleanSamples(hg,
                                          num_neighbors=num_neighbors,
                                          num_samples=num_samples)
@@ -260,6 +261,10 @@ def EmbedHg2vBoolean(
       samples,
       num_neighbors=num_neighbors,
       weighted=False)
+  if debug_summary_path:
+    vis_fn = lambda samples: PlotDistributions(debug_summary_path, samples)
+  else:
+    vis_fn = None
   model_fn = lambda hg: BooleanModel(hg,
                                      dimension=dimension,
                                      num_neighbors=num_neighbors)
@@ -270,7 +275,8 @@ def EmbedHg2vBoolean(
       samples_to_input_fn,
       model_fn,
       batch_size,
-      epochs)
+      epochs,
+      vis_fn)
   embedding.method_name = "Hypergraph2Vec Boolean"
   return embedding
 
@@ -281,7 +287,8 @@ def EmbedHg2vAdjJaccard(
     num_neighbors=5,
     num_samples=500,
     batch_size=256,
-    epochs=10):
+    epochs=10,
+    debug_summary_path=None):
   node2weight = {node_idx:1 for node_idx in hypergraph.node}
   edge2weight = {edge_idx:1 for edge_idx in hypergraph.edge}
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
@@ -293,6 +300,10 @@ def EmbedHg2vAdjJaccard(
       samples,
       num_neighbors=num_neighbors,
       weighted=False)
+  if debug_summary_path:
+    vis_fn = lambda samples: PlotDistributions(debug_summary_path, samples)
+  else:
+    vis_fn = None
   model_fn = lambda hg: UnweightedFloatModel(hg,
                                              dimension=dimension,
                                              num_neighbors=num_neighbors)
@@ -303,7 +314,8 @@ def EmbedHg2vAdjJaccard(
       samples_to_input_fn,
       model_fn,
       batch_size,
-      epochs)
+      epochs,
+      vis_fn)
   embedding.method_name = "Hypergraph2Vec AdjJaccard"
   return embedding
 
@@ -325,4 +337,7 @@ EMBEDDING_OPTIONS = {
 
 # Only include here if the embedding function supports the keyword argument
 # debug_summary_path
-DEBUG_SUMMARY_OPTIONS = {}
+DEBUG_SUMMARY_OPTIONS = {
+    "HG2V_BOOLEAN",
+    "HG2V_ADJ_JAC"
+    }
