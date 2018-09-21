@@ -168,12 +168,13 @@ def SparseVecToWeights(vec, idx2weight):
 
 ## Parallel Helper Functions ###################################################
 
+
 def _alpha_scale(val, alpha=0):
   assert alpha >= 0
   assert alpha <= 1
   assert val <= 1
   assert val >= 0
-  return alpha + (1-alpha) * (val)
+  return alpha + (1 - alpha) * (val)
 
 
 def _init_same_type_sample(
@@ -265,17 +266,21 @@ def _node_edge_sample(node_idx, edge_idx):
   # Sample from nodes
   neighbor_node_indices = sample(nodes, min(num_neighbors, len(nodes)))
 
-  node_centroid = (edge2node[edge_idx] * node2features) / edge2node[edge_idx].nnz
+  node_centroid = (
+      edge2node[edge_idx] * node2features) / edge2node[edge_idx].nnz
   prob_by_node = SparseWeightedJaccard(node2features[node_idx], node_centroid)
 
-  edge_centroid = (node2edge[node_idx] * edge2features) / node2edge[node_idx].nnz
+  edge_centroid = (
+      node2edge[node_idx] * edge2features) / node2edge[node_idx].nnz
   prob_by_edge = SparseWeightedJaccard(edge2features[edge_idx], edge_centroid)
 
   return SimilarityRecord(
       left_node_idx=node_idx,
       right_edge_idx=edge_idx,
-      left_weight=node2features[node_idx, edge_idx],
-      right_weight=edge2features[edge_idx, node_idx],
+      left_weight=node2features[node_idx,
+                                edge_idx],
+      right_weight=edge2features[edge_idx,
+                                 node_idx],
       neighbor_node_indices=neighbor_node_indices,
       neighbor_edge_indices=neighbor_edge_indices,
       node_edge_prob=_alpha_scale(prob_by_node * prob_by_edge))

@@ -32,8 +32,14 @@ _shared_info = {}
 def WeightByNeighborhood(hypergraph, alpha):
   "The goal is that larger neighborhoods contribute less"
   log.info("Getting neighboorhood sizes for all nodes / edges")
-  node_neighborhood = {idx: len(node.edges) for idx, node in hypergraph.node.items()}
-  edge_neighborhood = {idx: len(edge.nodes) for idx, edge in hypergraph.edge.items()}
+  node_neighborhood = {
+      idx: len(node.edges) for idx,
+      node in hypergraph.node.items()
+  }
+  edge_neighborhood = {
+      idx: len(edge.nodes) for idx,
+      edge in hypergraph.edge.items()
+  }
 
   log.info("Zero one scaling")
   node_neighborhood = ZeroOneScaleKeys(node_neighborhood)
@@ -50,8 +56,10 @@ def WeightByNeighborhood(hypergraph, alpha):
   node_neighborhood = DictToSparseRow(node_neighborhood)
   edge_neighborhood = DictToSparseRow(edge_neighborhood)
 
-  node2weight = ToCsrMatrix(hypergraph).astype(np.float32).multiply(edge_neighborhood)
-  edge2weight = ToEdgeCsrMatrix(hypergraph).astype(np.float32).multiply(node_neighborhood)
+  node2weight = ToCsrMatrix(hypergraph).astype(
+      np.float32).multiply(edge_neighborhood)
+  edge2weight = ToEdgeCsrMatrix(hypergraph).astype(
+      np.float32).multiply(node_neighborhood)
 
   return node2weight, edge2weight
 
@@ -75,7 +83,8 @@ def WeightByAlgebraicSpan(hypergraph, alpha):
   edge_span = DictToSparseRow(edge_span)
 
   node2weight = ToCsrMatrix(hypergraph).astype(np.float32).multiply(edge_span)
-  edge2weight = ToEdgeCsrMatrix(hypergraph).astype(np.float32).multiply(node_span)
+  edge2weight = ToEdgeCsrMatrix(hypergraph).astype(
+      np.float32).multiply(node_span)
 
   return node2weight, edge2weight
 
@@ -248,9 +257,10 @@ def AlphaScaleValues(data, alpha):
   assert alpha <= 1
   return {k: (alpha + (1 - alpha) * v) for k, v in data.items()}
 
+
 def DictToSparseRow(idx2val):
   num_cols = max(idx2val)
-  tmp = lil_matrix((1, num_cols+1), dtype=np.float32)
+  tmp = lil_matrix((1, num_cols + 1), dtype=np.float32)
   for idx, val in idx2val.items():
     tmp[0, idx] = val
   return csr_matrix(tmp)

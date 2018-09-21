@@ -207,10 +207,7 @@ class SameTypeSampleTest(SampleTest):
     idx2neighbors = csr_matrix([0, 1, 1, 1])
     num_samples = 3
     # 2 edges, per node data
-    idx2target = csr_matrix([[1, 0],
-                             [1, 0],
-                             [1, 1],
-                             [0, 1]])
+    idx2target = csr_matrix([[1, 0], [1, 0], [1, 1], [0, 1]])
     # edge 0 has weight 1, edge 1 has weight 2
     idx2features = csr_matrix([
       [1, 0], # node 0
@@ -227,18 +224,16 @@ class SameTypeSampleTest(SampleTest):
         idx2features,
         is_edge)
     expected = [
-        SimilarityRecord(
-            left_node_idx=idx,
-            right_node_idx=1,
-            node_node_prob=1),
+        SimilarityRecord(left_node_idx=idx,
+                         right_node_idx=1,
+                         node_node_prob=1),
         SimilarityRecord(
             left_node_idx=idx,
             right_node_idx=2,
             node_node_prob=1 / 3),
-        SimilarityRecord(
-            left_node_idx=idx,
-            right_node_idx=3,
-            node_node_prob=0)
+        SimilarityRecord(left_node_idx=idx,
+                         right_node_idx=3,
+                         node_node_prob=0)
     ]
     self.assertSimRecsMatch(actual, expected)
 
@@ -248,10 +243,7 @@ class SameTypeSampleTest(SampleTest):
     idx2neighbors = csr_matrix([0, 1, 1, 0])
     num_samples = 3
     # 2 nodes, per edge data
-    idx2target = csr_matrix([[1, 0],
-                             [1, 0],
-                             [1, 1],
-                             [0, 1]])
+    idx2target = csr_matrix([[1, 0], [1, 0], [1, 1], [0, 1]])
     idx2features = csr_matrix([
       [1, 0], # edge 0
       [1, 0], # edge 1
@@ -267,10 +259,9 @@ class SameTypeSampleTest(SampleTest):
         idx2features,
         is_edge)
     expected = [
-        SimilarityRecord(
-            left_edge_idx=idx,
-            right_edge_idx=1,
-            edge_edge_prob=1),
+        SimilarityRecord(left_edge_idx=idx,
+                         right_edge_idx=1,
+                         edge_edge_prob=1),
         SimilarityRecord(
             left_edge_idx=idx,
             right_edge_idx=2,
