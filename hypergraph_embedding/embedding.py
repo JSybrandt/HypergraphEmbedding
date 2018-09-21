@@ -397,6 +397,51 @@ def EmbedHg2vSpanWeightedJaccard(
   embedding.method_name = "Hypergraph2Vec Span Weighted Jaccard"
   return embedding
 
+def EmbedHg2vDistWeightedJaccard(
+    hypergraph,
+    dimension,
+    alpha=0,
+    num_neighbors=5,
+    num_samples=200,
+    batch_size=256,
+    epochs=10,
+    debug_summary_path=None):
+
+  log.info("Embedding weighted by algebraic distance.")
+  alg_emb = EmbedAlgebraicDistance(
+      hypergraph,
+      dimension=5,
+      iterations=10)
+  sup_norm = lambda x: np.linalg.norm(x, ord=float('inf'))
+  node2weight, edge2weight = WeightByDistance(hypergraph, alpha, alg_emb, sup_norm)
+  sampler_fn = lambda hg: WeightedJaccardSamples(hg,
+                                                 node2weight,
+                                                 edge2weight,
+                                                 num_neighbors=num_neighbors,
+                                                 num_samples=num_samples)
+  samples_to_input_fn = lambda samples: SamplesToModelInput(
+      samples,
+      num_neighbors=num_neighbors,
+      weighted=False)
+  if debug_summary_path:
+    vis_fn = lambda samples: PlotDistributions(debug_summary_path, samples)
+  else:
+    vis_fn = None
+  model_fn = lambda hg: UnweightedFloatModel(hg,
+                                             dimension=dimension,
+                                             num_neighbors=num_neighbors)
+  embedding = _hypergraph2vec_skeleton(
+      hypergraph,
+      dimension,
+      sampler_fn,
+      samples_to_input_fn,
+      model_fn,
+      batch_size,
+      epochs,
+      vis_fn)
+  embedding.method_name = "Hypergraph2Vec Span Weighted Jaccard"
+  return embedding
+
 
 EMBEDDING_OPTIONS = {
     "SVD": EmbedSvd,
@@ -413,6 +458,7 @@ EMBEDDING_OPTIONS = {
     "HG2V_ADJ_JAC": EmbedHg2vAdjJaccard,
     "HG2V_NEIGH_JAC": EmbedHg2vNeighborhoodWeightedJaccard,
     "HG2V_SPAN_JAC": EmbedHg2vSpanWeightedJaccard,
+    "HG2V_ALG_DIST": EmbedHg2vDistWeightedJaccard,
 }
 
 # Only include here if the embedding function supports the keyword argument
@@ -422,4 +468,5 @@ DEBUG_SUMMARY_OPTIONS = {
     "HG2V_ADJ_JAC",
     "HG2V_NEIGH_JAC",
     "HG2V_SPAN_JAC",
+    "HG2V_ALG_DIST",
 }

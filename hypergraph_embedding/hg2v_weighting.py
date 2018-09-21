@@ -28,6 +28,48 @@ log = logging.getLogger()
 
 _shared_info = {}
 
+def WeightByDistance(hypergraph, alpha, ref_embedding, norm):
+  """
+  Replaces each i-j weight with the norm of difference in the reference
+  Zero one scaled so that the smallest norm gets a 1.
+  Alpha scaled so that the minimum support is alpha
+
+  Input:
+    hypergraph          : a hypergraph proto message
+    alpha               : a value in [0, 1] indicating minimum support
+    ref_embedding : an embedding proto message used to calculate dists
+    norm                : a function that maps a vector to a real
+  Output:
+    node2features, edge2features
+  """
+
+  log.info("Getting largest indices")
+  num_nodes = max(hypergraph.node) + 1
+  num_edges = max(hypergraph.edge) + 1
+  log.info("Getting distances")
+  node_edge2dist = {}
+  for node_idx, node in hypergraph.node.items():
+    node_vec = np.array(ref_embedding.node[node_idx].values, dtype=np.float32)
+    for edge_idx in node.edges:
+      edge_vec = np.array(ref_embedding.edge[edge_idx].values, dtype=np.float32)
+      node_edge2dist[(node_idx, edge_idx)] = norm(node_vec - edge_vec)
+
+  log.info("Scaling distances")
+  node_edge2dist = AlphaScaleValues(
+                     OneMinusValues(
+                       ZeroOneScaleValues(
+                         node_edge2dist)),
+                     alpha)
+
+  log.info("Recording results in matrix")
+  node2edge_dist = lil_matrix((num_nodes, num_edges), dtype=np.float32)
+  for node_idx, node in hypergraph.node.items():
+    for edge_idx in node.edges:
+      node2edge_dist[node_idx, edge_idx] = node_edge2dist[(node_idx, edge_idx)]
+
+  return csr_matrix(node2edge_dist), csr_matrix(node2edge_dist.T)
+
+
 
 def WeightByNeighborhood(hypergraph, alpha):
   "The goal is that larger neighborhoods contribute less"
@@ -42,8 +84,8 @@ def WeightByNeighborhood(hypergraph, alpha):
   }
 
   log.info("Zero one scaling")
-  node_neighborhood = ZeroOneScaleKeys(node_neighborhood)
-  edge_neighborhood = ZeroOneScaleKeys(edge_neighborhood)
+  node_neighborhood = ZeroOneScaleValues(node_neighborhood)
+  edge_neighborhood = ZeroOneScaleValues(edge_neighborhood)
 
   log.info("1-value")
   node_neighborhood = OneMinusValues(node_neighborhood)
@@ -68,8 +110,8 @@ def WeightByAlgebraicSpan(hypergraph, alpha):
   node_span, edge_span = ComputeSpans(hypergraph)
 
   log.info("Zero one scaling")
-  node_span = ZeroOneScaleKeys(node_span)
-  edge_span = ZeroOneScaleKeys(edge_span)
+  node_span = ZeroOneScaleValues(node_span)
+  edge_span = ZeroOneScaleValues(edge_span)
 
   log.info("1-value")
   node_span = OneMinusValues(node_span)
@@ -218,7 +260,7 @@ def _zero_one_scale_key(idx, idx2value=None, min_val=None, delta_val=None):
     return idx, (idx2value[idx] - min_val) / delta_val
 
 
-def ZeroOneScaleKeys(idx2value, run_in_parallel=True, disable_pbar=False):
+def ZeroOneScaleValues(idx2value, run_in_parallel=True, disable_pbar=False):
   """
     Scales input dict idx2value to the 0-1 interval. If only one value,
     return 1.
