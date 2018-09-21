@@ -11,6 +11,7 @@ from .algebraic_distance import EmbedAlgebraicDistance
 import numpy as np
 import scipy as sp
 from scipy.spatial.distance import minkowski
+from scipy.sparse import csr_matrix, lil_matrix
 import multiprocessing
 from multiprocessing import Pool
 from tqdm import tqdm
@@ -31,45 +32,57 @@ _shared_info = {}
 def WeightByNeighborhood(hypergraph, alpha):
   "The goal is that larger neighborhoods contribute less"
   log.info("Getting neighboorhood sizes for all nodes / edges")
-  node2weight = {idx: len(node.edges) for idx, node in hypergraph.node.items()}
-  edge2weight = {idx: len(edge.nodes) for idx, edge in hypergraph.edge.items()}
+  node_neighborhood = {idx: len(node.edges) for idx, node in hypergraph.node.items()}
+  edge_neighborhood = {idx: len(edge.nodes) for idx, edge in hypergraph.edge.items()}
 
   log.info("Zero one scaling")
-  node2weight = ZeroOneScaleKeys(node2weight)
-  edge2weight = ZeroOneScaleKeys(edge2weight)
+  node_neighborhood = ZeroOneScaleKeys(node_neighborhood)
+  edge_neighborhood = ZeroOneScaleKeys(edge_neighborhood)
 
   log.info("1-value")
-  node2weight = OneMinusValues(node2weight)
-  edge2weight = OneMinusValues(edge2weight)
+  node_neighborhood = OneMinusValues(node_neighborhood)
+  edge_neighborhood = OneMinusValues(edge_neighborhood)
 
   log.info("Alpha scaling")
-  node2weight = AlphaScaleValues(node2weight, alpha)
-  edge2weight = AlphaScaleValues(edge2weight, alpha)
+  node_neighborhood = AlphaScaleValues(node_neighborhood, alpha)
+  edge_neighborhood = AlphaScaleValues(edge_neighborhood, alpha)
+
+  node_neighborhood = DictToSparseRow(node_neighborhood)
+  edge_neighborhood = DictToSparseRow(edge_neighborhood)
+
+  node2weight = ToCsrMatrix(hypergraph).astype(np.float32).multiply(edge_neighborhood)
+  edge2weight = ToEdgeCsrMatrix(hypergraph).astype(np.float32).multiply(node_neighborhood)
 
   return node2weight, edge2weight
 
 
 def WeightByAlgebraicSpan(hypergraph, alpha):
-  node2weight, edge2weight = ComputeSpans(hypergraph)
+  node_span, edge_span = ComputeSpans(hypergraph)
 
   log.info("Zero one scaling")
-  node2weight = ZeroOneScaleKeys(node2weight)
-  edge2weight = ZeroOneScaleKeys(edge2weight)
+  node_span = ZeroOneScaleKeys(node_span)
+  edge_span = ZeroOneScaleKeys(edge_span)
 
   log.info("1-value")
-  node2weight = OneMinusValues(node2weight)
-  edge2weight = OneMinusValues(edge2weight)
+  node_span = OneMinusValues(node_span)
+  edge_span = OneMinusValues(edge_span)
 
   log.info("Alpha scaling")
-  node2weight = AlphaScaleValues(node2weight, alpha)
-  edge2weight = AlphaScaleValues(edge2weight, alpha)
+  node_span = AlphaScaleValues(node_span, alpha)
+  edge_span = AlphaScaleValues(edge_span, alpha)
+
+  node_span = DictToSparseRow(node_span)
+  edge_span = DictToSparseRow(edge_span)
+
+  node2weight = ToCsrMatrix(hypergraph).astype(np.float32).multiply(edge_span)
+  edge2weight = ToEdgeCsrMatrix(hypergraph).astype(np.float32).multiply(node_span)
 
   return node2weight, edge2weight
 
 
 def UniformWeight(hypergraph):
-  node2weight = {node_idx: 1 for node_idx in hypergraph.node}
-  edge2weight = {edge_idx: 1 for edge_idx in hypergraph.edge}
+  node2weight = ToCsrMatrix(hypergraph).astype(np.float32)
+  edge2weight = ToEdgeCsrMatrix(hypergraph).astype(np.float32)
   return node2weight, edge2weight
 
 
@@ -234,3 +247,10 @@ def AlphaScaleValues(data, alpha):
   assert alpha >= 0
   assert alpha <= 1
   return {k: (alpha + (1 - alpha) * v) for k, v in data.items()}
+
+def DictToSparseRow(idx2val):
+  num_cols = max(idx2val)
+  tmp = lil_matrix((1, num_cols+1), dtype=np.float32)
+  for idx, val in idx2val.items():
+    tmp[0, idx] = val
+  return csr_matrix(tmp)
