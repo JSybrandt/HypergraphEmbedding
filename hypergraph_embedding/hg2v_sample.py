@@ -13,8 +13,8 @@ from multiprocessing import Pool
 from random import sample
 from tqdm import tqdm
 from scipy.sparse import csr_matrix
+from scipy.sparse import csc_matrix
 from scipy.sparse import lil_matrix
-from scipy.sparse import vstack
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -145,13 +145,22 @@ def SparseWeightedJaccard(row_i, row_j):
   assert row_j.shape[0] == 1
   assert row_i.shape[1] == row_j.shape[1]
 
+  nz_i = row_i.nonzero()[1]
+  nz_j = row_j.nonzero()[1]
+
+  important = np.union1d(nz_i, nz_j)
+
   numerator = denominator = 0
-  stack = vstack([row_i, row_j], dtype=np.float32)
-  for col_idx in set(stack.nonzero()[1]):
-    a = stack[0, col_idx]
-    b = stack[1, col_idx]
-    numerator += min(a, b)
-    denominator += max(a, b)
+  for col_idx in important:
+    x = row_i[0, col_idx]
+    y = row_j[0, col_idx]
+    if x < y:
+      numerator += x
+      denominator += y
+    else:
+      numerator += y
+      denominator += x
+
   if denominator == 0:
     return 0
   return numerator / denominator
@@ -209,9 +218,11 @@ def SameTypeSample(
   if is_edge is None:
     is_edge = _shared_info["is_edge"]
   records = []
-  neighbors = list(idx2neighbors[idx].nonzero()[1])
+  neighbors = idx2neighbors[idx].nonzero()[1]
   vec = idx2features[idx]
-  for neighbor_idx in sample(neighbors, min(num_samples, len(neighbors))):
+  for neighbor_idx in np.random.choice(neighbors,
+                                       min(num_samples, len(neighbors)),
+                                       replace=False):
     prob = SparseWeightedJaccard(vec, idx2features[neighbor_idx])
     if is_edge:
       records.append(

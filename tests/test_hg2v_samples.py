@@ -162,7 +162,7 @@ class SparseWeightedJaccardTest(unittest.TestCase):
     # ---------------------------------------------------    --
     # max(2,0) + max(3,0) + max(4,1) + max(0,0) + max(1,1) = 10
     actual = SparseWeightedJaccard(row_i, row_j)
-    self.assertEqual(actual, 0.2)
+    self.assertAlmostEqual(actual, 0.2)
 
 
 class SampleTest(unittest.TestCase):
