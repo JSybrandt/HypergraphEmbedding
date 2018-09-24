@@ -5,6 +5,7 @@ from hypergraph_embedding.hg2v_sample import SimilarityRecord
 from hypergraph_embedding.hg2v_sample import SamplesToModelInput
 from hypergraph_embedding.hg2v_sample import SparseWeightedJaccard
 from hypergraph_embedding.hg2v_sample import SameTypeSample
+from hypergraph_embedding.hg2v_sample import CentroidFromRows
 from scipy.sparse import csr_matrix
 import numpy as np
 
@@ -203,11 +204,6 @@ class SameTypeSampleTest(SampleTest):
 
   def test_typical_node(self):
     idx = 0
-    # 4 nodes
-    idx2neighbors = csr_matrix([0, 1, 1, 1])
-    num_samples = 3
-    # 2 edges, per node data
-    idx2target = csr_matrix([[1, 0], [1, 0], [1, 1], [0, 1]])
     # edge 0 has weight 1, edge 1 has weight 2
     idx2features = csr_matrix([
       [1, 0], # node 0
@@ -216,13 +212,20 @@ class SameTypeSampleTest(SampleTest):
       [0, 2]  # node 3
     ])
     is_edge = False
-    actual = SameTypeSample(
-        idx,
-        idx2neighbors,
-        num_samples,
-        idx2target,
-        idx2features,
-        is_edge)
+    actual = [
+        SameTypeSample((idx,
+                        1),
+                       idx2features,
+                       is_edge),
+        SameTypeSample((idx,
+                        2),
+                       idx2features,
+                       is_edge),
+        SameTypeSample((idx,
+                        3),
+                       idx2features,
+                       is_edge)
+    ]
     expected = [
         SimilarityRecord(left_node_idx=idx,
                          right_node_idx=1,
@@ -239,11 +242,6 @@ class SameTypeSampleTest(SampleTest):
 
   def test_typical_edge(self):
     idx = 0
-    # 4 edges
-    idx2neighbors = csr_matrix([0, 1, 1, 0])
-    num_samples = 3
-    # 2 nodes, per edge data
-    idx2target = csr_matrix([[1, 0], [1, 0], [1, 1], [0, 1]])
     idx2features = csr_matrix([
       [1, 0], # edge 0
       [1, 0], # edge 1
@@ -251,13 +249,16 @@ class SameTypeSampleTest(SampleTest):
       [0, 2]  # edge 3
     ])
     is_edge = True
-    actual = SameTypeSample(
-        idx,
-        idx2neighbors,
-        num_samples,
-        idx2target,
-        idx2features,
-        is_edge)
+    actual = [
+        SameTypeSample((idx,
+                        1),
+                       idx2features,
+                       is_edge),
+        SameTypeSample((idx,
+                        2),
+                       idx2features,
+                       is_edge)
+    ]
     expected = [
         SimilarityRecord(left_edge_idx=idx,
                          right_edge_idx=1,
@@ -268,3 +269,23 @@ class SameTypeSampleTest(SampleTest):
             edge_edge_prob=1 / 3)
     ]
     self.assertSimRecsMatch(actual, expected)
+
+
+class SparseMatrixTestCase(unittest.TestCase):
+
+  def assertSparseAlmostEqual(self, actual, expected, tol=1E-5):
+    self.assertEqual(actual.shape, expected.shape)
+    # >= is quicker than < apparently
+    # if any element is >= tol, then np.max returns true
+    self.assertFalse(((np.abs(actual - expected) >= tol).max()))
+
+
+class CentroidFromRowsTest(SparseMatrixTestCase):
+
+  def test_typical(self):
+    target2features = csr_matrix([[1, 2, 3], [0, 1, 0], [1, 0, 3]])
+    idx2targets = csr_matrix([[1, 0, 1]])
+    idx = 0
+    actual = csr_matrix(CentroidFromRows(idx, idx2targets, target2features))
+    expected = csr_matrix([[1, 1, 3]], dtype=np.float32)
+    self.assertSparseAlmostEqual(actual, expected)

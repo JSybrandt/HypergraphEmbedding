@@ -28,6 +28,7 @@ log = logging.getLogger()
 
 _shared_info = {}
 
+
 def WeightByDistance(hypergraph, alpha, ref_embedding, norm):
   """
   Replaces each i-j weight with the norm of difference in the reference
@@ -56,10 +57,8 @@ def WeightByDistance(hypergraph, alpha, ref_embedding, norm):
 
   log.info("Scaling distances")
   node_edge2dist = AlphaScaleValues(
-                     OneMinusValues(
-                       ZeroOneScaleValues(
-                         node_edge2dist)),
-                     alpha)
+      OneMinusValues(ZeroOneScaleValues(node_edge2dist)),
+      alpha)
 
   log.info("Recording results in matrix")
   node2edge_dist = lil_matrix((num_nodes, num_edges), dtype=np.float32)
@@ -68,7 +67,6 @@ def WeightByDistance(hypergraph, alpha, ref_embedding, norm):
       node2edge_dist[node_idx, edge_idx] = node_edge2dist[(node_idx, edge_idx)]
 
   return csr_matrix(node2edge_dist), csr_matrix(node2edge_dist.T)
-
 
 
 def WeightByNeighborhood(hypergraph, alpha):

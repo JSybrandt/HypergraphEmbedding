@@ -397,6 +397,7 @@ def EmbedHg2vSpanWeightedJaccard(
   embedding.method_name = "Hypergraph2Vec Span Weighted Jaccard"
   return embedding
 
+
 def EmbedHg2vDistWeightedJaccard(
     hypergraph,
     dimension,
@@ -408,10 +409,7 @@ def EmbedHg2vDistWeightedJaccard(
     debug_summary_path=None):
 
   log.info("Embedding weighted by algebraic distance.")
-  alg_emb = EmbedAlgebraicDistance(
-      hypergraph,
-      dimension=5,
-      iterations=10)
+  alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=5, iterations=10)
   sup_norm = lambda x: np.linalg.norm(x, ord=float('inf'))
   node2weight, edge2weight = WeightByDistance(hypergraph, alpha, alg_emb, sup_norm)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
