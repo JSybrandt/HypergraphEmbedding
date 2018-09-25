@@ -16,7 +16,7 @@ from scipy.sparse.linalg import svds
 from sklearn.decomposition import NMF
 import multiprocessing
 from multiprocessing import Pool
-import nimfa
+# import nimfa
 from tqdm import tqdm
 import logging
 from random import sample
@@ -100,16 +100,17 @@ def WeightByDistanceCluster(hypergraph, alpha, ref_embedding, norm, dim):
   W = nmf_model.fit_transform(node2edge_dist)
   H = nmf_model.components_
   # nmf_model = nimfa.Nmf(node2edge_dist,
-                        # max_iter=200,
-                        # rank=dim,
-                        # update='euclidean',
-                        # objective='fro')
+  # max_iter=200,
+  # rank=dim,
+  # update='euclidean',
+  # objective='fro')
   # nmf_fit = nmf_model()
   # W = nmf_fit.basis()
   # H = nmf_fit.coef()
   log.info("W shape... (%d, %d)", *W.shape)
   log.info("H shape... (%d, %d)", *H.shape)
   return csr_matrix(W), csr_matrix(H.T)
+
 
 def WeightByNeighborhood(hypergraph, alpha):
   "The goal is that larger neighborhoods contribute less"
