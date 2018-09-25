@@ -226,7 +226,10 @@ def _hypergraph2vec_skeleton(
   log.info("Sampling")
   samples = sampler_fn(hypergraph)
   if visualization_fn is not None:
-    visualization_fn(samples)
+    try:
+      visualization_fn(samples)
+    except:
+      log.error("Something happened when visualizing...")
   log.info("Converting samples to model input")
   input_features, output_probs = samples_to_input_fn(samples)
   log.info("Getting model")
@@ -329,10 +332,10 @@ def EmbedHg2vNeighborhoodWeightedJaccard(
     batch_size=256,
     epochs=10,
     debug_summary_path=None):
-  node2weight, edge2weight = WeightByNeighborhood(hypergraph, alpha)
+  node2feature, edge2feature = WeightByNeighborhood(hypergraph, alpha)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
-                                                 node2weight,
-                                                 edge2weight,
+                                                  node2feature,
+                                                 edge2feature,
                                                  num_neighbors=num_neighbors,
                                                  num_samples=num_samples)
   samples_to_input_fn = lambda samples: SamplesToModelInput(
@@ -411,7 +414,10 @@ def EmbedHg2vDistWeightedJaccard(
   log.info("Embedding weighted by algebraic distance.")
   alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=5, iterations=10)
   sup_norm = lambda x: np.linalg.norm(x, ord=float('inf'))
-  node2weight, edge2weight = WeightByDistance(hypergraph, alpha, alg_emb, sup_norm)
+  node2weight, edge2weight = WeightByDistance(hypergraph,
+                                              alpha,
+                                              alg_emb,
+                                              sup_norm)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
                                                  edge2weight,
@@ -437,7 +443,7 @@ def EmbedHg2vDistWeightedJaccard(
       batch_size,
       epochs,
       vis_fn)
-  embedding.method_name = "Hypergraph2Vec Span Weighted Jaccard"
+  embedding.method_name = "Hypergraph2Vec Dist Weighted Jaccard"
   return embedding
 
 

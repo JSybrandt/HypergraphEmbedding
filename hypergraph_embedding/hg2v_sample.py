@@ -16,6 +16,7 @@ from scipy.sparse import csr_matrix
 from scipy.sparse import csc_matrix
 from scipy.sparse import coo_matrix
 
+
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -210,13 +211,14 @@ def GetAllCentroids(important_indices, idx2targets, targets2features):
                       targets2features)) as pool:
     for v, (r, c) in tqdm(pool.imap(CentroidFromRows,
                                     important_indices,
-                                    chunksize=4),
+                                    chunksize=16),
                           total=len(important_indices)):
       vals.extend(v)
       rows.extend(r)
       cols.extend(c)
 
-  return csr_matrix((vals, (rows, cols)))
+  log.info("Converting centroids to csr_matrix")
+  return csr_matrix((vals, (rows, cols)), shape=(idx2targets.shape[0], targets2features.shape[1]))
 
 
 ## Parallel Helper Functions ###################################################
@@ -308,6 +310,15 @@ def NodeEdgeSample(
   if edge2node_centroid is None:
     edge2node_centroid = _shared_info["edge2node_centroid"]
 
+  assert node2edge.shape[0] == node2features.shape[0]
+  assert node2edge.shape[0] == node2edge_centroid.shape[0]
+  assert node2edge.shape[1] == edge2node.shape[0]
+  assert edge2node.shape[0] == edge2features.shape[0]
+  assert edge2node.shape[0] == edge2node_centroid.shape[0]
+
+  assert edge2features.shape[1] == node2edge_centroid.shape[1]
+  assert node2features.shape[1] == edge2node_centroid.shape[1]
+
   edges = node2edge[node_idx].nonzero()[1]
   neighbor_edge_indices = np.random.choice(
       edges,
@@ -332,10 +343,8 @@ def NodeEdgeSample(
   return SimilarityRecord(
       left_node_idx=node_idx,
       right_edge_idx=edge_idx,
-      left_weight=node2features[node_idx,
-                                edge_idx],
-      right_weight=edge2features[edge_idx,
-                                 node_idx],
+      left_weight=prob_by_node,
+      right_weight=prob_by_edge,
       neighbor_node_indices=neighbor_node_indices,
       neighbor_edge_indices=neighbor_edge_indices,
       node_edge_prob=_alpha_scale(prob_by_node * prob_by_edge))
@@ -377,9 +386,7 @@ def WeightedJaccardSamples(
 
   log.info("Getting node-node samples")
   samples = GetSamples(node2node_neighbors, hypergraph.node, num_samples)
-
   log.info("Sampling node-node probabilities")
-
   with Pool(workers,
             initializer=_init_same_type_sample,
             initargs=(node2features, # idx2features
@@ -401,7 +408,6 @@ def WeightedJaccardSamples(
 
   log.info("Getting edge-edge samples")
   samples = GetSamples(edge2edge_neighbors, hypergraph.edge, num_samples)
-
   log.info("Sampling edge-edge probabilities")
   with Pool(workers,
             initializer=_init_same_type_sample,
@@ -420,11 +426,16 @@ def WeightedJaccardSamples(
       hypergraph.node,
       node2edge,
       edge2features)
+  log.info("Node centroids have ~%f nonzero entries per row",
+           node2edge_centroid.nnz / len(hypergraph.node))
+
   log.info("Getting edge centroids")
   edge2node_centroid = GetAllCentroids(
       hypergraph.edge,
       edge2node,
       node2features)
+  log.info("Edge centroids have ~%f nonzero entries per row",
+           edge2node_centroid.nnz / len(hypergraph.edge))
 
   node2second_edge = node2node_neighbors * node2edge
   log.info("Getting node-edge samples")
@@ -583,12 +594,14 @@ def PlotDistributions(debug_summary_path, sim_records):
         nn_ax,
         ee_ax,
         ne_ax) = plt.subplots(5, 1, figsize=(8.5, 11))
-  node_spans.set_title("Node Weights")
-  node_spans.hist(list(node2features.values()))
-  node_spans.set_yscale("log")
-  edge_spans.set_title("Edge Weights")
-  edge_spans.hist(list(edge2features.values()))
-  edge_spans.set_yscale("log")
+  if len(node2features.values()):
+    node_spans.set_title("Node Weights")
+    node_spans.hist(list(node2features.values()))
+    node_spans.set_yscale("log")
+  if len(edge2features.values()):
+    edge_spans.set_title("Edge Weights")
+    edge_spans.hist(list(edge2features.values()))
+    edge_spans.set_yscale("log")
   nn_ax.set_title("Node-Node Probability Distribution")
   nn_ax.hist(nn_probs)
   nn_ax.set_yscale("log")
