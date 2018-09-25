@@ -8,4 +8,3 @@ keras
 tensorflow
 tqdm
 matplotlib
-nimfa

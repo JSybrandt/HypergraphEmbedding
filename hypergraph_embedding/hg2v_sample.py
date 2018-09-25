@@ -15,7 +15,6 @@ from tqdm import tqdm
 from scipy.sparse import csr_matrix
 from scipy.sparse import csc_matrix
 from scipy.sparse import coo_matrix
-from joblib import Parallel, delayed
 
 
 import matplotlib as mpl
@@ -441,36 +440,40 @@ def WeightedJaccardSamples(
   node2second_edge = node2node_neighbors * node2edge
   log.info("Getting node-edge samples")
   samples = GetSamples(node2second_edge, hypergraph.node, num_samples)
-  log.info("Getting node-edge relationships")
-  tmp = Parallel(n_jobs=workers)(
-      delayed(NodeEdgeSample)(
-        (node_idx, edge_idx),
-        node2edge,
-        edge2node,
-        num_neighbors,
-        node2features,
-        edge2features,
-        node2edge_centroid,
-        edge2node_centroid)
-      for node_idx, edge_idx in tqdm(samples))
-  similarity_records.extend(tmp)
+  with Pool(workers,
+            initializer=_init_node_edge_sample,
+            initargs=(node2edge,
+                      edge2node,
+                      num_neighbors,
+                      node2features,
+                      edge2features,
+                      node2edge_centroid,
+                      edge2node_centroid)) as pool:
+    log.info("Getting node-edge relationships")
+    for record in tqdm(pool.imap(NodeEdgeSample,
+                                 samples),
+                       total=len(samples),
+                       disable=disable_pbar):
+      similarity_records.append(record)
 
   edge2second_node = edge2edge_neighbors * edge2node
   log.info("Getting edge-node samples")
   samples = GetSamples(edge2second_node, hypergraph.edge, num_samples)
-  log.info("Getting edge-node relationships")
-  tmp = Parallel(n_jobs=workers)(
-      delayed(NodeEdgeSample)(
-        (node_idx, edge_idx),
-        node2edge,
-        edge2node,
-        num_neighbors,
-        node2features,
-        edge2features,
-        node2edge_centroid,
-        edge2node_centroid)
-      for edge_idx, node_idx in tqdm(samples))
-  similarity_records.extend(tmp)
+  with Pool(workers,
+            initializer=_init_node_edge_sample,
+            initargs=(node2edge,
+                      edge2node,
+                      num_neighbors,
+                      node2features,
+                      edge2features,
+                      node2edge_centroid,
+                      edge2node_centroid)) as pool:
+    log.info("Getting edge-node relationships")
+    for record in tqdm(pool.imap(EdgeNodeSample,
+                                 samples),
+                       total=len(samples),
+                       disable=disable_pbar):
+      similarity_records.append(record)
 
   return similarity_records
 

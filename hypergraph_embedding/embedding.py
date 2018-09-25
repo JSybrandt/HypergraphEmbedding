@@ -409,24 +409,15 @@ def EmbedHg2vDistWeightedJaccard(
     num_samples=200,
     batch_size=256,
     epochs=10,
-    nmf_clusters=25, # if set, cluster distance mat
     debug_summary_path=None):
 
   log.info("Embedding weighted by algebraic distance.")
   alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=5, iterations=10)
   sup_norm = lambda x: np.linalg.norm(x, ord=float('inf'))
-  if nmf_clusters is not None:
-    assert nmf_clusters > 1
-    node2weight, edge2weight = WeightByDistanceCluster(hypergraph,
-                                                       alpha,
-                                                       alg_emb,
-                                                       sup_norm,
-                                                       nmf_clusters)
-  else:
-    node2weight, edge2weight = WeightByDistance(hypergraph,
-                                                alpha,
-                                                alg_emb,
-                                                sup_norm)
+  node2weight, edge2weight = WeightByDistance(hypergraph,
+                                              alpha,
+                                              alg_emb,
+                                              sup_norm)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
                                                  edge2weight,
@@ -452,10 +443,7 @@ def EmbedHg2vDistWeightedJaccard(
       batch_size,
       epochs,
       vis_fn)
-  if nmf_clusters is not None:
-    embedding.method_name = "Hypergraph2Vec Dist({}) Weighted Jaccard".format(nmf_clusters)
-  else:
-    embedding.method_name = "Hypergraph2Vec Dist Weighted Jaccard"
+  embedding.method_name = "Hypergraph2Vec Dist Weighted Jaccard"
   return embedding
 
 
