@@ -30,7 +30,9 @@ log = logging.getLogger()
 
 _shared_info = {}
 
+
 def WeightBySameTypeDistance(hypergraph, alpha, ref_embedding, norm):
+
   def do_half(adj_mat, type_emb):
     vectors = {idx: np.array(emb.values) for idx, emb in type_emb.items()}
     indices2dist = {}
@@ -39,13 +41,14 @@ def WeightBySameTypeDistance(hypergraph, alpha, ref_embedding, norm):
     for row, col in tqdm(zip(rows, cols), total=adj_mat.nnz):
       indices2dist[(row, col)] = norm(vectors[row] - vectors[col])
     log.info("Scaling")
-    indices2dist =  AlphaScaleValues(OneMinusValues(ZeroOneScaleValues(indices2dist)), alpha)
+    indices2dist = AlphaScaleValues(
+        OneMinusValues(ZeroOneScaleValues(indices2dist)),
+        alpha)
     tmp = lil_matrix(adj_mat.shape, dtype=np.float32)
     log.info("Converting")
     for (row, col), value in indices2dist.items():
       tmp[row, col] = value
     return csr_matrix(tmp)
-
 
   # log.info("Identifying all node-node relationships")
   # node2edge = ToCsrMatrix(hypergraph)

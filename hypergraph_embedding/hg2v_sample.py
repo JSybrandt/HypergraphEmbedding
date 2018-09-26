@@ -16,7 +16,6 @@ from scipy.sparse import csr_matrix
 from scipy.sparse import csc_matrix
 from scipy.sparse import coo_matrix
 
-
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -218,7 +217,11 @@ def GetAllCentroids(important_indices, idx2targets, targets2features):
       cols.extend(c)
 
   log.info("Converting centroids to csr_matrix")
-  return csr_matrix((vals, (rows, cols)), shape=(idx2targets.shape[0], targets2features.shape[1]))
+  return csr_matrix((vals,
+                     (rows,
+                      cols)),
+                    shape=(idx2targets.shape[0],
+                           targets2features.shape[1]))
 
 
 ## Parallel Helper Functions ###################################################
@@ -426,16 +429,18 @@ def WeightedJaccardSamples(
       hypergraph.node,
       node2edge,
       edge2features)
-  log.info("Node centroids have ~%f nonzero entries per row",
-           node2edge_centroid.nnz / len(hypergraph.node))
+  log.info(
+      "Node centroids have ~%f nonzero entries per row",
+      node2edge_centroid.nnz / len(hypergraph.node))
 
   log.info("Getting edge centroids")
   edge2node_centroid = GetAllCentroids(
       hypergraph.edge,
       edge2node,
       node2features)
-  log.info("Edge centroids have ~%f nonzero entries per row",
-           edge2node_centroid.nnz / len(hypergraph.edge))
+  log.info(
+      "Edge centroids have ~%f nonzero entries per row",
+      edge2node_centroid.nnz / len(hypergraph.edge))
 
   node2second_edge = node2node_neighbors * node2edge
   log.info("Getting node-edge samples")
@@ -477,9 +482,11 @@ def WeightedJaccardSamples(
 
   return similarity_records
 
+
 ################################################################################
 # AlgebraicDistanceSamples - With helpers                                      #
 ################################################################################
+
 
 def SameTypeDistanceSample(indices, idx2features=None, is_edge=None):
   """
@@ -491,15 +498,21 @@ def SameTypeDistanceSample(indices, idx2features=None, is_edge=None):
   if is_edge is None:
     is_edge = _shared_info["is_edge"]
 
-
   features_i = idx2features[indices[0]]
   features_j = idx2features[indices[1]]
-  shared_cols = list(set(features_i.nonzero()[1]).intersection(set(features_j.nonzero()[1])))
+  shared_cols = list(
+      set(features_i.nonzero()[1]).intersection(set(features_j.nonzero()[1])))
   prob = 0
   if len(shared_cols) > 0:
-    prob = np.max(np.min(np.vstack([features_i[0, shared_cols].todense(),
-                                    features_j[0, shared_cols].todense()]),
-                        axis=0))
+    prob = np.max(
+        np.min(
+            np.vstack([
+                features_i[0,
+                           shared_cols].todense(),
+                features_j[0,
+                           shared_cols].todense()
+            ]),
+            axis=0))
 
   if is_edge:
     return SimilarityRecord(
@@ -512,13 +525,20 @@ def SameTypeDistanceSample(indices, idx2features=None, is_edge=None):
         right_node_idx=indices[1],
         node_node_prob=_alpha_scale(prob))
 
-def _init_diff_type_distance_sample(node2edge_weight, edge2edge_weight, num_neighbors, node2edge, edge2node):
+
+def _init_diff_type_distance_sample(
+    node2edge_weight,
+    edge2edge_weight,
+    num_neighbors,
+    node2edge,
+    edge2node):
   _shared_info.clear()
   _shared_info["node2edge_weight"] = node2edge_weight
   _shared_info["edge2edge_weight"] = edge2edge_weight
   _shared_info["num_neighbors"] = num_neighbors
   _shared_info["node2edge"] = node2edge
   _shared_info["edge2node"] = edge2node
+
 
 def DiffTypeDistanceSample(
     indices,
@@ -556,12 +576,20 @@ def DiffTypeDistanceSample(
 
   features_node = node2edge_weight[node_idx]
   features_edge = edge2edge_weight[edge_idx]
-  shared_cols = list(set(features_node.nonzero()[1]).intersection(set(features_edge.nonzero()[1])))
+  shared_cols = list(
+      set(features_node.nonzero()[1]).intersection(
+          set(features_edge.nonzero()[1])))
   prob = 0
   if len(shared_cols) > 0:
-    prob = np.max(np.min(np.vstack([features_node[0, shared_cols].todense(),
-                                    features_edge[0, shared_cols].todense()]),
-                        axis=0))
+    prob = np.max(
+        np.min(
+            np.vstack([
+                features_node[0,
+                              shared_cols].todense(),
+                features_edge[0,
+                              shared_cols].todense()
+            ]),
+            axis=0))
 
   return SimilarityRecord(
       left_node_idx=node_idx,
@@ -636,12 +664,11 @@ def AlgebraicDistanceSamples(
   samples = GetSamples(node2second_edge, hypergraph.node, num_samples)
   with Pool(workers,
             initializer=_init_diff_type_distance_sample,
-            initargs=(
-              node2edge_weight,
-              edge2edge_weight,
-              num_neighbors,
-              node2edge,
-              edge2node)) as pool:
+            initargs=(node2edge_weight,
+                      edge2edge_weight,
+                      num_neighbors,
+                      node2edge,
+                      edge2node)) as pool:
     for record in tqdm(pool.imap(DiffTypeDistanceSample,
                                  samples,
                                  chunksize=num_samples),
@@ -650,8 +677,6 @@ def AlgebraicDistanceSamples(
       similarity_records.append(record)
 
   return similarity_records
-
-
 
 
 ################################################################################

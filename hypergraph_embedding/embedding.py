@@ -446,6 +446,7 @@ def EmbedHg2vDistWeightedJaccard(
   embedding.method_name = "Hypergraph2Vec Dist Weighted Jaccard"
   return embedding
 
+
 def EmbedHg2vAlgDist(
     hypergraph,
     dimension,
