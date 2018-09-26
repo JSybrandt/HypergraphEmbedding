@@ -27,7 +27,7 @@ global EXPERIMENT_OPTIONS
 # Constant used to share information across processors.
 # Each map will call an _init* function that sets values in
 # this dict.
-_k_shared_data = {}
+_shared_data = {}
 
 LinkPredictionData = namedtuple(
     "LinkPredictionData",
@@ -227,14 +227,14 @@ def CalculateCommunityPredictionMetrics(
 
 
 def _init_node_emb_to_numpy(_embedding):
-  _k_shared_data['embedding'] = _embedding
+  _shared_data['embedding'] = _embedding
 
 
 def _node_emb_to_numpy(node_idx):
   return (
       node_idx,
       np.asarray(
-          _k_shared_data['embedding'].node[node_idx].values,
+          _shared_data['embedding'].node[node_idx].values,
           dtype=np.float32))
 
 
@@ -242,21 +242,21 @@ def _init_get_edge_centroid_range(
     _node2embedding,
     _hypergraph,
     _distance_function):
-  _k_shared_data['node2embedding'] = _node2embedding
-  _k_shared_data['hypergraph'] = _hypergraph
-  _k_shared_data['distance_function'] = _distance_function
+  _shared_data['node2embedding'] = _node2embedding
+  _shared_data['hypergraph'] = _hypergraph
+  _shared_data['distance_function'] = _distance_function
 
 
 def _get_edge_centroid_range(edge_idx):
   points = [
-      _k_shared_data['node2embedding'][i]
-      for i in _k_shared_data['hypergraph'].edge[edge_idx].nodes
+      _shared_data['node2embedding'][i]
+      for i in _shared_data['hypergraph'].edge[edge_idx].nodes
   ]
   centroid = np.mean(points, axis=0)
   with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     max_dist = max(
-        [_k_shared_data['distance_function'](centroid,
+        [_shared_data['distance_function'](centroid,
                                              vec) for vec in points])
   return (edge_idx, centroid, max_dist)
 
@@ -267,32 +267,32 @@ def _init_is_node_in_sphere(
     _edge2range,
     _hypergraph,
     _distance_function):
-  _k_shared_data['node2embedding'] = _node2embedding
-  _k_shared_data['edge2centroid'] = _edge2centroid
-  _k_shared_data['edge2range'] = _edge2range
-  _k_shared_data['hypergraph'] = _hypergraph
-  _k_shared_data['distance_function'] = _distance_function
+  _shared_data['node2embedding'] = _node2embedding
+  _shared_data['edge2centroid'] = _edge2centroid
+  _shared_data['edge2range'] = _edge2range
+  _shared_data['hypergraph'] = _hypergraph
+  _shared_data['distance_function'] = _distance_function
 
 
 def _is_node_in_sphere(indices):
   "Checks if this node is in any of the edges"
   node_idx, edge_idx = indices
-  if edge_idx in _k_shared_data['hypergraph'].node[node_idx].edges:
+  if edge_idx in _shared_data['hypergraph'].node[node_idx].edges:
     return None
-  if node_idx not in _k_shared_data['node2embedding']:
+  if node_idx not in _shared_data['node2embedding']:
     return None
-  if edge_idx not in _k_shared_data['edge2centroid']:
+  if edge_idx not in _shared_data['edge2centroid']:
     return None
 
-  vec = _k_shared_data['node2embedding'][node_idx]
-  centroid = _k_shared_data['edge2centroid'][edge_idx]
+  vec = _shared_data['node2embedding'][node_idx]
+  centroid = _shared_data['edge2centroid'][edge_idx]
 
   # cosine distance might cause errors if we have a 0 vector
   with warnings.catch_warnings():
     warnings.simplefilter("ignore")
-    if _k_shared_data['distance_function'](
+    if _shared_data['distance_function'](
         vec,
-        centroid) <= _k_shared_data['edge2range'][edge_idx]:
+        centroid) <= _shared_data['edge2range'][edge_idx]:
       return (node_idx, edge_idx)
 
   return None
@@ -387,34 +387,39 @@ class LetNothingIn():
 
 
 def _init_evaluate_classifier(_idx2embedding, _idx2classifier):
-  _k_shared_data['idx2embedding'] = _idx2embedding
-  _k_shared_data['idx2classifer'] = _idx2classifier
+  _shared_data['idx2embedding'] = _idx2embedding
+  _shared_data['idx2classifer'] = _idx2classifier
 
 
 def _evaluate_classifier(indices):
   "Checks if this node is in any of the edges"
   emb_idx, classifier_idx = indices
-  node_vec = _k_shared_data['idx2embedding'][emb_idx]
-  edge_model = _k_shared_data['idx2classifer'][classifier_idx]
+  node_vec = _shared_data['idx2embedding'][emb_idx]
+  edge_model = _shared_data['idx2classifer'][classifier_idx]
 
   return indices, edge_model.predict([node_vec])[0]
 
 
 def _init_train_personalized_classifier(
-    _idx2neighbors,
-    _neighbor_idx2embedding):
-  _k_shared_data['idx2neighbors'] = _idx2neighbors
-  _k_shared_data['neighbor_idx2embedding'] = _neighbor_idx2embedding
+    idx2neighbors,
+    neighbor_idx2embedding):
+  _shared_data.clear()
+  _shared_data['idx2neighbors'] = idx2neighbors
+  _shared_data['neighbor_idx2embedding'] = neighbor_idx2embedding
 
 
-def _train_personalized_classifier(idx):
+def _train_personalized_classifier(idx, idx2neighbors=None, neighbor_idx2embedding=None):
+  if idx2neighbors is None:
+    idx2neighbors = _shared_data['idx2neighbors']
+  if neighbor_idx2embedding is None:
+    neighbor_idx2embedding = _shared_data['neighbor_idx2embedding']
 
   # Sample positive results
-  pos_indices = set(_k_shared_data["idx2neighbors"][idx])
+  pos_indices = set(idx2neighbors[idx])
   if (len(pos_indices) == 0):
     return (idx, LetNothingIn())
 
-  neg_indices = _k_shared_data["neighbor_idx2embedding"].keys() - pos_indices
+  neg_indices = neighbor_idx2embedding.keys() - pos_indices
   if (len(neg_indices) == 0):
     return (idx, LetEverythingIn())
 
@@ -427,10 +432,10 @@ def _train_personalized_classifier(idx):
   samples = []
   labels = []
   for neigh_idx in pos_indices:
-    samples.append(_k_shared_data["neighbor_idx2embedding"][neigh_idx].values)
+    samples.append(neighbor_idx2embedding[neigh_idx].values)
     labels.append(1)
   for neigh_idx in neg_indices:
-    samples.append(_k_shared_data["neighbor_idx2embedding"][neigh_idx].values)
+    samples.append(neighbor_idx2embedding[neigh_idx].values)
     labels.append(0)
   samples, labels = shuffle(samples, labels)
   return (idx, LinearSVC().fit(samples, labels))
@@ -465,14 +470,20 @@ def GetPersonalizedClassifiers(
   else:
     log.info("Subset provided with %i entires", len(idx_subset))
 
-  with Pool(num_cores,
-            initializer=_init_train_personalized_classifier,
-            initargs=(idx2neighbors,
-                      neighbor_idx2embedding)) as pool:
-    with tqdm(total=len(idx_subset)) as pbar:
-      for idx, classifier in pool.imap(_train_personalized_classifier, idx_subset):
-        result[idx] = classifier
-        pbar.update(1)
+  if run_in_parallel:
+    with Pool(num_cores,
+              initializer=_init_train_personalized_classifier,
+              initargs=(idx2neighbors,
+                        neighbor_idx2embedding)) as pool:
+      with tqdm(total=len(idx_subset)) as pbar:
+        for idx, classifier in pool.imap(_train_personalized_classifier, idx_subset):
+          result[idx] = classifier
+          pbar.update(1)
+  else:  # we want a different impl for serial run, the parallel can cause oom errors
+    for idx in tqdm(idx_subset):
+      _, classifier = _train_personalized_classifier(idx, idx2neighbors, neighbor_idx2embedding)
+      result[idx] = classifier
+
   return result
 
 
@@ -484,7 +495,7 @@ def PersonalizedClassifierPrediction(
     run_in_parallel=True):
   """
   Given a hypergraph (assumed to contain missing links) and a corresponding
-  embedding, idetify missing node-edge connections. Performs this task by
+  embedding, identify missing node-edge connections. Performs this task by
   training a classifier per_node / per_edge and running predictions through
   each "personalized classifier"
   input:
@@ -648,7 +659,7 @@ def PersonalizedEdgeClassifierPrediction(
     hypergraph,
     embedding,
     links,
-    run_in_parallel=True):
+    run_in_parallel=False):
   return PersonalizedClassifierPrediction(
       hypergraph,
       embedding,
@@ -661,7 +672,7 @@ def PersonalizedNodeClassifierPrediction(
     hypergraph,
     embedding,
     links,
-    run_in_parallel=True):
+    run_in_parallel=False):
   return PersonalizedClassifierPrediction(
       hypergraph,
       embedding,
