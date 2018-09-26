@@ -349,7 +349,8 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
         hypergraph,
         embedding,
         per_edge=True,
-        run_in_parallel=False)
+        run_in_parallel=False,
+        disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.edge))
     for edge_idx in hypergraph.edge:
       self.assertTrue(edge_idx in actual)
@@ -363,7 +364,8 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
         hypergraph,
         embedding,
         per_edge=False,
-        run_in_parallel=False)
+        run_in_parallel=False,
+        disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.node))
     for node_idx in hypergraph.node:
       self.assertTrue(node_idx in actual)
@@ -385,7 +387,8 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
         hypergraph,
         embedding,
         per_edge=True,
-        run_in_parallel=False)
+        run_in_parallel=False,
+        disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.edge))
     for edge_idx in hypergraph.edge:
       self.assertTrue(edge_idx in actual)
@@ -408,7 +411,8 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
         hypergraph,
         embedding,
         per_edge=True,
-        run_in_parallel=False)
+        run_in_parallel=False,
+        disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.edge))
     for edge_idx in hypergraph.edge:
       self.assertTrue(edge_idx in actual)
@@ -427,7 +431,8 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
         hypergraph,
         embedding,
         per_edge=True,
-        run_in_parallel=False)
+        run_in_parallel=False,
+        disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.edge))
     for edge_idx in hypergraph.edge:
       self.assertTrue(edge_idx in actual)
@@ -439,7 +444,8 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
         hypergraph,
         embedding,
         per_edge=True,
-        run_in_parallel=False)
+        run_in_parallel=False,
+        disable_pbar=True)
     # I don't care what it predicts, just don't mess up
     self.assertTrue(actual[1].predict([[0, 1]]) >= 0)
 
@@ -450,7 +456,8 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
       actual_edge = GetPersonalizedClassifiers(
           hypergraph,
           embedding,
-          per_edge=True)
+          per_edge=True,
+          disable_pbar=True)
       self.assertEqual(len(actual_edge), len(hypergraph.edge))
       for edge_idx in hypergraph.edge:
         self.assertTrue(edge_idx in actual_edge)
@@ -459,7 +466,8 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
       actual_node = GetPersonalizedClassifiers(
           hypergraph,
           embedding,
-          per_edge=False)
+          per_edge=False,
+          disable_pbar=True)
       self.assertEqual(len(actual_node), len(hypergraph.node))
       for node_idx in hypergraph.node:
         self.assertTrue(node_idx in actual_node)
@@ -478,7 +486,8 @@ class TestPersonalizedClassifierPrediction(unittest.TestCase):
           hypergraph,
           embedding,
           potential_links,
-          per_edge=True)
+          per_edge=True,
+          disable_pbar=True)
       # All predicted links must have existed in input
       self.assertEqual(
           len(set(predicted_links).intersection(set(potential_links))),
@@ -494,7 +503,8 @@ class TestPersonalizedClassifierPrediction(unittest.TestCase):
           hypergraph,
           embedding,
           potential_links,
-          per_edge=False)
+          per_edge=False,
+          disable_pbar=True)
       # All predicted links must have existed in input
       self.assertEqual(
           len(set(predicted_links).intersection(set(potential_links))),
@@ -513,7 +523,8 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
       predicted_links = NodeEdgeEmbeddingPrediction(
           hypergraph,
           embedding,
-          potential_links)
+          potential_links,
+          disable_pbar=True)
       # All predicted links must have existed in input
       self.assertEqual(
           len(set(predicted_links).intersection(set(potential_links))),
@@ -550,7 +561,8 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
         hypergraph,
         embedding,
         potential_links,
-        OutputIfEqual())
+        OutputIfEqual(),
+        disable_pbar=True)
     actual = [tuple(p) for p in actual]
     expected = [(0, 0), (1, 1)]
     self.assertEqual(set(actual), set(expected))
@@ -573,6 +585,7 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
         hypergraph,
         embedding,
         potential_links,
-        AcceptAll())
+        AcceptAll(),
+        disable_pbar=True)
     expected = [(0, 0)]
     self.assertEqual(set(actual), set(expected))
