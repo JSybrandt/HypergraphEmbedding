@@ -4,3 +4,4 @@ __pycache__/
 *.swp
 *_pb2.py
 *.pb
+experiment/
