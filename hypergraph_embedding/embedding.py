@@ -119,7 +119,8 @@ def EmbedNode2VecBipartide(
     num_walks_per_node=10,
     walk_length=5,
     window=3,
-    run_in_parallel=True):
+    run_in_parallel=True,
+    disable_pbar=False):
   assert dimension > 0
   assert p >= 0 and p <= 1
   assert q >= 1 and q <= 1
@@ -142,7 +143,8 @@ def EmbedNode2VecBipartide(
       dimensions=dimension,
       walk_length=walk_length,
       num_walks=num_walks_per_node,
-      workers=workers)
+      workers=workers,
+      quiet=disable_pbar)
   model = embedder.fit(window=window, min_count=1, batch_words=4)
 
   max_node_idx = max(i for i, _ in hypergraph.node.items())
@@ -166,7 +168,8 @@ def EmbedNode2VecClique(
     num_walks_per_node=10,
     walk_length=5,
     window=3,
-    run_in_parallel=True):
+    run_in_parallel=True,
+    disable_pbar=False):
   assert dimension > 0
   assert p >= 0 and p <= 1
   assert q >= 1 and q <= 1
@@ -189,7 +192,8 @@ def EmbedNode2VecClique(
       dimensions=dimension,
       walk_length=walk_length,
       num_walks=num_walks_per_node,
-      workers=workers)
+      workers=workers,
+      quiet=disable_pbar)
   model = embedder.fit(window=window, min_count=1, batch_words=4)
 
   for node_idx in hypergraph.node:
@@ -222,7 +226,8 @@ def _hypergraph2vec_skeleton(
     model_fn,
     fit_batch_size,
     fit_epochs,
-    visualization_fn=None):
+    visualization_fn,
+    disable_pbar):
   log.info("Sampling")
   samples = sampler_fn(hypergraph)
   if visualization_fn is not None:
@@ -244,7 +249,8 @@ def _hypergraph2vec_skeleton(
       output_probs,
       batch_size=fit_batch_size,
       epochs=fit_epochs,
-      callbacks=[tensorboard])
+      callbacks=[tensorboard],
+      verbose=0 if disable_pbar else 1)
 
   log.info("Recording embeddings.")
   return KerasModelToEmbedding(hypergraph, model)
@@ -257,10 +263,12 @@ def EmbedHg2vBoolean(
     num_samples=200,
     batch_size=256,
     epochs=10,
-    debug_summary_path=None):
+    debug_summary_path=None,
+    disable_pbar=False):
   sampler_fn = lambda hg: BooleanSamples(hg,
                                          num_neighbors=num_neighbors,
-                                         num_samples=num_samples)
+                                         num_samples=num_samples,
+                                         disable_pbar=disable_pbar)
   samples_to_input_fn = lambda samples: SamplesToModelInput(
       samples,
       num_neighbors=num_neighbors,
@@ -280,7 +288,8 @@ def EmbedHg2vBoolean(
       model_fn,
       batch_size,
       epochs,
-      vis_fn)
+      vis_fn,
+      disable_pbar)
   embedding.method_name = "Hypergraph2Vec Boolean"
   return embedding
 
@@ -292,13 +301,15 @@ def EmbedHg2vAdjJaccard(
     num_samples=200,
     batch_size=256,
     epochs=10,
-    debug_summary_path=None):
+    debug_summary_path=None,
+    disable_pbar=False):
   node2weight, edge2weight = UniformWeight(hypergraph)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
                                                  edge2weight,
                                                  num_neighbors=num_neighbors,
-                                                 num_samples=num_samples)
+                                                 num_samples=num_samples,
+                                                 disable_pbar=disable_pbar)
   samples_to_input_fn = lambda samples: SamplesToModelInput(
       samples,
       num_neighbors=num_neighbors,
@@ -318,7 +329,8 @@ def EmbedHg2vAdjJaccard(
       model_fn,
       batch_size,
       epochs,
-      vis_fn)
+      vis_fn,
+      disable_pbar)
   embedding.method_name = "Hypergraph2Vec AdjJaccard"
   return embedding
 
@@ -331,13 +343,15 @@ def EmbedHg2vNeighborhoodWeightedJaccard(
     num_samples=200,
     batch_size=256,
     epochs=10,
-    debug_summary_path=None):
+    debug_summary_path=None,
+    disable_pbar=False):
   node2feature, edge2feature = WeightByNeighborhood(hypergraph, alpha)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                   node2feature,
                                                  edge2feature,
                                                  num_neighbors=num_neighbors,
-                                                 num_samples=num_samples)
+                                                 num_samples=num_samples,
+                                                 disable_pbar=disable_pbar)
   samples_to_input_fn = lambda samples: SamplesToModelInput(
       samples,
       num_neighbors=num_neighbors,
@@ -357,7 +371,8 @@ def EmbedHg2vNeighborhoodWeightedJaccard(
       model_fn,
       batch_size,
       epochs,
-      vis_fn)
+      vis_fn,
+      disable_pbar)
   embedding.method_name = "Hypergraph2Vec Neighborhood Weighted Jaccard"
   return embedding
 
@@ -370,13 +385,15 @@ def EmbedHg2vSpanWeightedJaccard(
     num_samples=200,
     batch_size=256,
     epochs=10,
-    debug_summary_path=None):
+    debug_summary_path=None,
+    disable_pbar=False):
   node2weight, edge2weight = WeightByAlgebraicSpan(hypergraph, alpha)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
                                                  edge2weight,
                                                  num_neighbors=num_neighbors,
-                                                 num_samples=num_samples)
+                                                 num_samples=num_samples,
+                                                 disable_pbar=disable_pbar)
   samples_to_input_fn = lambda samples: SamplesToModelInput(
       samples,
       num_neighbors=num_neighbors,
@@ -396,7 +413,8 @@ def EmbedHg2vSpanWeightedJaccard(
       model_fn,
       batch_size,
       epochs,
-      vis_fn)
+      vis_fn,
+      disable_pbar)
   embedding.method_name = "Hypergraph2Vec Span Weighted Jaccard"
   return embedding
 
@@ -409,7 +427,8 @@ def EmbedHg2vDistWeightedJaccard(
     num_samples=200,
     batch_size=256,
     epochs=10,
-    debug_summary_path=None):
+    debug_summary_path=None,
+    disable_pbar=False):
 
   log.info("Embedding weighted by algebraic distance.")
   alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=5, iterations=10)
@@ -422,7 +441,8 @@ def EmbedHg2vDistWeightedJaccard(
                                                  node2weight,
                                                  edge2weight,
                                                  num_neighbors=num_neighbors,
-                                                 num_samples=num_samples)
+                                                 num_samples=num_samples,
+                                                 disable_pbar=disable_pbar)
   samples_to_input_fn = lambda samples: SamplesToModelInput(
       samples,
       num_neighbors=num_neighbors,
@@ -442,7 +462,8 @@ def EmbedHg2vDistWeightedJaccard(
       model_fn,
       batch_size,
       epochs,
-      vis_fn)
+      vis_fn,
+      disable_pbar)
   embedding.method_name = "Hypergraph2Vec Dist Weighted Jaccard"
   return embedding
 
@@ -455,7 +476,8 @@ def EmbedHg2vAlgDist(
     num_samples=200,
     batch_size=256,
     epochs=5,
-    debug_summary_path=None):
+    debug_summary_path=None,
+    disable_pbar=False):
 
   log.info("Embedding weighted by algebraic distance.")
   alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=5, iterations=10)
@@ -494,7 +516,8 @@ def EmbedHg2vAlgDist(
       model_fn,
       batch_size,
       epochs,
-      vis_fn)
+      vis_fn,
+      disable_pbar)
   embedding.method_name = "Hypergraph2Vec Dist Weighted Jaccard"
   return embedding
 

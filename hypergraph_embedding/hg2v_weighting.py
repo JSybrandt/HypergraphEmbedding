@@ -31,14 +31,14 @@ log = logging.getLogger()
 _shared_info = {}
 
 
-def WeightBySameTypeDistance(hypergraph, alpha, ref_embedding, norm):
+def WeightBySameTypeDistance(hypergraph, alpha, ref_embedding, norm, disable_pbar):
 
   def do_half(adj_mat, type_emb):
     vectors = {idx: np.array(emb.values) for idx, emb in type_emb.items()}
     indices2dist = {}
     rows, cols = adj_mat.nonzero()
     log.info("Calculating distances")
-    for row, col in tqdm(zip(rows, cols), total=adj_mat.nnz):
+    for row, col in tqdm(zip(rows, cols), total=adj_mat.nnz, disable=disable_pbar):
       indices2dist[(row, col)] = norm(vectors[row] - vectors[col])
     log.info("Scaling")
     indices2dist = AlphaScaleValues(
@@ -64,7 +64,7 @@ def WeightBySameTypeDistance(hypergraph, alpha, ref_embedding, norm):
   return node2node_dist, edge2edge_dist
 
 
-def WeightByDistance(hypergraph, alpha, ref_embedding, norm):
+def WeightByDistance(hypergraph, alpha, ref_embedding, norm, disable_pbar):
   """
   Replaces each i-j weight with the norm of difference in the reference
   Zero one scaled so that the smallest norm gets a 1.

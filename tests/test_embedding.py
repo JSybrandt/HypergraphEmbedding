@@ -52,12 +52,7 @@ class EmbeddingTestCase(unittest.TestCase):
   def help_test_fuzz(self, embedding_function, num_fuzz=1):
     "Random embedding should never break"
     for i in range(num_fuzz):
-      hypergraph = CreateRandomHyperGraph(
-          randint(1,
-                  10),
-          randint(1,
-                  10),
-          random())
+      hypergraph = CreateRandomHyperGraph(25, 25, 0.25)
       max_dim = min(len(hypergraph.node), len(hypergraph.edge))
       if max_dim <= 1:
         continue  # the random creation might not have actually made a hg
@@ -117,7 +112,7 @@ class EmbedNmfTest(EmbeddingTestCase):
     self.assertEqual(actual.method_name, "NMF")
 
   def test_fuzz(self):
-    "Random embedding should never break"
+    "NMF embedding should never break"
     self.help_test_fuzz(EmbedNMF)
 
 
@@ -126,13 +121,14 @@ class EmbedNode2VecBipartideTest(EmbeddingTestCase):
   def test_typical(self):
     dim = 2
     _input = TestHypergraph()
-    actual = EmbedNode2VecBipartide(_input, dim)
+    actual = EmbedNode2VecBipartide(_input, dim, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "Node2VecBipartide(5)")
 
   def test_fuzz(self):
-    "Random embedding should never break"
-    self.help_test_fuzz(EmbedNode2VecBipartide, num_fuzz=10)
+    "N2V Bipartide embedding should never break"
+    embed = lambda hg, dim : EmbedNode2VecBipartide(hg, dim, disable_pbar=True)
+    self.help_test_fuzz(embed, num_fuzz=10)
 
   def test_disconnected_node(self):
     "Make sure we don't break if we have a totally disconnected node"
@@ -142,7 +138,7 @@ class EmbedNode2VecBipartideTest(EmbeddingTestCase):
     AddNodeToEdge(hg, 1, 0)
     AddNodeToEdge(hg, 2, 1)
 
-    actual = EmbedNode2VecBipartide(hg, dim)
+    actual = EmbedNode2VecBipartide(hg, dim, disable_pbar=True)
     self.checkEmbedding(actual, hg, dim)
     self.assertEqual(actual.method_name, "Node2VecBipartide(5)")
 
@@ -152,13 +148,14 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
   def test_typical(self):
     dim = 2
     _input = TestHypergraph()
-    actual = EmbedNode2VecClique(_input, dim)
+    actual = EmbedNode2VecClique(_input, dim, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "Node2VecClique(5)")
 
   def test_fuzz(self):
-    "Random embedding should never break"
-    self.help_test_fuzz(EmbedNode2VecClique, num_fuzz=10)
+    "N2V Clique embedding should never break"
+    embed = lambda hg, dim : EmbedNode2VecClique(hg, dim, disable_pbar=True)
+    self.help_test_fuzz(embed, num_fuzz=10)
 
   def test_disconnected_node(self):
     "Make sure we don't break if we have a totally disconnected node"
@@ -168,7 +165,7 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
     AddNodeToEdge(hg, 1, 0)
     AddNodeToEdge(hg, 2, 1)
 
-    actual = EmbedNode2VecClique(hg, dim)
+    actual = EmbedNode2VecClique(hg, dim, disable_pbar=True)
     self.checkEmbedding(actual, hg, dim)
     self.assertEqual(actual.method_name, "Node2VecClique(5)")
 
@@ -178,7 +175,7 @@ class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
   def test_typical(self):
     dim = 2
     _input = TestHypergraph()
-    actual = EmbedAlgebraicDistance(_input, dim)
+    actual = EmbedAlgebraicDistance(_input, dim, iterations=3, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "AlgebraicDistance")
 
@@ -194,18 +191,20 @@ class EmbedHg2vBooleanTest(EmbeddingTestCase):
         num_neighbors=2,
         num_samples=2,
         batch_size=1,
-        epochs=1)
+        epochs=1,
+        disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "Hypergraph2Vec Boolean")
 
   def test_fuzz(self):
-    "Random embedding should never break"
+    "Boolean embedding should never break"
     embed = lambda x, y: EmbedHg2vBoolean(x,
                                          y,
                                          num_neighbors=2,
                                          num_samples=2,
                                          batch_size=1,
-                                         epochs=1)
+                                         epochs=1,
+                                         disable_pbar=True)
     self.help_test_fuzz(embed)
 
 
@@ -220,16 +219,18 @@ class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
         num_neighbors=2,
         num_samples=2,
         batch_size=1,
-        epochs=1)
+        epochs=1,
+        disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "Hypergraph2Vec AdjJaccard")
 
   def test_fuzz(self):
-    "Random embedding should never break"
+    "AdjJacc embedding should never break"
     embed = lambda x, y: EmbedHg2vAdjJaccard(x,
                                          y,
                                          num_neighbors=2,
                                          num_samples=2,
                                          batch_size=1,
-                                         epochs=1)
+                                         epochs=1,
+                                         disable_pbar=True)
     self.help_test_fuzz(embed)

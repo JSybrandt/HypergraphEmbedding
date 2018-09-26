@@ -446,7 +446,8 @@ def GetPersonalizedClassifiers(
     embedding,
     per_edge=True,
     idx_subset=None,
-    run_in_parallel=True):
+    run_in_parallel=True,
+    disable_pbar=False):
   """
   Returns a dict from idx-classifier.
   If per_edge=True then there will be |edges| classifiers each mapping
@@ -475,12 +476,12 @@ def GetPersonalizedClassifiers(
               initializer=_init_train_personalized_classifier,
               initargs=(idx2neighbors,
                         neighbor_idx2embedding)) as pool:
-      with tqdm(total=len(idx_subset)) as pbar:
+      with tqdm(total=len(idx_subset), disable=disable_pbar) as pbar:
         for idx, classifier in pool.imap(_train_personalized_classifier, idx_subset):
           result[idx] = classifier
           pbar.update(1)
   else:  # we want a different impl for serial run, the parallel can cause oom errors
-    for idx in tqdm(idx_subset):
+    for idx in tqdm(idx_subset, disable=disable_pbar):
       _, classifier = _train_personalized_classifier(idx, idx2neighbors, neighbor_idx2embedding)
       result[idx] = classifier
 
@@ -492,7 +493,8 @@ def PersonalizedClassifierPrediction(
     embedding,
     links,
     per_edge=True,
-    run_in_parallel=True):
+    run_in_parallel=True,
+    disable_pbar=False):
   """
   Given a hypergraph (assumed to contain missing links) and a corresponding
   embedding, identify missing node-edge connections. Performs this task by
@@ -527,7 +529,8 @@ def PersonalizedClassifierPrediction(
       embedding,
       per_edge=per_edge,
       idx_subset=nessesary_classifiers,
-      run_in_parallel=run_in_parallel)
+      run_in_parallel=run_in_parallel,
+      disable_pbar=disable_pbar)
   log.info("Mapping %s to embeddings", "nodes" if per_edge else "edges")
   if per_edge:
     idx2embedding = {idx: emb.values for idx, emb in embedding.node.items()}
@@ -541,7 +544,8 @@ def PersonalizedClassifierPrediction(
             initializer=_init_evaluate_classifier,
             initargs=(idx2embedding,
                       idx2classifier)) as pool:
-    for (entity_idx, classifier_idx), res in pool.imap(_evaluate_classifier, entity_idx_classifier_idx, chunksize=250):
+    for (entity_idx, classifier_idx), res in pool.imap(
+        _evaluate_classifier, entity_idx_classifier_idx, chunksize=250):
       if res is not None and res > 0:
         if per_edge:
           node_idx, edge_idx = (entity_idx, classifier_idx)
@@ -572,7 +576,7 @@ def _NodeEdgeVectors(hypergraph, embedding):
       yield _GetVectorFromIdx(node_idx, edge_idx, embedding)
 
 
-def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding):
+def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding, disable_pbar):
   """
   Returns a classifier trained to predict node-edge connections biased
   on the provided hypergraph and embedding.
@@ -603,7 +607,7 @@ def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding):
   out = Dense(1, activation="sigmoid")(hidden)
   model = Model(inputs=[input_emb], outputs=[out])
   model.compile(optimizer="adagrad", loss="mean_squared_error")
-  model.fit(examples, labels, batch_size=100, epochs=5)
+  model.fit(examples, labels, batch_size=100, epochs=5, verbose=0 if disable_pbar else 1)
   return model
 
 
@@ -611,7 +615,8 @@ def NodeEdgeEmbeddingPrediction(
     hypergraph,
     embedding,
     potential_links,
-    classifier=None):
+    classifier=None,
+    disable_pbar=False):
   """
     Returns a subset of the input potential_links that a binary classifier
     deems good. If classifier is set, we will use that instead of
@@ -628,7 +633,7 @@ def NodeEdgeEmbeddingPrediction(
         potential_links
     """
   if classifier is None:
-    classifier = _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding)
+    classifier = _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding, disable_pbar)
 
   log.info("Deleting input edges that are not represented in the subgraph")
   potential_links = [(n,
@@ -639,7 +644,7 @@ def NodeEdgeEmbeddingPrediction(
 
   log.info("Converting potential links to embedding vectors")
   input_data = []
-  for node_idx, edge_idx in tqdm(potential_links):
+  for node_idx, edge_idx in tqdm(potential_links, disable=disable_pbar):
     input_data.append(_GetVectorFromIdx(node_idx, edge_idx, embedding))
   input_data = np.array(input_data)
   log.info("Evaluating predictions")

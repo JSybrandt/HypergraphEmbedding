@@ -14,7 +14,7 @@ pip:
 test: unittest
 
 unittest:
-	$(PYTHON) -W ignore::DeprecationWarning -m unittest discover -v
+	$(PYTHON) -W ignore::DeprecationWarning -m unittest discover -v -f
 
 clean:
 	rm -f $(MODULE)/hypergraph_pb2.py
