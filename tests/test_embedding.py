@@ -127,7 +127,7 @@ class EmbedNode2VecBipartideTest(EmbeddingTestCase):
 
   def test_fuzz(self):
     "N2V Bipartide embedding should never break"
-    embed = lambda hg, dim : EmbedNode2VecBipartide(hg, dim, disable_pbar=True)
+    embed = lambda hg, dim: EmbedNode2VecBipartide(hg, dim, disable_pbar=True)
     self.help_test_fuzz(embed, num_fuzz=10)
 
   def test_disconnected_node(self):
@@ -154,7 +154,7 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
 
   def test_fuzz(self):
     "N2V Clique embedding should never break"
-    embed = lambda hg, dim : EmbedNode2VecClique(hg, dim, disable_pbar=True)
+    embed = lambda hg, dim: EmbedNode2VecClique(hg, dim, disable_pbar=True)
     self.help_test_fuzz(embed, num_fuzz=10)
 
   def test_disconnected_node(self):
@@ -175,7 +175,11 @@ class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
   def test_typical(self):
     dim = 2
     _input = TestHypergraph()
-    actual = EmbedAlgebraicDistance(_input, dim, iterations=3, disable_pbar=True)
+    actual = EmbedAlgebraicDistance(
+        _input,
+        dim,
+        iterations=3,
+        disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "AlgebraicDistance")
 

@@ -257,7 +257,7 @@ def _get_edge_centroid_range(edge_idx):
     warnings.simplefilter("ignore")
     max_dist = max(
         [_shared_data['distance_function'](centroid,
-                                             vec) for vec in points])
+                                           vec) for vec in points])
   return (edge_idx, centroid, max_dist)
 
 
@@ -400,15 +400,16 @@ def _evaluate_classifier(indices):
   return indices, edge_model.predict([node_vec])[0]
 
 
-def _init_train_personalized_classifier(
-    idx2neighbors,
-    neighbor_idx2embedding):
+def _init_train_personalized_classifier(idx2neighbors, neighbor_idx2embedding):
   _shared_data.clear()
   _shared_data['idx2neighbors'] = idx2neighbors
   _shared_data['neighbor_idx2embedding'] = neighbor_idx2embedding
 
 
-def _train_personalized_classifier(idx, idx2neighbors=None, neighbor_idx2embedding=None):
+def _train_personalized_classifier(
+    idx,
+    idx2neighbors=None,
+    neighbor_idx2embedding=None):
   if idx2neighbors is None:
     idx2neighbors = _shared_data['idx2neighbors']
   if neighbor_idx2embedding is None:
@@ -607,7 +608,12 @@ def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding, disable_pbar):
   out = Dense(1, activation="sigmoid")(hidden)
   model = Model(inputs=[input_emb], outputs=[out])
   model.compile(optimizer="adagrad", loss="mean_squared_error")
-  model.fit(examples, labels, batch_size=100, epochs=5, verbose=0 if disable_pbar else 1)
+  model.fit(
+      examples,
+      labels,
+      batch_size=100,
+      epochs=5,
+      verbose=0 if disable_pbar else 1)
   return model
 
 
@@ -633,7 +639,10 @@ def NodeEdgeEmbeddingPrediction(
         potential_links
     """
   if classifier is None:
-    classifier = _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding, disable_pbar)
+    classifier = _TrainNodeEdgeEmbeddingClassifier(
+        hypergraph,
+        embedding,
+        disable_pbar)
 
   log.info("Deleting input edges that are not represented in the subgraph")
   potential_links = [(n,

@@ -31,7 +31,12 @@ log = logging.getLogger()
 _shared_info = {}
 
 
-def WeightBySameTypeDistance(hypergraph, alpha, ref_embedding, norm, disable_pbar):
+def WeightBySameTypeDistance(
+    hypergraph,
+    alpha,
+    ref_embedding,
+    norm,
+    disable_pbar):
 
   def do_half(adj_mat, type_emb):
     vectors = {idx: np.array(emb.values) for idx, emb in type_emb.items()}
