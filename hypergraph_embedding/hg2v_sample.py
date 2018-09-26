@@ -477,6 +477,182 @@ def WeightedJaccardSamples(
 
   return similarity_records
 
+################################################################################
+# AlgebraicDistanceSamples - With helpers                                      #
+################################################################################
+
+def SameTypeDistanceSample(indices, idx2features=None, is_edge=None):
+  """
+  Instead of calculating weighted jaccard, we are going to calculate the
+  max/min connection.
+  """
+  if idx2features is None:
+    idx2features = _shared_info["idx2features"]
+  if is_edge is None:
+    is_edge = _shared_info["is_edge"]
+
+
+  features_i = idx2features[indices[0]]
+  features_j = idx2features[indices[1]]
+  shared_cols = list(set(features_i.nonzero()[1]).intersection(set(features_j.nonzero()[1])))
+  prob = 0
+  if len(shared_cols) > 0:
+    prob = np.max(np.min(np.vstack([features_i[0, shared_cols].todense(),
+                                    features_j[0, shared_cols].todense()]),
+                        axis=0))
+
+  if is_edge:
+    return SimilarityRecord(
+        left_edge_idx=indices[0],
+        right_edge_idx=indices[1],
+        edge_edge_prob=_alpha_scale(prob))
+  else:
+    return SimilarityRecord(
+        left_node_idx=indices[0],
+        right_node_idx=indices[1],
+        node_node_prob=_alpha_scale(prob))
+
+def _init_diff_type_distance_sample(node2edge_weight, edge2edge_weight, num_neighbors, node2edge, edge2node):
+  _shared_info.clear()
+  _shared_info["node2edge_weight"] = node2edge_weight
+  _shared_info["edge2edge_weight"] = edge2edge_weight
+  _shared_info["num_neighbors"] = num_neighbors
+  _shared_info["node2edge"] = node2edge
+  _shared_info["edge2node"] = edge2node
+
+def DiffTypeDistanceSample(
+    indices,
+    node2edge_weight=None,
+    edge2edge_weight=None,
+    num_neighbors=None,
+    node2edge=None,
+    edge2node=None):
+
+  node_idx, edge_idx = indices
+  if node2edge_weight is None:
+    node2edge_weight = _shared_info["node2edge_weight"]
+  if edge2edge_weight is None:
+    edge2edge_weight = _shared_info["edge2edge_weight"]
+  if num_neighbors is None:
+    num_neighbors = _shared_info["num_neighbors"]
+  if node2edge is None:
+    node2edge = _shared_info["node2edge"]
+  if edge2node is None:
+    edge2node = _shared_info["edge2node"]
+
+  edges = node2edge[node_idx].nonzero()[1]
+  neighbor_edge_indices = np.random.choice(
+      edges,
+      min(num_neighbors,
+          len(edges)),
+      replace=False)
+
+  nodes = edge2node[edge_idx, :].nonzero()[1]
+  neighbor_node_indices = np.random.choice(
+      nodes,
+      min(num_neighbors,
+          len(nodes)),
+      replace=False)
+
+  features_node = node2edge_weight[node_idx]
+  features_edge = edge2edge_weight[edge_idx]
+  shared_cols = list(set(features_node.nonzero()[1]).intersection(set(features_edge.nonzero()[1])))
+  prob = 0
+  if len(shared_cols) > 0:
+    prob = np.max(np.min(np.vstack([features_node[0, shared_cols].todense(),
+                                    features_edge[0, shared_cols].todense()]),
+                        axis=0))
+
+  return SimilarityRecord(
+      left_node_idx=node_idx,
+      right_edge_idx=edge_idx,
+      neighbor_node_indices=neighbor_node_indices,
+      neighbor_edge_indices=neighbor_edge_indices,
+      node_edge_prob=_alpha_scale(prob))
+
+
+def AlgebraicDistanceSamples(
+    hypergraph,
+    node2edge_weight,
+    edge2node_weight,
+    node2node_weight,
+    edge2edge_weight,
+    num_neighbors,
+    num_samples,
+    run_in_parallel=True,
+    disable_pbar=False):
+  """
+    This function samples node-node, edge-edge, and node-edge relationships
+    directly accounting for algebraic distance. That is, the probability that
+    two nodes share an edge, two edges share a node, or a node exists within
+    an edge, is modeled directly by algebraic distance.
+  """
+
+  log.info("Performing input checks")
+  assert num_neighbors >= 0
+  assert num_samples >= 0
+
+  workers = multiprocessing.cpu_count() if run_in_parallel else 1
+
+  # return value
+  similarity_records = []
+
+  log.info("Getting node-node samples")
+  node2edge = ToCsrMatrix(hypergraph)
+  node2node = node2edge * node2edge.T
+  samples = GetSamples(node2node, hypergraph.node, num_samples)
+  log.info("Sampling node-node probabilities")
+  with Pool(workers,
+            initializer=_init_same_type_sample,
+            initargs=(node2edge_weight, # idx2features
+                      False  # is_edge
+                     )) as pool:
+    for record in tqdm(pool.imap(SameTypeDistanceSample,
+                                 samples,
+                                 chunksize=num_samples),
+                       total=len(samples),
+                       disable=disable_pbar):
+      similarity_records.append(record)
+
+  log.info("Getting edge-edge samples")
+  edge2node = ToEdgeCsrMatrix(hypergraph)
+  edge2edge = edge2node * edge2node.T
+  samples = GetSamples(edge2edge_weight, hypergraph.edge, num_samples)
+  log.info("Sampling edge-edge probabilities")
+  with Pool(workers,
+            initializer=_init_same_type_sample,
+            initargs=(edge2node_weight, # idx2features
+                      True  # is_edge
+                     )) as pool:
+    for record in tqdm(pool.imap(SameTypeDistanceSample,
+                                 samples,
+                                 chunksize=num_samples),
+                       total=len(samples),
+                       disable=disable_pbar):
+      similarity_records.append(record)
+
+  log.info("Getting node-edge samples")
+  node2second_edge = node2node * node2edge
+  samples = GetSamples(node2second_edge, hypergraph.node, num_samples)
+  with Pool(workers,
+            initializer=_init_diff_type_distance_sample,
+            initargs=(
+              node2edge_weight,
+              edge2edge_weight,
+              num_neighbors,
+              node2edge,
+              edge2node)) as pool:
+    for record in tqdm(pool.imap(DiffTypeDistanceSample,
+                                 samples,
+                                 chunksize=num_samples),
+                       total=len(samples),
+                       disable=disable_pbar):
+      similarity_records.append(record)
+
+  return similarity_records
+
+
+
 
 ################################################################################
 # Samples to Model Input w/ Helper functions                                   #

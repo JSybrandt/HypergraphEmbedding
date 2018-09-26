@@ -30,6 +30,36 @@ log = logging.getLogger()
 
 _shared_info = {}
 
+def WeightBySameTypeDistance(hypergraph, alpha, ref_embedding, norm):
+  def do_half(adj_mat, type_emb):
+    vectors = {idx: np.array(emb.values) for idx, emb in type_emb.items()}
+    indices2dist = {}
+    rows, cols = adj_mat.nonzero()
+    log.info("Calculating distances")
+    for row, col in tqdm(zip(rows, cols), total=adj_mat.nnz):
+      indices2dist[(row, col)] = norm(vectors[row] - vectors[col])
+    log.info("Scaling")
+    indices2dist =  AlphaScaleValues(OneMinusValues(ZeroOneScaleValues(indices2dist)), alpha)
+    tmp = lil_matrix(adj_mat.shape, dtype=np.float32)
+    log.info("Converting")
+    for (row, col), value in indices2dist.items():
+      tmp[row, col] = value
+    return csr_matrix(tmp)
+
+
+  # log.info("Identifying all node-node relationships")
+  # node2edge = ToCsrMatrix(hypergraph)
+  # node2node = node2edge * node2edge.T
+  # node2node_dist = do_half(node2node, ref_embedding.node)
+  node2node_dist = None
+
+  log.info("Identifying all edge-edge relationships")
+  edge2node = ToEdgeCsrMatrix(hypergraph)
+  edge2edge = edge2node * edge2node.T
+  edge2edge_dist = do_half(edge2edge, ref_embedding.edge)
+
+  return node2node_dist, edge2edge_dist
+
 
 def WeightByDistance(hypergraph, alpha, ref_embedding, norm):
   """
