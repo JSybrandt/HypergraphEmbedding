@@ -436,7 +436,8 @@ def EmbedHg2vDistWeightedJaccard(
   node2weight, edge2weight = WeightByDistance(hypergraph,
                                               alpha,
                                               alg_emb,
-                                              sup_norm)
+                                              sup_norm,
+                                              disable_pbar)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
                                                  edge2weight,
@@ -485,18 +486,21 @@ def EmbedHg2vAlgDist(
   node2edge_weight, edge2node_weight = WeightByDistance(hypergraph,
                                                         alpha,
                                                         alg_emb,
-                                                        sup_norm)
+                                                        sup_norm,
+                                                        disable_pbar)
   node2node_weight, edge2edge_weight = WeightBySameTypeDistance(hypergraph,
                                                                 alpha,
                                                                 alg_emb,
-                                                                sup_norm)
+                                                                sup_norm,
+                                                                disable_pbar=disable_pbar)
   sampler_fn = lambda hg: AlgebraicDistanceSamples(hg,
                                                    node2edge_weight,
                                                    edge2node_weight,
                                                    node2node_weight,
                                                    edge2edge_weight,
                                                    num_neighbors=num_neighbors,
-                                                   num_samples=num_samples)
+                                                   num_samples=num_samples,
+                                                   disable_pbar=disable_pbar)
   samples_to_input_fn = lambda samples: SamplesToModelInput(
       samples,
       num_neighbors=num_neighbors,

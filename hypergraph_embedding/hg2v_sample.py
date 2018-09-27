@@ -567,6 +567,50 @@ def _init_diff_type_distance_sample(
   _shared_info["edge2node"] = edge2node
 
 
+def DiffTypeJaccardSample(
+    indices,
+    node2edge_weight=None,
+    edge2edge_weight=None,
+    num_neighbors=None,
+    node2edge=None,
+    edge2node=None):
+
+  node_idx, edge_idx = indices
+  if node2edge_weight is None:
+    node2edge_weight = _shared_info["node2edge_weight"]
+  if edge2edge_weight is None:
+    edge2edge_weight = _shared_info["edge2edge_weight"]
+  if num_neighbors is None:
+    num_neighbors = _shared_info["num_neighbors"]
+  if node2edge is None:
+    node2edge = _shared_info["node2edge"]
+  if edge2node is None:
+    edge2node = _shared_info["edge2node"]
+  edges = node2edge[node_idx].nonzero()[1]
+  neighbor_edge_indices = np.random.choice(
+      edges,
+      min(num_neighbors,
+          len(edges)),
+      replace=False)
+
+  nodes = edge2node[edge_idx, :].nonzero()[1]
+  neighbor_node_indices = np.random.choice(
+      nodes,
+      min(num_neighbors,
+          len(nodes)),
+      replace=False)
+
+  features_node = node2edge_weight[node_idx]
+  features_edge = edge2edge_weight[edge_idx]
+  prob = SparseWeightedJaccard(features_node, features_edge)
+  return SimilarityRecord(
+      left_node_idx=node_idx,
+      right_edge_idx=edge_idx,
+      neighbor_node_indices=neighbor_node_indices,
+      neighbor_edge_indices=neighbor_edge_indices,
+      node_edge_prob=_alpha_scale(prob))
+
+
 def DiffTypeDistanceSample(
     indices,
     node2edge_weight=None,
@@ -662,7 +706,7 @@ def AlgebraicDistanceSamples(
             initargs=(node2edge_weight, # idx2features
                       False  # is_edge
                      )) as pool:
-    for record in tqdm(pool.imap(SameTypeDistanceSample,
+    for record in tqdm(pool.imap(SameTypeSample,
                                  samples,
                                  chunksize=num_samples),
                        total=len(samples),
@@ -683,7 +727,7 @@ def AlgebraicDistanceSamples(
             initargs=(edge2node_weight, # idx2features
                       True  # is_edge
                      )) as pool:
-    for record in tqdm(pool.imap(SameTypeDistanceSample,
+    for record in tqdm(pool.imap(SameTypeSample,
                                  samples,
                                  chunksize=num_samples),
                        total=len(samples),
@@ -704,7 +748,7 @@ def AlgebraicDistanceSamples(
                       num_neighbors,
                       node2edge,
                       edge2node)) as pool:
-    for record in tqdm(pool.imap(DiffTypeDistanceSample,
+    for record in tqdm(pool.imap(DiffTypeJaccardSample,
                                  samples,
                                  chunksize=num_samples),
                        total=len(samples),
