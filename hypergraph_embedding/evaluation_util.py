@@ -612,7 +612,7 @@ def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding, disable_pbar):
       examples,
       labels,
       batch_size=100,
-      epochs=5,
+      epochs=20,
       verbose=0 if disable_pbar else 1)
   return model
 

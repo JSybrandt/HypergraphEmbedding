@@ -25,6 +25,8 @@ from multiprocessing import Pool
 from tqdm import tqdm
 from time import time
 
+from keras.callbacks import EarlyStopping
+
 log = logging.getLogger()
 
 global EMBEDDING_OPTIONS
@@ -244,12 +246,14 @@ def _hypergraph2vec_skeleton(
   log.info("Follow along at %s", tb_log)
   tensorboard = TensorBoard(log_dir=tb_log)
 
+  stopper = EarlyStopping(monitor="loss")
+
   model.fit(
       input_features,
       output_probs,
       batch_size=fit_batch_size,
       epochs=fit_epochs,
-      callbacks=[tensorboard],
+      callbacks=[tensorboard, stopper],
       verbose=0 if disable_pbar else 1)
 
   log.info("Recording embeddings.")
@@ -476,7 +480,7 @@ def EmbedHg2vAlgDist(
     num_neighbors=5,
     num_samples=200,
     batch_size=256,
-    epochs=5,
+    epochs=10,
     debug_summary_path=None,
     disable_pbar=False):
 

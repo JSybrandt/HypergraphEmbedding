@@ -55,11 +55,10 @@ def WeightBySameTypeDistance(
       tmp[row, col] = value
     return csr_matrix(tmp)
 
-  # log.info("Identifying all node-node relationships")
-  # node2edge = ToCsrMatrix(hypergraph)
-  # node2node = node2edge * node2edge.T
-  # node2node_dist = do_half(node2node, ref_embedding.node)
-  node2node_dist = None
+  log.info("Identifying all node-node relationships")
+  node2edge = ToCsrMatrix(hypergraph)
+  node2node = node2edge * node2edge.T
+  node2node_dist = do_half(node2node, ref_embedding.node)
 
   log.info("Identifying all edge-edge relationships")
   edge2node = ToEdgeCsrMatrix(hypergraph)
