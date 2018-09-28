@@ -253,7 +253,8 @@ def _hypergraph2vec_skeleton(
       output_probs,
       batch_size=fit_batch_size,
       epochs=fit_epochs,
-      callbacks=[tensorboard, stopper],
+      callbacks=[tensorboard,
+                 stopper],
       verbose=0 if disable_pbar else 1)
 
   log.info("Recording embeddings.")

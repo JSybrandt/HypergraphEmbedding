@@ -71,7 +71,7 @@ def PrepLinkPredictionExperiment(hypergraph, args):
 
 def AddPredictionRecords(eval_metric, good_links, bad_links, predictions):
   log.info("Adding link data...")
-  predictions = set([(n,e) for n,e in predictions])
+  predictions = set([(n, e) for n, e in predictions])
   for node, edge in good_links:
     record = eval_metric.records.add()
     record.node_idx = node

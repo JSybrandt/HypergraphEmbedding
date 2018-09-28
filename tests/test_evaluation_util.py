@@ -486,17 +486,21 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
     expected = [(0, 0)]
     self.assertEqual(set(actual), set(expected))
 
+
 class AddPredictionRecordsTest(unittest.TestCase):
+
   def test_typical(self):
     good_links = [(0, 0), (0, 1)]
     bad_links = [(1, 0), (1, 1)]
-    predicted_links = [(0,0), (1,1)]
+    predicted_links = [(0, 0), (1, 1)]
 
-    actual = AddPredictionRecords(EvaluationMetrics(),
-                                  good_links,
-                                  bad_links,
-                                  predicted_links)
-    expected = ParseProto("""
+    actual = AddPredictionRecords(
+        EvaluationMetrics(),
+        good_links,
+        bad_links,
+        predicted_links)
+    expected = ParseProto(
+        """
       records {
         node_idx: 0
         edge_idx: 0
@@ -520,5 +524,6 @@ class AddPredictionRecordsTest(unittest.TestCase):
         edge_idx: 1
         label: false
         prediction: true
-      }""", EvaluationMetrics())
+      }""",
+        EvaluationMetrics())
     self.assertEqual(actual, expected)

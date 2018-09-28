@@ -43,8 +43,8 @@ def _update_alg_dist(a_idx, A2B=None, B2A=None, A2emb=None, B2emb=None):
 
   a_emb = A2emb[a_idx, :]
 
-  b_emb_weight = [(B2emb[b_idx], 1/B2A[b_idx].nnz)
-                  for b_idx in A2B[a_idx].nonzero()[1]]
+  b_emb_weight = [(B2emb[b_idx],
+                   1 / B2A[b_idx].nnz) for b_idx in A2B[a_idx].nonzero()[1]]
   b_emb = sum(e * w for e, w in b_emb_weight) / sum(w for _, w in b_emb_weight)
 
   return a_idx, (a_emb + b_emb) / 2
