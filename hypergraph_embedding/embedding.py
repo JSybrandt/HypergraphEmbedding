@@ -496,7 +496,7 @@ def EmbedHg2vAlgDist(
   node2node_weight, edge2edge_weight = WeightBySameTypeDistance(hypergraph,
                                                                 alpha,
                                                                 alg_emb,
-                                                                sup_norm,
+                                                                euc_norm,
                                                                 disable_pbar=disable_pbar)
   sampler_fn = lambda hg: AlgebraicDistanceSamples(hg,
                                                    node2edge_weight,
