@@ -756,6 +756,16 @@ def AlgebraicDistanceSamples(
       hypergraph.node,
       num_samples,
       disable_pbar)
+
+  log.info("Getting edge-node samples")
+  edge2second_node = edge2edge * edge2node
+  edge_node_samples = GetSamples(
+      edge2second_node,
+      hypergraph.edge,
+      num_samples,
+      disable_pbar)
+  samples.extend([(n,e) for e,n in edge_node_samples])
+
   with Pool(workers,
             initializer=_init_diff_type_distance_sample,
             initargs=(node2edge_weight,
