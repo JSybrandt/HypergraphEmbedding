@@ -40,7 +40,7 @@ def ParseArgs():
       help=(
           "Specifies how to parse the input file. "
           "Options: " + " ".join([o for o in PARSING_OPTIONS])),
-      default="")
+      default="SNAP")
   parser.add_argument(
       "--name",
       type=str,

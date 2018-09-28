@@ -1,12 +1,14 @@
 import unittest
 from itertools import product
 from hypergraph_embedding import Hypergraph
+from hypergraph_embedding import EvaluationMetrics
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.data_util import *
 from hypergraph_embedding.evaluation_util import *
 from hypergraph_embedding.embedding import EmbedRandom
 from random import random, randint, sample
 from scipy.spatial import distance
+from google.protobuf.text_format import Parse as ParseProto
 
 
 def isclose(actual, expected, abs_tol=1e-6):
@@ -102,112 +104,6 @@ class TestRemoveRandomConnections(unittest.TestCase):
       removed_hg, removed_list = RemoveRandomConnections(original, remove_prob)
       self.checkSubset(removed_hg, original, removed_list)
       self.checkValid(removed_hg)
-
-
-class TestEdgeCentroidPrediction(unittest.TestCase):
-
-  def test_typical(self):
-    hypergraph = Hypergraph()
-    AddNodeToEdge(hypergraph, 0, 0)
-    AddNodeToEdge(hypergraph, 1, 0)
-
-    embedding = HypergraphEmbedding()
-    embedding.dim = 2
-    embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([1, 0])
-    embedding.node[2].values.extend([0.5, 0.5])
-
-    # default is cosine
-    actual = EdgeCentroidPrediction(hypergraph, embedding, [(2, 0)])
-    self.assertEqual(set(actual), set([(2, 0)]))
-
-  def test_euclidian(self):
-    hypergraph = Hypergraph()
-    AddNodeToEdge(hypergraph, 0, 0)
-    AddNodeToEdge(hypergraph, 1, 0)
-    AddNodeToEdge(hypergraph, 2, 0)
-
-    embedding = HypergraphEmbedding()
-    embedding.dim = 2
-    embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([-1, -1])
-    embedding.node[2].values.extend([1, -1])
-    embedding.node[3].values.extend([0, 0])
-
-    actual = EdgeCentroidPrediction(
-        hypergraph,
-        embedding,
-        [(3,
-          0)],
-        distance_function=distance.euclidean)
-    # expect that node 3 is inside the triangle
-    self.assertEqual(set(actual), set([(3, 0)]))
-
-  def test_multiple_edges(self):
-    hypergraph = Hypergraph()
-    AddNodeToEdge(hypergraph, 0, 0)
-    AddNodeToEdge(hypergraph, 1, 0)
-    AddNodeToEdge(hypergraph, 0, 1)
-    AddNodeToEdge(hypergraph, 1, 1)
-
-    embedding = HypergraphEmbedding()
-    embedding.dim = 2
-    embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([1, 0])
-    embedding.node[2].values.extend([0.5, 0.5])
-
-    actual = EdgeCentroidPrediction(hypergraph, embedding, [(2, 0), (2, 1)])
-    self.assertEqual(set(actual), set([(2, 0), (2, 1)]))
-
-  def test_dropped_edge(self):
-    hypergraph = Hypergraph()
-    AddNodeToEdge(hypergraph, 0, 0)
-    AddNodeToEdge(hypergraph, 1, 0)
-    AddNodeToEdge(hypergraph, 1, 1)  # dropped, only 1
-
-    embedding = HypergraphEmbedding()
-    embedding.dim = 2
-    embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([1, 0])
-    embedding.node[2].values.extend([0.5, 0.5])
-
-    actual = EdgeCentroidPrediction(hypergraph, embedding, [(2, 0), (2, 1)])
-    self.assertEqual(set(actual), set([(2, 0)]))
-
-  def test_only_missing_links(self):
-    "Given the optional parameter for missing links, don't test everything"
-    hypergraph = Hypergraph()
-    AddNodeToEdge(hypergraph, 0, 0)
-    AddNodeToEdge(hypergraph, 1, 0)
-
-    embedding = HypergraphEmbedding()
-    embedding.dim = 2
-    embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([1, 0])
-    embedding.node[2].values.extend([0.5, 0.5])  # detect
-    embedding.node[3].values.extend([0.5, 0.5])  # skip
-
-    links = [(2, 0)]
-
-    actual = EdgeCentroidPrediction(hypergraph, embedding, links)
-    self.assertEqual(set(actual), set([(2, 0)]))
-
-  def test_missing_edge_removed(self):
-    "Tests the case wherein a listed missing edge doesn't appear"
-    hypergraph = Hypergraph()
-    AddNodeToEdge(hypergraph, 0, 0)
-    AddNodeToEdge(hypergraph, 1, 0)
-
-    embedding = HypergraphEmbedding()
-    embedding.dim = 2
-    embedding.node[0].values.extend([0, 1])
-    embedding.node[1].values.extend([1, 0])
-
-    # Test each case, none should fail
-    links = [(2, 0), (0, 1), (1, 1)]
-
-    actual = EdgeCentroidPrediction(hypergraph, embedding, links)
-    self.assertEqual(set(actual), set())
 
 
 class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
@@ -589,3 +485,40 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
         disable_pbar=True)
     expected = [(0, 0)]
     self.assertEqual(set(actual), set(expected))
+
+class AddPredictionRecordsTest(unittest.TestCase):
+  def test_typical(self):
+    good_links = [(0, 0), (0, 1)]
+    bad_links = [(1, 0), (1, 1)]
+    predicted_links = [(0,0), (1,1)]
+
+    actual = AddPredictionRecords(EvaluationMetrics(),
+                                  good_links,
+                                  bad_links,
+                                  predicted_links)
+    expected = ParseProto("""
+      records {
+        node_idx: 0
+        edge_idx: 0
+        label: true
+        prediction: true
+      }
+      records {
+        node_idx: 0
+        edge_idx: 1
+        label: true
+        prediction: false
+      }
+      records {
+        node_idx: 1
+        edge_idx: 0
+        label: false
+        prediction: false
+      }
+      records {
+        node_idx: 1
+        edge_idx: 1
+        label: false
+        prediction: true
+      }""", EvaluationMetrics())
+    self.assertEqual(actual, expected)

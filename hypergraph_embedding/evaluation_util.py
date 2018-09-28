@@ -69,6 +69,25 @@ def PrepLinkPredictionExperiment(hypergraph, args):
       bad_links=bad_links)
 
 
+def AddPredictionRecords(eval_metric, good_links, bad_links, predictions):
+  log.info("Adding link data...")
+  predictions = set([(n,e) for n,e in predictions])
+  for node, edge in good_links:
+    record = eval_metric.records.add()
+    record.node_idx = node
+    record.edge_idx = edge
+    record.label = True
+    record.prediction = (node, edge) in predictions
+
+  for node, edge in bad_links:
+    record = eval_metric.records.add()
+    record.node_idx = node
+    record.edge_idx = edge
+    record.label = False
+    record.prediction = (node, edge) in predictions
+  return eval_metric
+
+
 def RunLinkPredictionExperiment(link_prediction_data, experiment_name):
   assert experiment_name in EXPERIMENT_OPTIONS
 
@@ -85,22 +104,7 @@ def RunLinkPredictionExperiment(link_prediction_data, experiment_name):
       bad_links)
   metrics.experiment_name = experiment_name
   log.info("Result:\n%s", metrics)
-  log.info("Adding link data...")
-  predicted_links = set([(n,e) for n,e in predicted_links])
-  for node, edge in good_links:
-    record = metrics.records.add()
-    record.node_idx = node
-    record.edge_idx = edge
-    record.label = True
-    record.prediction = (node, edge) in predicted_links
-
-  for node, edge in bad_links:
-    record = metrics.records.add()
-    record.node_idx = node
-    record.edge_idx = edge
-    record.label = False
-    record.prediction = (node, edge) in predicted_links
-
+  AddPredictionRecords(metrics, good_links, bad_links, predictions)
   return metrics
 
 
