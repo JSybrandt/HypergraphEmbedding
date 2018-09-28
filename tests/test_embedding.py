@@ -238,3 +238,10 @@ class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
                                          epochs=1,
                                          disable_pbar=True)
     self.help_test_fuzz(embed)
+
+
+class EmbedAutoEncoderTest(EmbeddingTestCase):
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedAutoEncoder(_input, dim, disable_pbar=True)
