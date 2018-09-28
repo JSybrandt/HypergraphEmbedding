@@ -104,7 +104,7 @@ def RunLinkPredictionExperiment(link_prediction_data, experiment_name):
       bad_links)
   metrics.experiment_name = experiment_name
   log.info("Result:\n%s", metrics)
-  AddPredictionRecords(metrics, good_links, bad_links, predictions)
+  AddPredictionRecords(metrics, good_links, bad_links, predicted_links)
   return metrics
 
 

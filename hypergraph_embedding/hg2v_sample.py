@@ -721,7 +721,7 @@ def AlgebraicDistanceSamples(
             initargs=(node2edge_weight, # idx2features
                       False  # is_edge
                      )) as pool:
-    for record in tqdm(pool.imap(SameTypeSample,
+    for record in tqdm(pool.imap(SameTypeDistanceSample,
                                  samples,
                                  chunksize=num_samples),
                        total=len(samples),
@@ -742,7 +742,7 @@ def AlgebraicDistanceSamples(
             initargs=(edge2node_weight, # idx2features
                       True  # is_edge
                      )) as pool:
-    for record in tqdm(pool.imap(SameTypeSample,
+    for record in tqdm(pool.imap(SameTypeDistanceSample,
                                  samples,
                                  chunksize=num_samples),
                        total=len(samples),
@@ -763,35 +763,12 @@ def AlgebraicDistanceSamples(
                       num_neighbors,
                       node2edge,
                       edge2node)) as pool:
-    for record in tqdm(pool.imap(DiffTypeJaccardSample,
+    for record in tqdm(pool.imap(DiffTypeDistanceSample,
                                  samples,
                                  chunksize=num_samples),
                        total=len(samples),
                        disable=disable_pbar):
       similarity_records.append(record)
-
-  # log.info("Getting edge-node samples")
-  # edge2second_node = edge2edge * edge2node
-  # samples = GetSamples(
-  # edge2second_node,
-  # hypergraph.edge,
-  # num_samples,
-  # disable_pbar)
-  # # flip!
-  # samples = [(n, e) for e, n in samples]
-  # with Pool(workers,
-  # initializer=_init_diff_type_distance_sample,
-  # initargs=(node2node_weight,
-  # edge2node_weight,
-  # num_neighbors,
-  # node2edge,
-  # edge2node)) as pool:
-  # for record in tqdm(pool.imap(DiffTypeJaccardSample,
-  # samples,
-  # chunksize=num_samples),
-  # total=len(samples),
-  # disable=disable_pbar):
-  # similarity_records.append(record)
 
   return similarity_records
 
