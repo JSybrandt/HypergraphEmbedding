@@ -42,6 +42,17 @@ message EvaluationMetrics {
 	optional int32 num_false_pos = 7;
 	optional int32 num_false_neg = 8;
   optional string experiment_name = 9;
+
+	// This message is used to store specific metric results
+	message EvaluationRecord {
+	  optional int32 node_idx = 1;
+		optional int32 edge_idx = 2;
+		// The ground-truth
+		optional bool label = 3;
+		// What the model thinks
+		optional bool prediction = 4;
+	}
+	repeated EvaluationRecord records = 10;
 }
 
 message ExperimentalResult {

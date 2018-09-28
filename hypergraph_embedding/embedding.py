@@ -435,12 +435,12 @@ def EmbedHg2vDistWeightedJaccard(
     disable_pbar=False):
 
   log.info("Embedding weighted by algebraic distance.")
-  alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=5, iterations=10)
-  sup_norm = lambda x: np.linalg.norm(x, ord=float('inf'))
+  alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=10, iterations=20)
+  euc_norm = lambda x: np.linalg.norm(x, ord=2)
   node2weight, edge2weight = WeightByDistance(hypergraph,
                                               alpha,
                                               alg_emb,
-                                              sup_norm,
+                                              euc_norm,
                                               disable_pbar)
   sampler_fn = lambda hg: WeightedJaccardSamples(hg,
                                                  node2weight,
@@ -485,12 +485,12 @@ def EmbedHg2vAlgDist(
     disable_pbar=False):
 
   log.info("Embedding weighted by algebraic distance.")
-  alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=5, iterations=10)
-  sup_norm = lambda x: np.linalg.norm(x, ord=float('inf'))
+  alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=10, iterations=20)
+  euc_norm = lambda x: np.linalg.norm(x, ord=2)
   node2edge_weight, edge2node_weight = WeightByDistance(hypergraph,
                                                         alpha,
                                                         alg_emb,
-                                                        sup_norm,
+                                                        euc_norm,
                                                         disable_pbar)
   node2node_weight, edge2edge_weight = WeightBySameTypeDistance(hypergraph,
                                                                 alpha,
