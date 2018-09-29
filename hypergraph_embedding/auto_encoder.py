@@ -15,82 +15,68 @@ from tqdm import tqdm
 import numpy as np
 log = logging.getLogger()
 
-# Used to coordinate parallel processes
-_shared_info = {}
 
-
-def _init_auto_encoder_sample(matrix):
-  _shared_info.clear()
-  _shared_info["matrix"] = matrix
-
-
-def _auto_encoder_sample(row_idx, matrix=None):
+def _auto_encoder_sample(row_idx, matrix, num_samples):
   """
   Returns a list of tuples original - perturbed
   Each value is normalized such that it sums to 1.
   """
-  if matrix is None:
-    matrix = _shared_info["matrix"]
 
   sparse_row = matrix[row_idx]
   normalized_row = (sparse_row / sparse_row.nnz).A.flatten()
-
-  samples = [(normalized_row, normalized_row)]
+  perturbed_samples = [normalized_row]
   if sparse_row.nnz > 1:
-    for col_idx in sparse_row.nonzero()[1]:
+    nonzero_cols = sparse_row.nonzero()[1]
+    num_samples = min(len(nonzero_cols), num_samples)
+    for col_idx in np.random.choice(nonzero_cols, num_samples, replace=False):
       perturbed = (sparse_row / (sparse_row.nnz - 1)).A.flatten()
       perturbed[col_idx] = 0
-      samples.append((normalized_row, perturbed))
-  return samples
+      perturbed_samples.append(perturbed)
+  original_samples = [normalized_row] * len(perturbed_samples)
+  return original_samples, perturbed_samples
 
 
-def _to_samples(indices, matrix):
-  return {idx: (matrix[idx] / matrix[idx].nnz).A.flatten() for idx in indices}
-
-
-def _get_auto_encoder_embeddings(samples, dimension, idx2sample, disable_pbar):
-  log.info("Converting samples to input arrays")
-  #samples is original, perturbed
-  originals = np.array([o for o, _ in samples])
-  perturbed = np.array([p for _, p in samples])
-  sample_size = originals.shape[1]
-  assert originals.shape == perturbed.shape
-
+def _get_auto_encoder_embeddings(
+    matrix, dimension, important_indices, epochs, idx_per_batch,
+    samples_per_idx, disable_pbar):
   log.info("Constructing model")
-  perturbed_input_layer = Input((sample_size,
-                                ),
+  sample_size = matrix.shape[1]
+  perturbed_input_layer = Input((sample_size,),
                                 name="perturbed_input_layer",
                                 dtype=np.float32)
   encoding_layer = Dense(
-      dimension,
-      name="encoding_layer",
-      activation="softmax")(
+      dimension, name="encoding_layer", activation="relu")(
           perturbed_input_layer)
   original_output_layer = Dense(
-      sample_size,
-      name="original_output_layer",
-      activation="softmax")(
+      sample_size, name="original_output_layer", activation="softmax")(
           encoding_layer)
 
   encoding_trainer = Model(
-      inputs=[perturbed_input_layer],
-      outputs=[original_output_layer])
+      inputs=[perturbed_input_layer], outputs=[original_output_layer])
   encoding_trainer.compile(
-      optimizer="adagrad",
-      loss="kullback_leibler_divergence")
+      optimizer="adagrad", loss="kullback_leibler_divergence")
 
   log.info("Training model")
-  encoding_trainer.fit(
-      perturbed,
-      originals,
-      batch_size=128,
-      epochs=20,
-      verbose=0 if disable_pbar else 1)
+  indices = np.array(important_indices)
+  for epoch in range(epochs):
+    log.info("Epoch %i / %i", epoch + 1, epochs)
+    for idx_batch in tqdm(np.array_split(np.random.permutation(indices), max(
+        1, int(len(important_indices) / idx_per_batch))), disable=disable_pbar):
+      originals = []
+      perturbed = []
+      for idx in idx_batch:
+        tmp_o, tmp_p = _auto_encoder_sample(idx, matrix, samples_per_idx)
+        originals.extend(tmp_o)
+        perturbed.extend(tmp_p)
+      originals = np.array(originals, dtype=np.float32)
+      perturbed = np.array(perturbed, dtype=np.float32)
+      encoding_trainer.train_on_batch(perturbed, originals)
 
   log.info("Extracting embeddings")
   embedding = Model(inputs=[perturbed_input_layer], outputs=[encoding_layer])
-  indices = [idx for idx in idx2sample]
-  samples = np.array([idx2sample[idx] for idx in indices])
+  indices = [idx for idx in important_indices]
+  samples = np.array(
+      [(matrix[idx] / matrix[idx].nnz).A.flatten() for idx in indices])
   embeddings = embedding.predict(samples)
   return [(idx, embeddings[row, :]) for row, idx in enumerate(indices)]
 
@@ -98,39 +84,27 @@ def _get_auto_encoder_embeddings(samples, dimension, idx2sample, disable_pbar):
 def EmbedAutoEncoder(
     hypergraph,
     dimension,
+    num_samples=100,
+    epochs=5,
+    idx_per_batch=200,
     run_in_parallel=True,
     disable_pbar=False):
   workers = multiprocessing.cpu_count() if run_in_parallel else 1
-
-  def do_half(important_rows, matrix):
-    samples = []
-    with Pool(workers,
-              initializer=_init_auto_encoder_sample,
-              initargs=(matrix,
-                       )) as pool:
-      for tmp in tqdm(pool.imap(_auto_encoder_sample,
-                                important_rows),
-                      total=len(important_rows),
-                      disable=disable_pbar):
-        samples += tmp
-
-    return _get_auto_encoder_embeddings(
-        samples,
-        dimension,
-        _to_samples(important_rows,
-                    matrix),
-        disable_pbar)
 
   embedding = HypergraphEmbedding()
   embedding.dim = dimension
   embedding.method_name = "AutoEncoder"
 
   log.info("Collecting node samples for auto encoder")
-  for node_idx, emb in do_half(hypergraph.node, ToCsrMatrix(hypergraph)):
+  for node_idx, emb in _get_auto_encoder_embeddings(
+      ToCsrMatrix(hypergraph), dimension, hypergraph.node, epochs,
+      idx_per_batch, num_samples, disable_pbar):
     embedding.node[node_idx].values.extend(emb)
 
   log.info("Collecting edge samples for auto encoder")
-  for edge_idx, emb in do_half(hypergraph.edge, ToEdgeCsrMatrix(hypergraph)):
+  for edge_idx, emb in _get_auto_encoder_embeddings(
+      ToEdgeCsrMatrix(hypergraph), dimension, hypergraph.edge, epochs,
+      idx_per_batch, num_samples, disable_pbar):
     embedding.edge[edge_idx].values.extend(emb)
 
   return embedding

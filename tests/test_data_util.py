@@ -19,13 +19,8 @@ class TestAMinerUtil(unittest.TestCase):
       actual = [p for p in ParseAMiner(ifile)]
     expected = [
         Paper(
-            "ArnetMiner: extraction and mining of academic social networks",
-            [
-                "Jie Tang",
-                "Jing Zhang",
-                "Limin Yao",
-                "Juanzi Li",
-                "Li Zhang",
+            "ArnetMiner: extraction and mining of academic social networks", [
+                "Jie Tang", "Jing Zhang", "Limin Yao", "Juanzi Li", "Li Zhang",
                 "Zhong Su"
             ])
     ]
@@ -36,12 +31,8 @@ class TestAMinerUtil(unittest.TestCase):
     _input = ("#* T\n#@ A;B\n#* T2\n#@ C;D\n")
     actual = [p for p in ParseAMiner(StringIO(_input))]
     expected = [
-        Paper(title="T",
-              authors=["A",
-                       "B"]),
-        Paper(title="T2",
-              authors=["C",
-                       "D"])
+        Paper(title="T", authors=["A", "B"]),
+        Paper(title="T2", authors=["C", "D"])
     ]
     self.assertEqual(actual, expected)
 

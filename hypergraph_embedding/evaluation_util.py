@@ -31,10 +31,7 @@ _shared_data = {}
 
 LinkPredictionData = namedtuple(
     "LinkPredictionData",
-    ("hypergraph",
-     "embedding",
-     "good_links",
-     "bad_links"))
+    ("hypergraph", "embedding", "good_links", "bad_links"))
 
 
 def PrepLinkPredictionExperiment(hypergraph, args):
@@ -50,9 +47,9 @@ def PrepLinkPredictionExperiment(hypergraph, args):
   assert args.experiment_lp_probability <= 1
 
   log.info(
-      "Creating subgraph with removal prob. %f",
-      args.experiment_lp_probability)
-  new_graph, good_links = RemoveRandomConnections(hypergraph, args.experiment_lp_probability)
+      "Creating subgraph with removal prob. %f", args.experiment_lp_probability)
+  new_graph, good_links = RemoveRandomConnections(
+      hypergraph, args.experiment_lp_probability)
   log.info("Removed %i links", len(good_links))
 
   log.info("Sampling missing links for evaluation")
@@ -99,9 +96,7 @@ def RunLinkPredictionExperiment(link_prediction_data, experiment_name):
 
   log.info("Evaluating link prediction performance")
   metrics = CalculateCommunityPredictionMetrics(
-      predicted_links,
-      good_links,
-      bad_links)
+      predicted_links, good_links, bad_links)
   metrics.experiment_name = experiment_name
   log.info("Result:\n%s", metrics)
   AddPredictionRecords(metrics, good_links, bad_links, predicted_links)
@@ -146,9 +141,7 @@ def RemoveRandomConnections(original_hypergraph, probability):
         removed_connections.append((node_idx, edge_idx))
       else:
         AddNodeToEdge(
-            new_hg,
-            node_idx,
-            edge_idx,
+            new_hg, node_idx, edge_idx,
             node.name if node.HasField("name") else None,
             edge.name if edge.HasField("name") else None)
   return new_hg, removed_connections
@@ -184,15 +177,12 @@ def SampleMissingConnections(hypergraph, num_samples):
 
   if len(samples) < num_samples:
     log.critical(
-        "SampleMissingConnections failed to find %i samples",
-        num_samples)
+        "SampleMissingConnections failed to find %i samples", num_samples)
   return list(samples)
 
 
 def CalculateCommunityPredictionMetrics(
-    predicted_connections,
-    good_links,
-    bad_links):
+    predicted_connections, good_links, bad_links):
   """
     Treats good_links as positive examples, and computes a Metrics
     named tuple.
@@ -253,14 +243,11 @@ def _node_emb_to_numpy(node_idx):
   return (
       node_idx,
       np.asarray(
-          _shared_data['embedding'].node[node_idx].values,
-          dtype=np.float32))
+          _shared_data['embedding'].node[node_idx].values, dtype=np.float32))
 
 
 def _init_get_edge_centroid_range(
-    _node2embedding,
-    _hypergraph,
-    _distance_function):
+    _node2embedding, _hypergraph, _distance_function):
   _shared_data['node2embedding'] = _node2embedding
   _shared_data['hypergraph'] = _hypergraph
   _shared_data['distance_function'] = _distance_function
@@ -275,16 +262,12 @@ def _get_edge_centroid_range(edge_idx):
   with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     max_dist = max(
-        [_shared_data['distance_function'](centroid,
-                                           vec) for vec in points])
+        [_shared_data['distance_function'](centroid, vec) for vec in points])
   return (edge_idx, centroid, max_dist)
 
 
 def _init_is_node_in_sphere(
-    _node2embedding,
-    _edge2centroid,
-    _edge2range,
-    _hypergraph,
+    _node2embedding, _edge2centroid, _edge2range, _hypergraph,
     _distance_function):
   _shared_data['node2embedding'] = _node2embedding
   _shared_data['edge2centroid'] = _edge2centroid
@@ -310,8 +293,7 @@ def _is_node_in_sphere(indices):
   with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     if _shared_data['distance_function'](
-        vec,
-        centroid) <= _shared_data['edge2range'][edge_idx]:
+        vec, centroid) <= _shared_data['edge2range'][edge_idx]:
       return (node_idx, edge_idx)
 
   return None
@@ -358,9 +340,7 @@ def _init_train_personalized_classifier(idx2neighbors, neighbor_idx2embedding):
 
 
 def _train_personalized_classifier(
-    idx,
-    idx2neighbors=None,
-    neighbor_idx2embedding=None):
+    idx, idx2neighbors=None, neighbor_idx2embedding=None):
   if idx2neighbors is None:
     idx2neighbors = _shared_data['idx2neighbors']
   if neighbor_idx2embedding is None:
@@ -424,17 +404,17 @@ def GetPersonalizedClassifiers(
     log.info("Subset provided with %i entires", len(idx_subset))
 
   if run_in_parallel:
-    with Pool(num_cores,
-              initializer=_init_train_personalized_classifier,
-              initargs=(idx2neighbors,
-                        neighbor_idx2embedding)) as pool:
+    with Pool(num_cores, initializer=_init_train_personalized_classifier,
+              initargs=(idx2neighbors, neighbor_idx2embedding)) as pool:
       with tqdm(total=len(idx_subset), disable=disable_pbar) as pbar:
-        for idx, classifier in pool.imap(_train_personalized_classifier, idx_subset):
+        for idx, classifier in pool.imap(_train_personalized_classifier,
+                                         idx_subset):
           result[idx] = classifier
           pbar.update(1)
   else:  # we want a different impl for serial run, the parallel can cause oom errors
     for idx in tqdm(idx_subset, disable=disable_pbar):
-      _, classifier = _train_personalized_classifier(idx, idx2neighbors, neighbor_idx2embedding)
+      _, classifier = _train_personalized_classifier(
+          idx, idx2neighbors, neighbor_idx2embedding)
       result[idx] = classifier
 
   return result
@@ -466,11 +446,8 @@ def PersonalizedClassifierPrediction(
   num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
 
   log.info("Removing potential links that do not have embeddings")
-  entity_idx_classifier_idx = [(n,
-                                e) if per_edge else (e,
-                                                     n)
-                               for n,
-                               e in links
+  entity_idx_classifier_idx = [(n, e) if per_edge else (e, n)
+                               for n, e in links
                                if n in embedding.node and e in embedding.edge]
 
   # Get only the needed ones
@@ -492,10 +469,8 @@ def PersonalizedClassifierPrediction(
   predicted_links = []
 
   log.info("Running each classifier")
-  with Pool(num_cores,
-            initializer=_init_evaluate_classifier,
-            initargs=(idx2embedding,
-                      idx2classifier)) as pool:
+  with Pool(num_cores, initializer=_init_evaluate_classifier,
+            initargs=(idx2embedding, idx2classifier)) as pool:
     for (entity_idx, classifier_idx), res in pool.imap(
         _evaluate_classifier, entity_idx_classifier_idx, chunksize=250):
       if res is not None and res > 0:
@@ -517,8 +492,7 @@ def _GetVectorFromIdx(node_idx, edge_idx, embedding):
   assert node_idx in embedding.node
   assert edge_idx in embedding.edge
   return np.concatenate(
-      (embedding.node[node_idx].values,
-       embedding.edge[edge_idx].values),
+      (embedding.node[node_idx].values, embedding.edge[edge_idx].values),
       axis=0)
 
 
@@ -569,10 +543,7 @@ def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding, disable_pbar):
 
 
 def NodeEdgeEmbeddingPrediction(
-    hypergraph,
-    embedding,
-    potential_links,
-    classifier=None,
+    hypergraph, embedding, potential_links, classifier=None,
     disable_pbar=False):
   """
     Returns a subset of the input potential_links that a binary classifier
@@ -591,15 +562,11 @@ def NodeEdgeEmbeddingPrediction(
     """
   if classifier is None:
     classifier = _TrainNodeEdgeEmbeddingClassifier(
-        hypergraph,
-        embedding,
-        disable_pbar)
+        hypergraph, embedding, disable_pbar)
 
   log.info("Deleting input edges that are not represented in the subgraph")
-  potential_links = [(n,
-                      e)
-                     for n,
-                     e in potential_links
+  potential_links = [(n, e)
+                     for n, e in potential_links
                      if n in hypergraph.node and e in hypergraph.edge]
 
   log.info("Converting potential links to embedding vectors")
@@ -621,10 +588,7 @@ def NodeEdgeEmbeddingPrediction(
 
 
 def PersonalizedEdgeClassifierPrediction(
-    hypergraph,
-    embedding,
-    links,
-    run_in_parallel=False):
+    hypergraph, embedding, links, run_in_parallel=False):
   return PersonalizedClassifierPrediction(
       hypergraph,
       embedding,
@@ -634,10 +598,7 @@ def PersonalizedEdgeClassifierPrediction(
 
 
 def PersonalizedNodeClassifierPrediction(
-    hypergraph,
-    embedding,
-    links,
-    run_in_parallel=False):
+    hypergraph, embedding, links, run_in_parallel=False):
   return PersonalizedClassifierPrediction(
       hypergraph,
       embedding,

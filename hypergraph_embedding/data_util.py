@@ -80,10 +80,7 @@ def PapersToHypergraph(parser):
       if author not in author2idx:
         author2idx[author] = len(author2idx)
       AddNodeToEdge(
-          result,
-          author2idx[author],
-          title2idx[paper.title],
-          author,
+          result, author2idx[author], title2idx[paper.title], author,
           paper.title)
   return result
 

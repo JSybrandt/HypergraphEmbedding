@@ -121,10 +121,12 @@ class HypergraphUtilTest(unittest.TestCase):
     _input = Hypergraph()
     AddNodeToEdge(_input, 1, 2)
     actual = ToCsrMatrix(_input)
-    expected = csr_matrix([
-        [0, 0, 0],  # node 0 not listed
-        [0, 0, 1]  # node 1 in edge 2
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0, 0],  # node 0 not listed
+            [0, 0, 1]  # node 1 in edge 2
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToEdgeCsrMatrix_one(self):
@@ -132,11 +134,13 @@ class HypergraphUtilTest(unittest.TestCase):
     _input = Hypergraph()
     AddNodeToEdge(_input, 1, 2)
     actual = ToEdgeCsrMatrix(_input)
-    expected = csr_matrix([
-        [0, 0],  # node 0 not listed
-        [0, 0],
-        [0, 1]   # node 1 in edge 2
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0],  # node 0 not listed
+            [0, 0],
+            [0, 1]  # node 1 in edge 2
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToCsrMatrix_multiple(self):
@@ -146,11 +150,13 @@ class HypergraphUtilTest(unittest.TestCase):
     AddNodeToEdge(_input, 1, 2)
     AddNodeToEdge(_input, 2, 0)
     actual = ToCsrMatrix(_input)
-    expected = csr_matrix([
-        [0, 0, 0],  # node 0 not listed
-        [0, 1, 1],  # node 1 in edge 1 & 2
-        [1, 0, 0]  # node 2 in edge 0
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0, 0],  # node 0 not listed
+            [0, 1, 1],  # node 1 in edge 1 & 2
+            [1, 0, 0]  # node 2 in edge 0
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToCsrMatrix_empty(self):
@@ -208,10 +214,12 @@ class HypergraphUtilTest(unittest.TestCase):
     _input = Hypergraph()
     AddNodeToEdge(_input, 1, 2)
     actual = ToCscMatrix(_input)
-    expected = csr_matrix([
-        [0, 0, 0],  # node 0 not listed
-        [0, 0, 1]  # node 1 in edge 2
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0, 0],  # node 0 not listed
+            [0, 0, 1]  # node 1 in edge 2
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToCscMatrix_multiple(self):
@@ -221,11 +229,13 @@ class HypergraphUtilTest(unittest.TestCase):
     AddNodeToEdge(_input, 1, 2)
     AddNodeToEdge(_input, 2, 0)
     actual = ToCscMatrix(_input)
-    expected = csr_matrix([
-        [0, 0, 0],  # node 0 not listed
-        [0, 1, 1],  # node 1 in edge 1 & 2
-        [1, 0, 0]  # node 2 in edge 0
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0, 0],  # node 0 not listed
+            [0, 1, 1],  # node 1 in edge 1 & 2
+            [1, 0, 0]  # node 2 in edge 0
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToCscMatrix_empty(self):

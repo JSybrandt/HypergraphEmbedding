@@ -201,8 +201,7 @@ if __name__ == "__main__":
       hypergraph.ParseFromString(proto_file.read())
 
   log.info(
-      "Hypergraph contains %i nodes and %i edges",
-      len(hypergraph.node),
+      "Hypergraph contains %i nodes and %i edges", len(hypergraph.node),
       len(hypergraph.edge))
 
   if args.embedding:

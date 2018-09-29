@@ -29,17 +29,13 @@ def AddNodeToEdge(hypergraph, node_id, edge_id, node_name=None, edge_name=None):
     if node.HasField("name") and node.name != node_name:
       logging.getLogger().warning(
           "Overwriting Node #{} name from {} to {}".format(
-              node_id,
-              node.name,
-              node_name))
+              node_id, node.name, node_name))
     node.name = node_name
   if edge_name is not None:
     if edge.HasField("name") and edge.name != edge_name:
       logging.getLogger().warning(
           "Overwriting Edge #{} name from {} to {}".format(
-              edge_id,
-              edge.name,
-              edge_name))
+              edge_id, edge.name, edge_name))
     edge.name = edge_name
   return hypergraph
 

@@ -179,10 +179,7 @@ class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
     dim = 2
     _input = TestHypergraph()
     actual = EmbedAlgebraicDistance(
-        _input,
-        dim,
-        iterations=3,
-        disable_pbar=True)
+        _input, dim, iterations=3, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "AlgebraicDistance")
 
@@ -264,49 +261,14 @@ class EmbedAutoEncoderTest(EmbeddingTestCase):
     self.assertEqual(actual.method_name, "AutoEncoder")
 
   def test_auto_encoder_sample(self):
-    actual = ae._auto_encoder_sample(0, csr_matrix([1, 0, 1, 0, 1]))
+    actual = ae._auto_encoder_sample(0, csr_matrix([1, 0, 1, 0, 1]), 100)
     expected = [
         (
-            np.array([1 / 3,
-                      0,
-                      1 / 3,
-                      0,
-                      1 / 3]),
-            np.array([1 / 3,
-                      0,
-                      1 / 3,
-                      0,
-                      1 / 3])),
-        (np.array([1 / 3,
-                   0,
-                   1 / 3,
-                   0,
-                   1 / 3]),
-         np.array([0,
-                   0,
-                   0.5,
-                   0,
-                   0.5])),
-        (np.array([1 / 3,
-                   0,
-                   1 / 3,
-                   0,
-                   1 / 3]),
-         np.array([0.5,
-                   0,
-                   0,
-                   0,
-                   0.5])),
-        (np.array([1 / 3,
-                   0,
-                   1 / 3,
-                   0,
-                   1 / 3]),
-         np.array([0.5,
-                   0,
-                   0.5,
-                   0,
-                   0]))
+            np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+            np.array([1 / 3, 0, 1 / 3, 0, 1 / 3])),
+        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]), np.array([0, 0, 0.5, 0, 0.5])),
+        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]), np.array([0.5, 0, 0, 0, 0.5])),
+        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]), np.array([0.5, 0, 0.5, 0, 0]))
     ]
     self.assertEqual(len(actual), len(expected))
     for (a_key, a_sample), (e_key, e_sample) in zip(actual, expected):
@@ -314,18 +276,9 @@ class EmbedAutoEncoderTest(EmbeddingTestCase):
       self.assertArrayAlmostEqual(a_sample, e_sample)
 
   def test_auto_encoder_sample_one(self):
-    actual = ae._auto_encoder_sample(0, csr_matrix([0, 0, 1, 0, 0]))
+    actual = ae._auto_encoder_sample(0, csr_matrix([0, 0, 1, 0, 0]), 1)
     expected = [
-        (np.array([0,
-                   0,
-                   1,
-                   0,
-                   0]),
-         np.array([0,
-                   0,
-                   1,
-                   0,
-                   0])),
+        (np.array([0, 0, 1, 0, 0]), np.array([0, 0, 1, 0, 0])),
     ]
     self.assertEqual(len(actual), len(expected))
     for (a_key, a_sample), (e_key, e_sample) in zip(actual, expected):

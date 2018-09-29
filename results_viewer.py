@@ -53,10 +53,7 @@ def ParseArgs():
       help="Number of embeddings to represent in picture.",
       default=1000)
   parser.add_argument(
-      "protos",
-      type=str,
-      help="Path to the results proto buffer",
-      nargs="+")
+      "protos", type=str, help="Path to the results proto buffer", nargs="+")
   return parser.parse_args()
 
 
@@ -156,7 +153,8 @@ def PrintPicture(result, path, num_samples):
 
   def project_2d_samples(idx2emb):
     raw = np.zeros((num_samples, result.embedding.dim), dtype=np.float16)
-    for row, idx in enumerate(sample(idx2emb.keys(), min(num_samples, len(idx2emb)))):
+    for row, idx in enumerate(sample(idx2emb.keys(), min(num_samples,
+                                                         len(idx2emb)))):
       raw[row, :] = idx2emb[idx].values
     U, _, _ = svd(raw, full_matrices=0, overwrite_a=True)
     return (U[:, 0], U[:, 1])
@@ -175,8 +173,7 @@ def PrintPicture(result, path, num_samples):
   plt.tight_layout()
   fig.suptitle(
       "{} {}:{}".format(
-          result.hypergraph.name,
-          result.embedding.method_name,
+          result.hypergraph.name, result.embedding.method_name,
           result.embedding.dim))
   fig.subplots_adjust(top=0.9)
   fig.savefig(path)
