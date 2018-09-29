@@ -3,7 +3,10 @@ from hypergraph_embedding import Hypergraph
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.hypergraph_util import *
 from hypergraph_embedding.embedding import *
+import hypergraph_embedding.auto_encoder as ae
+from hypergraph_embedding.auto_encoder import EmbedAutoEncoder
 import scipy as sp
+from scipy.sparse import csr_matrix
 import itertools
 from random import random, randint
 
@@ -238,3 +241,93 @@ class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
                                          epochs=1,
                                          disable_pbar=True)
     self.help_test_fuzz(embed)
+
+
+class EmbedAutoEncoderTest(EmbeddingTestCase):
+
+  def assertArrayAlmostEqual(self, actual, expected, tol=1e-5):
+    self.assertEqual(actual.shape, expected.shape)
+    self.assertTrue(np.max(np.abs(actual - expected)) < tol)
+
+  def matchSparseArrays(self, actual, expected):
+    actual_indexed = {tuple(a.nonzero()[1]): a for a in actual}
+    expected_indexed = {tuple(e.nonzero()[1]): e for e in expected}
+    self.assertEqual(actual_indexed.keys(), expected_indexed.keys())
+    for key in actual_indexed:
+      self.assertArrayAlmostEqual(actual_indexed[key], expected_indexed[key])
+
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedAutoEncoder(_input, dim, disable_pbar=True)
+    self.checkEmbedding(actual, _input, dim)
+    self.assertEqual(actual.method_name, "AutoEncoder")
+
+  def test_auto_encoder_sample(self):
+    actual = ae._auto_encoder_sample(0, csr_matrix([1, 0, 1, 0, 1]))
+    expected = [
+        (
+            np.array([1 / 3,
+                      0,
+                      1 / 3,
+                      0,
+                      1 / 3]),
+            np.array([1 / 3,
+                      0,
+                      1 / 3,
+                      0,
+                      1 / 3])),
+        (np.array([1 / 3,
+                   0,
+                   1 / 3,
+                   0,
+                   1 / 3]),
+         np.array([0,
+                   0,
+                   0.5,
+                   0,
+                   0.5])),
+        (np.array([1 / 3,
+                   0,
+                   1 / 3,
+                   0,
+                   1 / 3]),
+         np.array([0.5,
+                   0,
+                   0,
+                   0,
+                   0.5])),
+        (np.array([1 / 3,
+                   0,
+                   1 / 3,
+                   0,
+                   1 / 3]),
+         np.array([0.5,
+                   0,
+                   0.5,
+                   0,
+                   0]))
+    ]
+    self.assertEqual(len(actual), len(expected))
+    for (a_key, a_sample), (e_key, e_sample) in zip(actual, expected):
+      self.assertArrayAlmostEqual(a_key, e_key)
+      self.assertArrayAlmostEqual(a_sample, e_sample)
+
+  def test_auto_encoder_sample_one(self):
+    actual = ae._auto_encoder_sample(0, csr_matrix([0, 0, 1, 0, 0]))
+    expected = [
+        (np.array([0,
+                   0,
+                   1,
+                   0,
+                   0]),
+         np.array([0,
+                   0,
+                   1,
+                   0,
+                   0])),
+    ]
+    self.assertEqual(len(actual), len(expected))
+    for (a_key, a_sample), (e_key, e_sample) in zip(actual, expected):
+      self.assertArrayAlmostEqual(a_key, e_key)
+      self.assertArrayAlmostEqual(a_sample, e_sample)

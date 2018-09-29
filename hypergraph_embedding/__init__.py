@@ -12,6 +12,7 @@ from hypergraph_embedding.embedding import *
 from hypergraph_embedding.evaluation_util import *
 from hypergraph_embedding.hg2v_model import *
 from hypergraph_embedding.hg2v_sample import *
+from hypergraph_embedding.auto_encoder import *
 
 __all__ = [
     # proto
