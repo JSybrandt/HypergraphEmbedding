@@ -247,11 +247,17 @@ class EmbedAutoEncoderTest(EmbeddingTestCase):
     self.assertTrue(np.max(np.abs(actual - expected)) < tol)
 
   def matchSparseArrays(self, actual, expected):
-    actual_indexed = {tuple(a.nonzero()[1]): a for a in actual}
-    expected_indexed = {tuple(e.nonzero()[1]): e for e in expected}
+    actual_indexed = {tuple(a.nonzero()[0]): a for a in actual}
+    expected_indexed = {tuple(e.nonzero()[0]): e for e in expected}
     self.assertEqual(actual_indexed.keys(), expected_indexed.keys())
     for key in actual_indexed:
       self.assertArrayAlmostEqual(actual_indexed[key], expected_indexed[key])
+
+  def assertArraysEqual(self, actual, expected):
+    self.assertEqual(len(actual), len(expected))
+    for a, e in zip(actual, expected):
+      self.assertArrayAlmostEqual(a, e)
+
 
   def test_typical(self):
     dim = 2
@@ -261,31 +267,27 @@ class EmbedAutoEncoderTest(EmbeddingTestCase):
     self.assertEqual(actual.method_name, "AutoEncoder")
 
   def test_auto_encoder_sample(self):
-    actual = ae._auto_encoder_sample(0, csr_matrix([1, 0, 1, 0, 1]), 100)
-    expected = [
-        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-         np.array([1 / 3, 0, 1 / 3, 0, 1 / 3])),
-
-        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-         np.array([0, 0, 0.5, 0, 0.5])),
-
-        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-         np.array([0.5, 0, 0, 0, 0.5])),
-
-        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-         np.array([0.5, 0, 0.5, 0, 0]))
+    ac_original, ac_perturbed = ae._auto_encoder_sample(0, csr_matrix([1, 0, 1, 0, 1]), 100)
+    ex_original = [
+      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3])
     ]
-    self.assertEqual(len(actual), len(expected))
-    for (a_key, a_sample), (e_key, e_sample) in zip(actual, expected):
-      self.assertArrayAlmostEqual(a_key, e_key)
-      self.assertArrayAlmostEqual(a_sample, e_sample)
+    ex_perturbed = [
+      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+      np.array([0, 0, 0.5, 0, 0.5]),
+      np.array([0.5, 0, 0, 0, 0.5]),
+      np.array([0.5, 0, 0.5, 0, 0])
+    ]
+
+    self.assertArraysEqual(ac_original, ex_original)
+    self.matchSparseArrays(ac_perturbed, ex_perturbed)
 
   def test_auto_encoder_sample_one(self):
-    actual = ae._auto_encoder_sample(0, csr_matrix([0, 0, 1, 0, 0]), 1)
-    expected = [
-        (np.array([0, 0, 1, 0, 0]), np.array([0, 0, 1, 0, 0])),
+    ac_original, ac_perturbed = ae._auto_encoder_sample(0, csr_matrix([0, 0, 1, 0, 0]), 1)
+    ex_original = ex_perturbed = [
+      np.array([0, 0, 1, 0, 0])
     ]
-    self.assertEqual(len(actual), len(expected))
-    for (a_key, a_sample), (e_key, e_sample) in zip(actual, expected):
-      self.assertArrayAlmostEqual(a_key, e_key)
-      self.assertArrayAlmostEqual(a_sample, e_sample)
+    self.assertArraysEqual(ac_original, ex_original)
+    self.matchSparseArrays(ac_perturbed, ex_perturbed)
