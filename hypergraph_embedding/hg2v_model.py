@@ -18,6 +18,8 @@ log = logging.getLogger()
 
 def KerasModelToEmbedding(hypergraph,
                           model,
+                          node_map,
+                          edge_map,
                           node_layer_name="node_embedding",
                           edge_layer_name="edge_embedding"):
   "Given a trained model, extract embedding weights into proto"
@@ -28,9 +30,9 @@ def KerasModelToEmbedding(hypergraph,
   embedding.dim = len(node_weights[0])
 
   for node_idx in hypergraph.node:
-    embedding.node[node_idx].values.extend(node_weights[node_idx + 1])
+    embedding.node[node_map[node_idx]].values.extend(node_weights[node_idx + 1])
   for edge_idx in hypergraph.edge:
-    embedding.edge[edge_idx].values.extend(edge_weights[edge_idx + 1])
+    embedding.edge[edge_map[edge_idx]].values.extend(edge_weights[edge_idx + 1])
   return embedding
 
 

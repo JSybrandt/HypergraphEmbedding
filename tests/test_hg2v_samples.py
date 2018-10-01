@@ -4,7 +4,7 @@ import unittest
 from hypergraph_embedding.hg2v_sample import SimilarityRecord
 from hypergraph_embedding.hg2v_sample import SamplesToModelInput
 from hypergraph_embedding.hg2v_sample import SparseWeightedJaccard
-from hypergraph_embedding.hg2v_sample import SameTypeSample
+from hypergraph_embedding.hg2v_sample import SameTypeJaccardSample
 from hypergraph_embedding.hg2v_sample import CentroidFromRows
 from scipy.sparse import csr_matrix
 import numpy as np
@@ -251,9 +251,9 @@ class SameTypeSampleTest(SampleTest):
     ])
     is_edge = False
     actual = [
-        SameTypeSample((idx, 1), idx2features, is_edge),
-        SameTypeSample((idx, 2), idx2features, is_edge),
-        SameTypeSample((idx, 3), idx2features, is_edge)
+        SameTypeJaccardSample((idx, 1), idx2features, is_edge),
+        SameTypeJaccardSample((idx, 2), idx2features, is_edge),
+        SameTypeJaccardSample((idx, 3), idx2features, is_edge)
     ]
     expected = [
         SimilarityRecord(left_node_idx=idx, right_node_idx=1, node_node_prob=1),
@@ -273,8 +273,8 @@ class SameTypeSampleTest(SampleTest):
     ])
     is_edge = True
     actual = [
-        SameTypeSample((idx, 1), idx2features, is_edge),
-        SameTypeSample((idx, 2), idx2features, is_edge)
+        SameTypeJaccardSample((idx, 1), idx2features, is_edge),
+        SameTypeJaccardSample((idx, 2), idx2features, is_edge)
     ]
     expected = [
         SimilarityRecord(left_edge_idx=idx, right_edge_idx=1, edge_edge_prob=1),
