@@ -217,3 +217,44 @@ def CompressRange(original_hg):
   inv_edge_map = {y: x for x, y in edge_map.items()}
 
   return compressed_hg, inv_node_map, inv_edge_map
+
+
+def ToBlockDiagonal(original_hg):
+  """
+  Given a hypergraph, reorder its node/edge idx to form a block diagonal
+  matrix. Computed using BFS. Returns the inverse node/edge maps to later
+  restore to the original HG.
+  """
+
+  node_map = {}
+  edge_map = {}
+
+  bipartide = ToBipartideNxGraph(original_hg)
+
+  max_node_idx = max(original_hg.node)
+
+  def bip_idx_is_node(idx):
+    return idx <= max_node_idx
+
+  def bip_idx_to_hg_idx(bip_idx):
+    if bip_idx_is_node(bip_idx):
+      return bip_idx
+    else:
+      return bip_idx - max_node_idx - 1
+
+  seen_bips = set()
+  for root_bip_idx in bipartide.nodes():
+    if seen_bips not in seen_bips:
+      for bip in nx.bfs_tree(bipartide, root_bip_idx):
+        if bip not in seen_bips:
+          seen_bips.add(bip)
+          if bip_idx_is_node(bip):
+            tmp = node_map
+          else:
+            tmp = edge_map
+          tmp[bip_idx_to_hg_idx(bip)] = len(tmp)
+
+  inv_node_map = {y: x for x, y in node_map.items()}
+  inv_edge_map = {y: x for x, y in edge_map.items()}
+  new_hg = Relabel(original_hg, node_map, edge_map)
+  return new_hg, inv_node_map, inv_edge_map

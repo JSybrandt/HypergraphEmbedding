@@ -5,3 +5,4 @@ __pycache__/
 *_pb2.py
 *.pb
 experiment/
+*.png

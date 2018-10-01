@@ -369,6 +369,35 @@ class RelabelAndCompressionTest(unittest.TestCase):
       self.assertEqual(len(compressed.edge), max(compressed.edge) + 1)
       self.assertEqual(len(compressed.edge), len(original.edge))
 
+class ToBlockDiagonalTest(unittest.TestCase):
+  def test_typical(self):
+    original = Hypergraph()
+    AddNodeToEdge(original, 100, 50)
+    AddNodeToEdge(original, 200, 50)
+    AddNodeToEdge(original, 200, 150)
+
+    compressed, node_map, edge_map = ToBlockDiagonal(original)
+    self.assertEqual(len(compressed.node), max(compressed.node) + 1)
+    self.assertEqual(len(compressed.node), len(original.node))
+    self.assertEqual(len(compressed.edge), max(compressed.edge) + 1)
+    self.assertEqual(len(compressed.edge), len(original.edge))
+
+    restored = Relabel(compressed, node_map, edge_map)
+    SparseArrayEquals(self, ToCsrMatrix(original), ToCsrMatrix(restored))
+
+  def test_fuzz(self):
+    for _ in range(10):
+      original = CreateRandomHyperGraph(100, 100, 0.01)
+      compressed, node_map, edge_map = ToBlockDiagonal(original)
+      self.assertEqual(len(compressed.node), max(compressed.node) + 1)
+      self.assertEqual(len(compressed.node), len(original.node))
+      self.assertEqual(len(compressed.edge), max(compressed.edge) + 1)
+      self.assertEqual(len(compressed.edge), len(original.edge))
+
+      restored = Relabel(compressed, node_map, edge_map)
+      SparseArrayEquals(self, ToCsrMatrix(original), ToCsrMatrix(restored))
+
+
 
 if __name__ == "__main__":
   unittest.main()
