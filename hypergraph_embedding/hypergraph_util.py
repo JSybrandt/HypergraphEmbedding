@@ -1,7 +1,7 @@
 # This file contains functions for generating and manipulating the Hypergraph
 # proto message.
 
-from . import hypergraph_pb2 as pb
+from .hypergraph_pb2 import Hypergraph
 import numpy as np
 import scipy as sp
 import networkx as nx
@@ -49,7 +49,7 @@ def CreateRandomHyperGraph(num_nodes, num_edges, probability):
   assert probability >= 0
   assert num_edges >= 0
   assert num_nodes >= 0
-  result = pb.Hypergraph()
+  result = Hypergraph()
   for i in range(num_nodes):
     for j in range(num_edges):
       if random() < probability:
@@ -63,7 +63,7 @@ def FromSparseMatrix(sparse_matrix):
     represents a node, each column represents an edge. A 1 in row i and
     column j represents that node i belongs to edge j.
     """
-  res = pb.Hypergraph()
+  res = Hypergraph()
   rows, cols = sparse_matrix.nonzero()
   for r, c in zip(rows, cols):
     AddNodeToEdge(res, r, c)
@@ -175,3 +175,43 @@ def ToCliqueNxGraph(hypergraph):
     for i, j in itertools.combinations(edge.nodes, 2):
       result.add_edge(i, j)
   return result
+
+def Relabel(original_hg, node_map, edge_map):
+  """
+  Given a hypergraph and optional maps of nodes/edges. Create a new hypergraph
+  where nodes/edges have been relabeled.
+  """
+
+  relabed_hg = Hypergraph()
+  for node_idx, node in original_hg.node.items():
+    for edge_idx in node.edges:
+      assert node_idx in node_map
+      assert edge_idx in edge_map
+      AddNodeToEdge(relabed_hg, node_map[node_idx], edge_map[edge_idx])
+
+  return relabed_hg
+
+def CompressRange(original_hg):
+  """
+  Given a hypergraph, produce a new object where all nodes / edges have been
+  moved into the 0-n range. Additionally produces the node/edge map to restore
+  the original.
+  """
+
+  compressed_hg = Hypergraph()
+
+  node_map = {}
+  edge_map = {}
+
+  for node_idx, node in original_hg.node.items():
+    if node_idx not in node_map:
+      node_map[node_idx] = len(node_map)
+    for edge_idx in node.edges:
+      if edge_idx not in edge_map:
+        edge_map[edge_idx] = len(edge_map)
+      AddNodeToEdge(compressed_hg, node_map[node_idx], edge_map[edge_idx])
+
+  inv_node_map = {y: x for x, y in node_map.items()}
+  inv_edge_map = {y: x for x, y in edge_map.items()}
+
+  return compressed_hg, inv_node_map, inv_edge_map

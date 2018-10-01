@@ -263,12 +263,17 @@ class EmbedAutoEncoderTest(EmbeddingTestCase):
   def test_auto_encoder_sample(self):
     actual = ae._auto_encoder_sample(0, csr_matrix([1, 0, 1, 0, 1]), 100)
     expected = [
-        (
-            np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-            np.array([1 / 3, 0, 1 / 3, 0, 1 / 3])),
-        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]), np.array([0, 0, 0.5, 0, 0.5])),
-        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]), np.array([0.5, 0, 0, 0, 0.5])),
-        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]), np.array([0.5, 0, 0.5, 0, 0]))
+        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+         np.array([1 / 3, 0, 1 / 3, 0, 1 / 3])),
+
+        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+         np.array([0, 0, 0.5, 0, 0.5])),
+
+        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+         np.array([0.5, 0, 0, 0, 0.5])),
+
+        (np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+         np.array([0.5, 0, 0.5, 0, 0]))
     ]
     self.assertEqual(len(actual), len(expected))
     for (a_key, a_sample), (e_key, e_sample) in zip(actual, expected):

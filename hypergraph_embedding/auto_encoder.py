@@ -10,6 +10,7 @@ from keras.models import Model
 from . import HypergraphEmbedding
 from .hypergraph_util import ToCsrMatrix
 from .hypergraph_util import ToEdgeCsrMatrix
+from .hypergraph_util import CompressRange
 import logging
 from tqdm import tqdm
 import numpy as np
@@ -91,20 +92,23 @@ def EmbedAutoEncoder(
     disable_pbar=False):
   workers = multiprocessing.cpu_count() if run_in_parallel else 1
 
+  log.info("Compressing index space")
+  compressed, inv_node_map, inv_edge_map = CompressRange(hypergraph)
+
   embedding = HypergraphEmbedding()
   embedding.dim = dimension
   embedding.method_name = "AutoEncoder"
 
   log.info("Collecting node samples for auto encoder")
   for node_idx, emb in _get_auto_encoder_embeddings(
-      ToCsrMatrix(hypergraph), dimension, hypergraph.node, epochs,
+      ToCsrMatrix(compressed), dimension, compressed.node, epochs,
       idx_per_batch, num_samples, disable_pbar):
-    embedding.node[node_idx].values.extend(emb)
+    embedding.node[inv_node_map[node_idx]].values.extend(emb)
 
   log.info("Collecting edge samples for auto encoder")
   for edge_idx, emb in _get_auto_encoder_embeddings(
-      ToEdgeCsrMatrix(hypergraph), dimension, hypergraph.edge, epochs,
+      ToEdgeCsrMatrix(compressed), dimension, compressed.edge, epochs,
       idx_per_batch, num_samples, disable_pbar):
-    embedding.edge[edge_idx].values.extend(emb)
+    embedding.edge[inv_edge_map[edge_idx]].values.extend(emb)
 
   return embedding
