@@ -49,19 +49,18 @@ class TestRemoveRandomConnections(unittest.TestCase):
     self.assertEqual(len(node2edge), 0)
 
   def test_remove_all(self):
+    "shouldn't be able to remove all"
     _input = Hypergraph()
     AddNodeToEdge(_input, 0, 0)
     AddNodeToEdge(_input, 0, 1)
     AddNodeToEdge(_input, 1, 1)
     actual_hg, removed_list = RemoveRandomConnections(_input, 1)
-    self.assertEqual(actual_hg, Hypergraph())
+    self.assertTrue(0 in actual_hg.node)
+    self.assertTrue(1 in actual_hg.node)
+    self.assertTrue(0 in actual_hg.edge)
+    self.assertTrue(1 in actual_hg.edge)
     # better not remove the original
     self.assertNotEqual(actual_hg, _input)
-    self.assertEqual(set(removed_list), set([
-        (0, 0),
-        (0, 1),
-        (1, 1),
-    ]))
 
   def test_remove_none(self):
     _input = Hypergraph()
@@ -228,11 +227,7 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
     "per edge"
     hypergraph, embedding = self.DummySetup()
     actual = GetPersonalizedClassifiers(
-        hypergraph,
-        embedding,
-        per_edge=True,
-        run_in_parallel=False,
-        disable_pbar=True)
+        hypergraph, embedding, per_edge=True, disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.edge))
     for edge_idx in hypergraph.edge:
       self.assertTrue(edge_idx in actual)
@@ -243,11 +238,7 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
     "per edge"
     hypergraph, embedding = self.DummySetup()
     actual = GetPersonalizedClassifiers(
-        hypergraph,
-        embedding,
-        per_edge=False,
-        run_in_parallel=False,
-        disable_pbar=True)
+        hypergraph, embedding, per_edge=False, disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.node))
     for node_idx in hypergraph.node:
       self.assertTrue(node_idx in actual)
@@ -266,11 +257,7 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
     embedding.edge[1].values.extend([0, 1])
 
     actual = GetPersonalizedClassifiers(
-        hypergraph,
-        embedding,
-        per_edge=True,
-        run_in_parallel=False,
-        disable_pbar=True)
+        hypergraph, embedding, per_edge=True, disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.edge))
     for edge_idx in hypergraph.edge:
       self.assertTrue(edge_idx in actual)
@@ -290,11 +277,7 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
     embedding.edge[1].values.extend([0, 1])
 
     actual = GetPersonalizedClassifiers(
-        hypergraph,
-        embedding,
-        per_edge=True,
-        run_in_parallel=False,
-        disable_pbar=True)
+        hypergraph, embedding, per_edge=True, disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.edge))
     for edge_idx in hypergraph.edge:
       self.assertTrue(edge_idx in actual)
@@ -310,11 +293,7 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
     embedding.node[1].values.extend([1, 0])
 
     actual = GetPersonalizedClassifiers(
-        hypergraph,
-        embedding,
-        per_edge=True,
-        run_in_parallel=False,
-        disable_pbar=True)
+        hypergraph, embedding, per_edge=True, disable_pbar=True)
     self.assertEqual(len(actual), len(hypergraph.edge))
     for edge_idx in hypergraph.edge:
       self.assertTrue(edge_idx in actual)
@@ -323,11 +302,7 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
   def test_actually_predicts(self):
     hypergraph, embedding = self.DummySetup()
     actual = GetPersonalizedClassifiers(
-        hypergraph,
-        embedding,
-        per_edge=True,
-        run_in_parallel=False,
-        disable_pbar=True)
+        hypergraph, embedding, per_edge=True, disable_pbar=True)
     # I don't care what it predicts, just don't mess up
     self.assertTrue(actual[1].predict([[0, 1]]) >= 0)
 

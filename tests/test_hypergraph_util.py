@@ -24,6 +24,18 @@ def SparseArrayEquals(test, actual, expected):
 
 class HypergraphUtilTest(unittest.TestCase):
 
+  def test_RemoveNodeFromEdge_typical(self):
+    actual = Hypergraph()
+    AddNodeToEdge(actual, 1, 2)
+    AddNodeToEdge(actual, 1, 3)
+
+    RemoveNodeFromEdge(actual, 1, 3)
+
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 1, 2)
+
+    self.assertEqual(actual, expected)
+
   def test_AddNodeToEdge_typical(self):
     "Adds both the node and the edge reference"
     actual = Hypergraph()

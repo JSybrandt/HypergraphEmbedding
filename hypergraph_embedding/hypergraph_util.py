@@ -10,34 +10,52 @@ import itertools
 import logging
 
 
-def AddNodeToEdge(hypergraph, node_id, edge_id, node_name=None, edge_name=None):
+def AddNodeToEdge(hypergraph,
+                  node_idx,
+                  edge_idx,
+                  node_name=None,
+                  edge_name=None):
   """
     Modifies hypergraph by setting a connection from given node to given edge.
     If node/edge name are supplied.
     """
-  assert node_id >= 0
-  assert edge_id >= 0
+  assert node_idx >= 0
+  assert edge_idx >= 0
 
-  node = hypergraph.node[node_id]
-  edge = hypergraph.edge[edge_id]
+  node = hypergraph.node[node_idx]
+  edge = hypergraph.edge[edge_idx]
 
-  if edge_id not in node.edges:
-    node.edges.append(edge_id)
-  if node_id not in edge.nodes:
-    edge.nodes.append(node_id)
+  if edge_idx not in node.edges:
+    node.edges.append(edge_idx)
+  if node_idx not in edge.nodes:
+    edge.nodes.append(node_idx)
   if node_name is not None:
     if node.HasField("name") and node.name != node_name:
       logging.getLogger().warning(
           "Overwriting Node #{} name from {} to {}".format(
-              node_id, node.name, node_name))
+              node_idx, node.name, node_name))
     node.name = node_name
   if edge_name is not None:
     if edge.HasField("name") and edge.name != edge_name:
       logging.getLogger().warning(
           "Overwriting Edge #{} name from {} to {}".format(
-              edge_id, edge.name, edge_name))
+              edge_idx, edge.name, edge_name))
     edge.name = edge_name
   return hypergraph
+
+
+def RemoveNodeFromEdge(hypergraph, node_idx, edge_idx):
+  assert node_idx in hypergraph.node
+  assert edge_idx in hypergraph.node[node_idx].edges
+  assert edge_idx in hypergraph.edge
+  assert node_idx in hypergraph.edge[edge_idx].nodes
+
+  hypergraph.node[node_idx].edges.remove(edge_idx)
+  hypergraph.edge[edge_idx].nodes.remove(node_idx)
+  if len(hypergraph.node[node_idx].edges) == 0:
+    hypergraph.node.pop(node_idx)
+  if len(hypergraph.edge[edge_idx].nodes) == 0:
+    hypergraph.edge.pop(edge_idx)
 
 
 def CreateRandomHyperGraph(num_nodes, num_edges, probability):

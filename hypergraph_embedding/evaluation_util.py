@@ -11,14 +11,15 @@ import multiprocessing
 from multiprocessing import Pool, Manager
 from sklearn.utils import shuffle
 from scipy.spatial.distance import cosine
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 from tqdm import tqdm
-from random import random, choice, sample
+import random
 import warnings
 
 import keras
 from keras.models import Model
 from keras.layers import Input, Dense
+from keras.callbacks import EarlyStopping
 
 log = logging.getLogger()
 
@@ -116,6 +117,7 @@ def RemoveRandomConnections(original_hypergraph, probability):
   """
     This function creates a new hypergraph where each node-edge with randomly
     sampled nodes removed from communities.
+    Does not delete a whole node or edge
     input:
       - hypergraph proto object
       - number between 0 and 1
@@ -130,19 +132,27 @@ def RemoveRandomConnections(original_hypergraph, probability):
   removed_connections = []
 
   new_hg = Hypergraph()
-  if original_hypergraph.HasField("name"):
-    new_hg.name = original_hypergraph.name
+  new_hg.CopyFrom(original_hypergraph)
+
+  node_edges = []
   for node_idx, node in original_hypergraph.node.items():
     for edge_idx in node.edges:
-      edge = original_hypergraph.edge[edge_idx]
+      node_edges.append((node_idx, edge_idx))
 
-      # If we are going to drop this connection
-      if random() < probability and probability > 0:
-        removed_connections.append((node_idx, edge_idx))
-      else:
-        AddNodeToEdge(new_hg, node_idx, edge_idx,
-                      node.name if node.HasField("name") else None,
-                      edge.name if edge.HasField("name") else None)
+  random.shuffle(node_edges)
+
+  for node_idx, edge_idx in node_edges:
+    if len(new_hg.node[node_idx].edges) == 1:
+      # If there is only one last connection to this node
+      continue
+    if len(new_hg.edge[edge_idx].nodes) == 1:
+      # If there is only one last connection to this edge
+      continue
+
+    if random.random() < probability and probability > 0:
+      RemoveNodeFromEdge(new_hg, node_idx, edge_idx)
+      removed_connections.append((node_idx, edge_idx))
+
   return new_hg, removed_connections
 
 
@@ -169,8 +179,8 @@ def SampleMissingConnections(hypergraph, num_samples):
   num_tries_till_failure = 10 * num_samples
   while len(samples) < num_samples and num_tries_till_failure:
     num_tries_till_failure -= 1
-    node_idx = choice(nodes)
-    edge_idx = choice(edges)
+    node_idx = random.choice(nodes)
+    edge_idx = random.choice(edges)
     if edge_idx not in hypergraph.node[node_idx].edges:
       samples.add((node_idx, edge_idx))
 
@@ -355,7 +365,9 @@ def _train_personalized_classifier(idx,
     return (idx, LetEverythingIn())
 
   # sample negative results to equal positive
-  neg_indices = sample(neg_indices, min(len(neg_indices), len(pos_indices)))
+  neg_indices = random.sample(neg_indices,
+                              min(len(neg_indices),
+                                  len(pos_indices) * 2))
 
   assert len(pos_indices) > 0
   assert len(neg_indices) > 0
@@ -369,14 +381,13 @@ def _train_personalized_classifier(idx,
     samples.append(neighbor_idx2embedding[neigh_idx].values)
     labels.append(0)
   samples, labels = shuffle(samples, labels)
-  return (idx, LinearSVC().fit(samples, labels))
+  return (idx, SVC(C=1, gamma=0.1).fit(samples, labels))
 
 
 def GetPersonalizedClassifiers(hypergraph,
                                embedding,
                                per_edge=True,
                                idx_subset=None,
-                               run_in_parallel=True,
                                disable_pbar=False):
   """
   Returns a dict from idx-classifier.
@@ -385,8 +396,6 @@ def GetPersonalizedClassifiers(hypergraph,
   |nodes| classifiers mapping edge embedding to boolean.
   Outputs a dict from idx to classifier.
   """
-
-  num_cores = multiprocessing.cpu_count() if run_in_parallel else 1
 
   if per_edge:
     idx2neighbors = {idx: edge.nodes for idx, edge in hypergraph.edge.items()}
@@ -401,21 +410,10 @@ def GetPersonalizedClassifiers(hypergraph,
   else:
     log.info("Subset provided with %i entires", len(idx_subset))
 
-  if run_in_parallel:
-    with Pool(
-        num_cores,
-        initializer=_init_train_personalized_classifier,
-        initargs=(idx2neighbors, neighbor_idx2embedding)) as pool:
-      with tqdm(total=len(idx_subset), disable=disable_pbar) as pbar:
-        for idx, classifier in pool.imap(_train_personalized_classifier,
-                                         idx_subset):
-          result[idx] = classifier
-          pbar.update(1)
-  else:  # we want a different impl for serial run, the parallel can cause oom errors
-    for idx in tqdm(idx_subset, disable=disable_pbar):
-      _, classifier = _train_personalized_classifier(idx, idx2neighbors,
-                                                     neighbor_idx2embedding)
-      result[idx] = classifier
+  for idx in tqdm(idx_subset, disable=disable_pbar):
+    _, classifier = _train_personalized_classifier(idx, idx2neighbors,
+                                                   neighbor_idx2embedding)
+    result[idx] = classifier
 
   return result
 
@@ -457,7 +455,6 @@ def PersonalizedClassifierPrediction(hypergraph,
       embedding,
       per_edge=per_edge,
       idx_subset=nessesary_classifiers,
-      run_in_parallel=run_in_parallel,
       disable_pbar=disable_pbar)
   log.info("Mapping %s to embeddings", "nodes" if per_edge else "edges")
   if per_edge:
@@ -508,11 +505,11 @@ def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding, disable_pbar):
   Returns a classifier trained to predict node-edge connections biased
   on the provided hypergraph and embedding.
   Output:
-    - A model that impliments a `predict` method, mapping
+    - A model that implements a `predict` method, mapping
       [node_embedding edge_embedding] to 0 or 1
   """
 
-  log.info("Collecting postive training examples")
+  log.info("Collecting positive training examples")
   examples = []
   labels = []
   for vec in _NodeEdgeVectors(hypergraph, embedding):
@@ -534,11 +531,13 @@ def _TrainNodeEdgeEmbeddingClassifier(hypergraph, embedding, disable_pbar):
   out = Dense(1, activation="sigmoid")(hidden)
   model = Model(inputs=[input_emb], outputs=[out])
   model.compile(optimizer="adagrad", loss="mean_squared_error")
+  stopper = EarlyStopping(monitor="loss", min_delta=1e-3)
   model.fit(
       examples,
       labels,
-      batch_size=100,
-      epochs=20,
+      batch_size=256,
+      epochs=30,
+      callbacks=[stopper],
       verbose=0 if disable_pbar else 1)
   return model
 
