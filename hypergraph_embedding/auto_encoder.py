@@ -37,9 +37,8 @@ def _auto_encoder_sample(row_idx, matrix, num_samples):
   return original_samples, perturbed_samples
 
 
-def _get_auto_encoder_embeddings(
-    matrix, dimension, important_indices, epochs, idx_per_batch,
-    samples_per_idx, disable_pbar):
+def _get_auto_encoder_embeddings(matrix, dimension, important_indices, epochs,
+                                 idx_per_batch, samples_per_idx, disable_pbar):
   log.info("Constructing model")
   sample_size = matrix.shape[1]
   perturbed_input_layer = Input((sample_size,),
@@ -61,8 +60,11 @@ def _get_auto_encoder_embeddings(
   indices = np.array(important_indices)
   for epoch in range(epochs):
     log.info("Epoch %i / %i", epoch + 1, epochs)
-    for idx_batch in tqdm(np.array_split(np.random.permutation(indices), max(
-        1, int(len(important_indices) / idx_per_batch))), disable=disable_pbar):
+    for idx_batch in tqdm(
+        np.array_split(
+            np.random.permutation(indices),
+            max(1, int(len(important_indices) / idx_per_batch))),
+        disable=disable_pbar):
       originals = []
       perturbed = []
       for idx in idx_batch:
@@ -82,14 +84,13 @@ def _get_auto_encoder_embeddings(
   return [(idx, embeddings[row, :]) for row, idx in enumerate(indices)]
 
 
-def EmbedAutoEncoder(
-    hypergraph,
-    dimension,
-    num_samples=100,
-    epochs=5,
-    idx_per_batch=200,
-    run_in_parallel=True,
-    disable_pbar=False):
+def EmbedAutoEncoder(hypergraph,
+                     dimension,
+                     num_samples=100,
+                     epochs=5,
+                     idx_per_batch=200,
+                     run_in_parallel=True,
+                     disable_pbar=False):
   workers = multiprocessing.cpu_count() if run_in_parallel else 1
 
   log.info("Compressing index space")

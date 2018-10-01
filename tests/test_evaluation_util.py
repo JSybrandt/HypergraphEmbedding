@@ -122,8 +122,8 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
         (2, 1),  # bad prediction
         (2, 3),  # bad prediction
     ]
-    actual = CalculateCommunityPredictionMetrics(
-        predicted, good_links, bad_links)
+    actual = CalculateCommunityPredictionMetrics(predicted, good_links,
+                                                 bad_links)
 
     # accuracy = # good / all = (2 + 2) / 7
     self.assertTrue(isclose(actual.accuracy, 4 / 7, abs_tol=1e-4))
@@ -149,8 +149,8 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
     good_links = [(1, 2)  # missed
                  ]
     bad_links = [(2, 3)]
-    actual = CalculateCommunityPredictionMetrics(
-        predicted, good_links, bad_links)
+    actual = CalculateCommunityPredictionMetrics(predicted, good_links,
+                                                 bad_links)
     self.assertTrue(isclose(actual.accuracy, 0.5))
     # precision = # found / # guessed = NAN
     # SHOULD NOT CRASH
@@ -167,8 +167,8 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
     predicted = [(1, 2)]
     good_links = []
     bad_links = [(1, 2)]
-    actual = CalculateCommunityPredictionMetrics(
-        predicted, good_links, bad_links)
+    actual = CalculateCommunityPredictionMetrics(predicted, good_links,
+                                                 bad_links)
 
     self.assertTrue(actual.accuracy == 0)
     # recall = # found / # num to find = NAN
@@ -467,8 +467,8 @@ class AddPredictionRecordsTest(unittest.TestCase):
     bad_links = [(1, 0), (1, 1)]
     predicted_links = [(0, 0), (1, 1)]
 
-    actual = AddPredictionRecords(
-        EvaluationMetrics(), good_links, bad_links, predicted_links)
+    actual = AddPredictionRecords(EvaluationMetrics(), good_links, bad_links,
+                                  predicted_links)
     expected = ParseProto(
         """
       records {

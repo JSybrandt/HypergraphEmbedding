@@ -258,7 +258,6 @@ class EmbedAutoEncoderTest(EmbeddingTestCase):
     for a, e in zip(actual, expected):
       self.assertArrayAlmostEqual(a, e)
 
-
   def test_typical(self):
     dim = 2
     _input = TestHypergraph()
@@ -267,27 +266,27 @@ class EmbedAutoEncoderTest(EmbeddingTestCase):
     self.assertEqual(actual.method_name, "AutoEncoder")
 
   def test_auto_encoder_sample(self):
-    ac_original, ac_perturbed = ae._auto_encoder_sample(0, csr_matrix([1, 0, 1, 0, 1]), 100)
+    ac_original, ac_perturbed = ae._auto_encoder_sample(
+        0, csr_matrix([1, 0, 1, 0, 1]), 100)
     ex_original = [
-      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3])
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3])
     ]
     ex_perturbed = [
-      np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
-      np.array([0, 0, 0.5, 0, 0.5]),
-      np.array([0.5, 0, 0, 0, 0.5]),
-      np.array([0.5, 0, 0.5, 0, 0])
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+        np.array([0, 0, 0.5, 0, 0.5]),
+        np.array([0.5, 0, 0, 0, 0.5]),
+        np.array([0.5, 0, 0.5, 0, 0])
     ]
 
     self.assertArraysEqual(ac_original, ex_original)
     self.matchSparseArrays(ac_perturbed, ex_perturbed)
 
   def test_auto_encoder_sample_one(self):
-    ac_original, ac_perturbed = ae._auto_encoder_sample(0, csr_matrix([0, 0, 1, 0, 0]), 1)
-    ex_original = ex_perturbed = [
-      np.array([0, 0, 1, 0, 0])
-    ]
+    ac_original, ac_perturbed = ae._auto_encoder_sample(
+        0, csr_matrix([0, 0, 1, 0, 0]), 1)
+    ex_original = ex_perturbed = [np.array([0, 0, 1, 0, 0])]
     self.assertArraysEqual(ac_original, ex_original)
     self.matchSparseArrays(ac_perturbed, ex_perturbed)

@@ -228,9 +228,8 @@ class SampleTest(unittest.TestCase):
     "Attempts to match similarity records on keys"
 
     def key(rec):
-      return (
-          rec.left_node_idx, rec.left_edge_idx, rec.right_node_idx,
-          rec.right_edge_idx)
+      return (rec.left_node_idx, rec.left_edge_idx, rec.right_node_idx,
+              rec.right_edge_idx)
 
     keyed_a = {key(a): a for a in recs_a}
     keyed_b = {key(b): b for b in recs_b}

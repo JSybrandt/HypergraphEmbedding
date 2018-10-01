@@ -18,11 +18,10 @@ class TestAMinerUtil(unittest.TestCase):
     with open(DATA_PATH) as ifile:
       actual = [p for p in ParseAMiner(ifile)]
     expected = [
-        Paper(
-            "ArnetMiner: extraction and mining of academic social networks", [
-                "Jie Tang", "Jing Zhang", "Limin Yao", "Juanzi Li", "Li Zhang",
-                "Zhong Su"
-            ])
+        Paper("ArnetMiner: extraction and mining of academic social networks", [
+            "Jie Tang", "Jing Zhang", "Limin Yao", "Juanzi Li", "Li Zhang",
+            "Zhong Su"
+        ])
     ]
     self.assertEqual(actual, expected)
 

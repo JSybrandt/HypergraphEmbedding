@@ -323,7 +323,9 @@ class HypergraphUtilTest(unittest.TestCase):
 
     self.assertTrue(nx.is_isomorphic(actual, expected))
 
+
 class RelabelAndCompressionTest(unittest.TestCase):
+
   def test_typical(self):
     _input = Hypergraph()
     AddNodeToEdge(_input, 0, 1)
@@ -351,11 +353,10 @@ class RelabelAndCompressionTest(unittest.TestCase):
     compressed, node_map, edge_map = CompressRange(original)
     restored = Relabel(compressed, node_map, edge_map)
     SparseArrayEquals(self, ToCsrMatrix(original), ToCsrMatrix(restored))
-    self.assertEqual(len(compressed.node), max(compressed.node)+1)
+    self.assertEqual(len(compressed.node), max(compressed.node) + 1)
     self.assertEqual(len(compressed.node), len(original.node))
-    self.assertEqual(len(compressed.edge), max(compressed.edge)+1)
+    self.assertEqual(len(compressed.edge), max(compressed.edge) + 1)
     self.assertEqual(len(compressed.edge), len(original.edge))
-
 
   def test_compress_range_fuzz(self):
     for _ in range(10):
@@ -363,9 +364,9 @@ class RelabelAndCompressionTest(unittest.TestCase):
       compressed, node_map, edge_map = CompressRange(original)
       restored = Relabel(compressed, node_map, edge_map)
       SparseArrayEquals(self, ToCsrMatrix(original), ToCsrMatrix(restored))
-      self.assertEqual(len(compressed.node), max(compressed.node)+1)
+      self.assertEqual(len(compressed.node), max(compressed.node) + 1)
       self.assertEqual(len(compressed.node), len(original.node))
-      self.assertEqual(len(compressed.edge), max(compressed.edge)+1)
+      self.assertEqual(len(compressed.edge), max(compressed.edge) + 1)
       self.assertEqual(len(compressed.edge), len(original.edge))
 
 

@@ -51,9 +51,8 @@ def _update_alg_dist(a_idx, A2B=None, B2A=None, A2emb=None, B2emb=None):
   return a_idx, (a_emb + b_emb) / 2
 
 
-def _helper_update_embeddings(
-    hypergraph, node_embeddings, edge_embeddings, node2edges, edge2nodes,
-    workers, disable_pbar):
+def _helper_update_embeddings(hypergraph, node_embeddings, edge_embeddings,
+                              node2edges, edge2nodes, workers, disable_pbar):
   if not disable_pbar:
     log.info("Placing nodes with respect to edges")
   new_node_embeddings = np.copy(node_embeddings)
@@ -102,8 +101,10 @@ def _init_scale_alg_dist(embedding, min_embedding, delta_embedding):
   _shared_info["delta_embedding"] = delta_embedding
 
 
-def _scale_alg_dist(
-    idx, embedding=None, min_embedding=None, delta_embedding=None):
+def _scale_alg_dist(idx,
+                    embedding=None,
+                    min_embedding=None,
+                    delta_embedding=None):
   if embedding is None:
     embedding = _shared_info["embedding"]
   if min_embedding is None:
@@ -113,8 +114,8 @@ def _scale_alg_dist(
   return idx, (embedding[idx, :] - min_embedding) / delta_embedding
 
 
-def _helper_scale_embeddings(
-    hypergraph, node_embeddings, edge_embeddings, workers, disable_pbar):
+def _helper_scale_embeddings(hypergraph, node_embeddings, edge_embeddings,
+                             workers, disable_pbar):
   if not disable_pbar:
     log.info("Getting min-max embedding per dimension")
   min_edge_embedding = np.min(edge_embeddings, axis=0)
@@ -159,12 +160,11 @@ def _helper_scale_embeddings(
   return node_embeddings, edge_embeddings
 
 
-def EmbedAlgebraicDistance(
-    hypergraph,
-    dimension,
-    iterations=20,
-    run_in_parallel=True,
-    disable_pbar=False):
+def EmbedAlgebraicDistance(hypergraph,
+                           dimension,
+                           iterations=20,
+                           run_in_parallel=True,
+                           disable_pbar=False):
   workers = multiprocessing.cpu_count() if run_in_parallel else 1
 
   num_nodes = max(hypergraph.node) + 1

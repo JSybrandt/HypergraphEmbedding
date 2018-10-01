@@ -176,6 +176,7 @@ def ToCliqueNxGraph(hypergraph):
       result.add_edge(i, j)
   return result
 
+
 def Relabel(original_hg, node_map, edge_map):
   """
   Given a hypergraph and optional maps of nodes/edges. Create a new hypergraph
@@ -190,6 +191,7 @@ def Relabel(original_hg, node_map, edge_map):
       AddNodeToEdge(relabed_hg, node_map[node_idx], edge_map[edge_idx])
 
   return relabed_hg
+
 
 def CompressRange(original_hg):
   """

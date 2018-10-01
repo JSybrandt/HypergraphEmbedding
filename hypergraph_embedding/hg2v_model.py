@@ -16,11 +16,10 @@ from keras.models import Model
 log = logging.getLogger()
 
 
-def KerasModelToEmbedding(
-    hypergraph,
-    model,
-    node_layer_name="node_embedding",
-    edge_layer_name="edge_embedding"):
+def KerasModelToEmbedding(hypergraph,
+                          model,
+                          node_layer_name="node_embedding",
+                          edge_layer_name="edge_embedding"):
   "Given a trained model, extract embedding weights into proto"
   node_weights = model.get_layer(node_layer_name).get_weights()[0]
   edge_weights = model.get_layer(edge_layer_name).get_weights()[0]

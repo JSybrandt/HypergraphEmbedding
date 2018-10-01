@@ -23,9 +23,8 @@ def ParseArgs():
   parser.add_argument(
       "--log-level",
       type=str,
-      help=(
-          "Specifies level of logging verbosity. "
-          "Options: CRITICAL, ERROR, WARNING, INFO, DEBUG, NONE"),
+      help=("Specifies level of logging verbosity. "
+            "Options: CRITICAL, ERROR, WARNING, INFO, DEBUG, NONE"),
       default="INFO")
 
   # Raw data options (convert to hypergraph)
@@ -37,9 +36,8 @@ def ParseArgs():
   parser.add_argument(
       "--raw-data-format",
       type=str,
-      help=(
-          "Specifies how to parse the input file. "
-          "Options: " + " ".join([o for o in PARSING_OPTIONS])),
+      help=("Specifies how to parse the input file. "
+            "Options: " + " ".join([o for o in PARSING_OPTIONS])),
       default="SNAP")
   parser.add_argument(
       "--name",
@@ -56,15 +54,13 @@ def ParseArgs():
   parser.add_argument(
       "--embedding-method",
       type=str,
-      help=(
-          "Specifies the manner in which the provided hypergraph should be "
-          "embedded. Options: " + " ".join([o for o in EMBEDDING_OPTIONS])))
+      help=("Specifies the manner in which the provided hypergraph should be "
+            "embedded. Options: " + " ".join([o for o in EMBEDDING_OPTIONS])))
   parser.add_argument(
       "--embedding-dimension",
       type=int,
-      help=(
-          "Dimensonality of output embeddings. "
-          "Should be positive and less than #nodes and #edges."))
+      help=("Dimensonality of output embeddings. "
+            "Should be positive and less than #nodes and #edges."))
   parser.add_argument(
       "--embedding-debug-summary",
       type=str,
@@ -77,23 +73,20 @@ def ParseArgs():
   parser.add_argument(
       "--experiment",
       type=str,
-      help=(
-          "If set, perform an evaluation experiment on the hypergraph. "
-          "--experiment-result must also be set. "
-          "Options: " + " ".join([o for o in EXPERIMENT_OPTIONS])),
+      help=("If set, perform an evaluation experiment on the hypergraph. "
+            "--experiment-result must also be set. "
+            "Options: " + " ".join([o for o in EXPERIMENT_OPTIONS])),
       nargs="*")
   parser.add_argument(
       "--experiment-result",
       type=str,
-      help=(
-          "Path to store experiment data proto. If set --experiment "
-          "must also be set."))
+      help=("Path to store experiment data proto. If set --experiment "
+            "must also be set."))
   parser.add_argument(
       "--experiment-lp-probability",
       type=float,
-      help=(
-          "Used to determine the proportion of removed node-edge connections "
-          "for LP_* experiments"),
+      help=("Used to determine the proportion of removed node-edge connections "
+            "for LP_* experiments"),
       default=0.1)
 
   # Required hypergraph argument
@@ -200,9 +193,8 @@ if __name__ == "__main__":
       hypergraph = Hypergraph()
       hypergraph.ParseFromString(proto_file.read())
 
-  log.info(
-      "Hypergraph contains %i nodes and %i edges", len(hypergraph.node),
-      len(hypergraph.edge))
+  log.info("Hypergraph contains %i nodes and %i edges", len(hypergraph.node),
+           len(hypergraph.edge))
 
   if args.embedding:
     log.info("Writing an embedding for FULL input hypergraph")
