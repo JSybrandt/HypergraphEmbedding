@@ -14,38 +14,48 @@ class SamplesToModelInputTest(unittest.TestCase):
 
   def test_node_sim_unweighted(self):
     _input = SimilarityRecord(
-        left_node_idx=0,
-        right_node_idx=1,
-        node_node_prob=0.5)
+        left_node_idx=0, right_node_idx=1, node_node_prob=0.5)
     actual = SamplesToModelInput([_input], num_neighbors=2, weighted=False)
     # note, the node indices should be incremented
-    expected = ([[1],          # left_node_idx
-                 [0],          # left_edge_idx
-                 [2],          # right_node_idx
-                 [0],          # right_edge_idx
-                 [0], [0],     # neighbor_node_indices
-                 [0], [0]],    # neighbor_edge_indices
-                 [[0.5],       # node_node_prob
-                  [0],         # edge_edge_prob
-                  [0]])        # node_edge_prob
+    expected = (
+        [
+            [1],  # left_node_idx
+            [0],  # left_edge_idx
+            [2],  # right_node_idx
+            [0],  # right_edge_idx
+            [0],
+            [0],  # neighbor_node_indices
+            [0],
+            [0]
+        ],  # neighbor_edge_indices
+        [
+            [0.5],  # node_node_prob
+            [0],  # edge_edge_prob
+            [0]
+        ])  # node_edge_prob
     self.assertEqual(actual, expected)
 
   def test_edge_sim_unweighted(self):
     _input = SimilarityRecord(
-        left_edge_idx=0,
-        right_edge_idx=1,
-        edge_edge_prob=0.5)
+        left_edge_idx=0, right_edge_idx=1, edge_edge_prob=0.5)
     actual = SamplesToModelInput([_input], num_neighbors=2, weighted=False)
     # note, the node indices should be incremented
-    expected = ([[0],          # left_node_idx
-                 [1],          # left_edge_idx
-                 [0],          # right_node_idx
-                 [2],          # right_edge_idx
-                 [0], [0],     # neighbor_node_indices
-                 [0], [0]],    # neighbor_edge_indices
-                 [[0],         # node_node_prob
-                  [0.5],       # edge_edge_prob
-                  [0]])        # node_edge_prob
+    expected = (
+        [
+            [0],  # left_node_idx
+            [1],  # left_edge_idx
+            [0],  # right_node_idx
+            [2],  # right_edge_idx
+            [0],
+            [0],  # neighbor_node_indices
+            [0],
+            [0]
+        ],  # neighbor_edge_indices
+        [
+            [0],  # node_node_prob
+            [0.5],  # edge_edge_prob
+            [0]
+        ])  # node_edge_prob
     self.assertEqual(actual, expected)
 
   def test_edge_node_sim_unweighted(self):
@@ -53,20 +63,26 @@ class SamplesToModelInputTest(unittest.TestCase):
         left_node_idx=0,
         right_edge_idx=1,
         neighbor_node_indices=[2],
-        neighbor_edge_indices=[3,
-                               4],
+        neighbor_edge_indices=[3, 4],
         node_edge_prob=0.5)
     actual = SamplesToModelInput([_input], num_neighbors=2, weighted=False)
     # note, the node indices should be incremented
-    expected = ([[1],          # left_node_idx
-                 [0],          # left_edge_idx
-                 [0],          # right_node_idx
-                 [2],          # right_edge_idx
-                 [3], [0],     # neighbor_node_indices
-                 [4], [5]],    # neighbor_edge_indices
-                 [[0],         # node_node_prob
-                  [0],         # edge_edge_prob
-                  [0.5]])      # node_edge_prob
+    expected = (
+        [
+            [1],  # left_node_idx
+            [0],  # left_edge_idx
+            [0],  # right_node_idx
+            [2],  # right_edge_idx
+            [3],
+            [0],  # neighbor_node_indices
+            [4],
+            [5]
+        ],  # neighbor_edge_indices
+        [
+            [0],  # node_node_prob
+            [0],  # edge_edge_prob
+            [0.5]
+        ])  # node_edge_prob
     self.assertEqual(actual, expected)
 
   def test_node_sim_weighted(self):
@@ -78,19 +94,28 @@ class SamplesToModelInputTest(unittest.TestCase):
         node_node_prob=0.5)
     actual = SamplesToModelInput([_input], num_neighbors=2, weighted=True)
     # note, the node indices should be incremented
-    expected = ([[1],          # left_node_idx
-                 [0],          # left_edge_idx
-                 [2],          # right_node_idx
-                 [0],          # right_edge_idx
-                 [0.3],        # left_weight
-                 [0.6],        # right_weight
-                 [0], [0],     # neighbor_node_indices
-                 [0], [0],     # neighbor_node_weights
-                 [0], [0],     # neighbor_edge_indices
-                 [0], [0]],    # neighbor_edge_weights
-                 [[0.5],       # node_node_prob
-                  [0],         # edge_edge_prob
-                  [0]])        # node_edge_prob
+    expected = (
+        [
+            [1],  # left_node_idx
+            [0],  # left_edge_idx
+            [2],  # right_node_idx
+            [0],  # right_edge_idx
+            [0.3],  # left_weight
+            [0.6],  # right_weight
+            [0],
+            [0],  # neighbor_node_indices
+            [0],
+            [0],  # neighbor_node_weights
+            [0],
+            [0],  # neighbor_edge_indices
+            [0],
+            [0]
+        ],  # neighbor_edge_weights
+        [
+            [0.5],  # node_node_prob
+            [0],  # edge_edge_prob
+            [0]
+        ])  # node_edge_prob
     self.assertEqual(actual, expected)
 
   def test_edge_sim_weighted(self):
@@ -101,26 +126,33 @@ class SamplesToModelInputTest(unittest.TestCase):
         right_weight=0.6,
         neighbor_node_indices=[2],
         neighbor_node_weights=[0.25],
-        neighbor_edge_indices=[3,
-                               4],
-        neighbor_edge_weights=[0.5,
-                               0.75],
+        neighbor_edge_indices=[3, 4],
+        neighbor_edge_weights=[0.5, 0.75],
         node_edge_prob=0.5)
     actual = SamplesToModelInput([_input], num_neighbors=2)
     # note, the node indices should be incremented
-    expected = ([[0],           # left_node_idx
-                 [1],           # left_edge_idx
-                 [0],           # right_node_idx
-                 [2],           # right_edge_idx
-                 [0.3],         # left_weight
-                 [0.6],         # right_weight
-                 [3], [0],      # neighbor_node_indices
-                 [0.25], [0],   # neighbor_node_weights
-                 [4], [5],      # neighbor_edge_indices
-                 [0.5], [.75]], # neighbor_edge_weights
-                 [[0],          # node_node_prob
-                  [0],          # edge_edge_prob
-                  [0.5]])       # node_edge_prob
+    expected = (
+        [
+            [0],  # left_node_idx
+            [1],  # left_edge_idx
+            [0],  # right_node_idx
+            [2],  # right_edge_idx
+            [0.3],  # left_weight
+            [0.6],  # right_weight
+            [3],
+            [0],  # neighbor_node_indices
+            [0.25],
+            [0],  # neighbor_node_weights
+            [4],
+            [5],  # neighbor_edge_indices
+            [0.5],
+            [.75]
+        ],  # neighbor_edge_weights
+        [
+            [0],  # node_node_prob
+            [0],  # edge_edge_prob
+            [0.5]
+        ])  # node_edge_prob
     self.assertEqual(actual, expected)
 
   def test_node_edge_sim_weighted(self):
@@ -132,19 +164,28 @@ class SamplesToModelInputTest(unittest.TestCase):
         edge_edge_prob=0.5)
     actual = SamplesToModelInput([_input], num_neighbors=2)
     # note, the node indices should be incremented
-    expected = ([[0],          # left_node_idx
-                 [1],          # left_edge_idx
-                 [0],          # right_node_idx
-                 [2],          # right_edge_idx
-                 [0.3],        # left_weight
-                 [0.6],        # right_weight
-                 [0], [0],     # neighbor_node_indices
-                 [0], [0],     # neighbor_node_weights
-                 [0], [0],     # neighbor_edge_indices
-                 [0], [0]],    # neighbor_edge_weights
-                 [[0],         # node_node_prob
-                  [0.5],       # edge_edge_prob
-                  [0]])        # node_edge_prob
+    expected = (
+        [
+            [0],  # left_node_idx
+            [1],  # left_edge_idx
+            [0],  # right_node_idx
+            [2],  # right_edge_idx
+            [0.3],  # left_weight
+            [0.6],  # right_weight
+            [0],
+            [0],  # neighbor_node_indices
+            [0],
+            [0],  # neighbor_node_weights
+            [0],
+            [0],  # neighbor_edge_indices
+            [0],
+            [0]
+        ],  # neighbor_edge_weights
+        [
+            [0],  # node_node_prob
+            [0.5],  # edge_edge_prob
+            [0]
+        ])  # node_edge_prob
     self.assertEqual(actual, expected)
 
 
@@ -187,11 +228,8 @@ class SampleTest(unittest.TestCase):
     "Attempts to match similarity records on keys"
 
     def key(rec):
-      return (
-          rec.left_node_idx,
-          rec.left_edge_idx,
-          rec.right_node_idx,
-          rec.right_edge_idx)
+      return (rec.left_node_idx, rec.left_edge_idx, rec.right_node_idx,
+              rec.right_edge_idx)
 
     keyed_a = {key(a): a for a in recs_a}
     keyed_b = {key(b): b for b in recs_b}
@@ -206,67 +244,42 @@ class SameTypeSampleTest(SampleTest):
     idx = 0
     # edge 0 has weight 1, edge 1 has weight 2
     idx2features = csr_matrix([
-      [1, 0], # node 0
-      [1, 0], # node 1
-      [1, 2], # node 2
-      [0, 2]  # node 3
+        [1, 0],  # node 0
+        [1, 0],  # node 1
+        [1, 2],  # node 2
+        [0, 2]  # node 3
     ])
     is_edge = False
     actual = [
-        SameTypeSample((idx,
-                        1),
-                       idx2features,
-                       is_edge),
-        SameTypeSample((idx,
-                        2),
-                       idx2features,
-                       is_edge),
-        SameTypeSample((idx,
-                        3),
-                       idx2features,
-                       is_edge)
+        SameTypeSample((idx, 1), idx2features, is_edge),
+        SameTypeSample((idx, 2), idx2features, is_edge),
+        SameTypeSample((idx, 3), idx2features, is_edge)
     ]
     expected = [
-        SimilarityRecord(left_node_idx=idx,
-                         right_node_idx=1,
-                         node_node_prob=1),
+        SimilarityRecord(left_node_idx=idx, right_node_idx=1, node_node_prob=1),
         SimilarityRecord(
-            left_node_idx=idx,
-            right_node_idx=2,
-            node_node_prob=1 / 3),
-        SimilarityRecord(left_node_idx=idx,
-                         right_node_idx=3,
-                         node_node_prob=0)
+            left_node_idx=idx, right_node_idx=2, node_node_prob=1 / 3),
+        SimilarityRecord(left_node_idx=idx, right_node_idx=3, node_node_prob=0)
     ]
     self.assertSimRecsMatch(actual, expected)
 
   def test_typical_edge(self):
     idx = 0
     idx2features = csr_matrix([
-      [1, 0], # edge 0
-      [1, 0], # edge 1
-      [1, 2], # edge 2
-      [0, 2]  # edge 3
+        [1, 0],  # edge 0
+        [1, 0],  # edge 1
+        [1, 2],  # edge 2
+        [0, 2]  # edge 3
     ])
     is_edge = True
     actual = [
-        SameTypeSample((idx,
-                        1),
-                       idx2features,
-                       is_edge),
-        SameTypeSample((idx,
-                        2),
-                       idx2features,
-                       is_edge)
+        SameTypeSample((idx, 1), idx2features, is_edge),
+        SameTypeSample((idx, 2), idx2features, is_edge)
     ]
     expected = [
-        SimilarityRecord(left_edge_idx=idx,
-                         right_edge_idx=1,
-                         edge_edge_prob=1),
+        SimilarityRecord(left_edge_idx=idx, right_edge_idx=1, edge_edge_prob=1),
         SimilarityRecord(
-            left_edge_idx=idx,
-            right_edge_idx=2,
-            edge_edge_prob=1 / 3)
+            left_edge_idx=idx, right_edge_idx=2, edge_edge_prob=1 / 3)
     ]
     self.assertSimRecsMatch(actual, expected)
 

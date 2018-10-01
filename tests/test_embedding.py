@@ -3,7 +3,10 @@ from hypergraph_embedding import Hypergraph
 from hypergraph_embedding import HypergraphEmbedding
 from hypergraph_embedding.hypergraph_util import *
 from hypergraph_embedding.embedding import *
+import hypergraph_embedding.auto_encoder as ae
+from hypergraph_embedding.auto_encoder import EmbedAutoEncoder
 import scipy as sp
+from scipy.sparse import csr_matrix
 import itertools
 from random import random, randint
 
@@ -176,10 +179,7 @@ class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
     dim = 2
     _input = TestHypergraph()
     actual = EmbedAlgebraicDistance(
-        _input,
-        dim,
-        iterations=3,
-        disable_pbar=True)
+        _input, dim, iterations=3, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
     self.assertEqual(actual.method_name, "AlgebraicDistance")
 
@@ -238,3 +238,55 @@ class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
                                          epochs=1,
                                          disable_pbar=True)
     self.help_test_fuzz(embed)
+
+
+class EmbedAutoEncoderTest(EmbeddingTestCase):
+
+  def assertArrayAlmostEqual(self, actual, expected, tol=1e-5):
+    self.assertEqual(actual.shape, expected.shape)
+    self.assertTrue(np.max(np.abs(actual - expected)) < tol)
+
+  def matchSparseArrays(self, actual, expected):
+    actual_indexed = {tuple(a.nonzero()[0]): a for a in actual}
+    expected_indexed = {tuple(e.nonzero()[0]): e for e in expected}
+    self.assertEqual(actual_indexed.keys(), expected_indexed.keys())
+    for key in actual_indexed:
+      self.assertArrayAlmostEqual(actual_indexed[key], expected_indexed[key])
+
+  def assertArraysEqual(self, actual, expected):
+    self.assertEqual(len(actual), len(expected))
+    for a, e in zip(actual, expected):
+      self.assertArrayAlmostEqual(a, e)
+
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedAutoEncoder(_input, dim, disable_pbar=True)
+    self.checkEmbedding(actual, _input, dim)
+    self.assertEqual(actual.method_name, "AutoEncoder")
+
+  def test_auto_encoder_sample(self):
+    ac_original, ac_perturbed = ae._auto_encoder_sample(
+        0, csr_matrix([1, 0, 1, 0, 1]), 100)
+    ex_original = [
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3])
+    ]
+    ex_perturbed = [
+        np.array([1 / 3, 0, 1 / 3, 0, 1 / 3]),
+        np.array([0, 0, 0.5, 0, 0.5]),
+        np.array([0.5, 0, 0, 0, 0.5]),
+        np.array([0.5, 0, 0.5, 0, 0])
+    ]
+
+    self.assertArraysEqual(ac_original, ex_original)
+    self.matchSparseArrays(ac_perturbed, ex_perturbed)
+
+  def test_auto_encoder_sample_one(self):
+    ac_original, ac_perturbed = ae._auto_encoder_sample(
+        0, csr_matrix([0, 0, 1, 0, 0]), 1)
+    ex_original = ex_perturbed = [np.array([0, 0, 1, 0, 0])]
+    self.assertArraysEqual(ac_original, ex_original)
+    self.matchSparseArrays(ac_perturbed, ex_perturbed)

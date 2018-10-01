@@ -16,11 +16,10 @@ from keras.models import Model
 log = logging.getLogger()
 
 
-def KerasModelToEmbedding(
-    hypergraph,
-    model,
-    node_layer_name="node_embedding",
-    edge_layer_name="edge_embedding"):
+def KerasModelToEmbedding(hypergraph,
+                          model,
+                          node_layer_name="node_embedding",
+                          edge_layer_name="edge_embedding"):
   "Given a trained model, extract embedding weights into proto"
   node_weights = model.get_layer(node_layer_name).get_weights()[0]
   edge_weights = model.get_layer(edge_layer_name).get_weights()[0]
@@ -50,17 +49,12 @@ def BooleanModel(hypergraph, dimension, num_neighbors):
   right_node_idx = Input((1,), name="right_node_idx", dtype=np.int32)
   right_edge_idx = Input((1,), name="right_edge_idx", dtype=np.int32)
   neighbor_edge_indices = [
-      Input((1,
-            ),
-            dtype=np.int32,
-            name="edges_containing_node_{}".format(i))
+      Input((1,), dtype=np.int32, name="edges_containing_node_{}".format(i))
       for i in range(num_neighbors)
   ]
   neighbor_node_indices = [
-      Input((1,
-            ),
-            dtype=np.int32,
-            name="nodes_in_edge_{}".format(i)) for i in range(num_neighbors)
+      Input((1,), dtype=np.int32, name="nodes_in_edge_{}".format(i))
+      for i in range(num_neighbors)
   ]
 
   node_emb = Embedding(
@@ -82,25 +76,21 @@ def BooleanModel(hypergraph, dimension, num_neighbors):
 
   # calculate expected probabilities
   node_node_prob = Activation(
-      "sigmoid",
-      name="node_node_prob")(
-          Dot(1)([left_node_vec,
-                  right_node_vec]))
+      "sigmoid", name="node_node_prob")(
+          Dot(1)([left_node_vec, right_node_vec]))
   edge_edge_prob = Activation(
-      "sigmoid",
-      name="edge_edge_prob")(
-          Dot(1)([left_edge_vec,
-                  right_edge_vec]))
+      "sigmoid", name="edge_edge_prob")(
+          Dot(1)([left_edge_vec, right_edge_vec]))
 
   # Get neighborhood embeddings
   sig = Activation("sigmoid")
   nodes_dot_sigs = [
-      sig(Dot(1)([Flatten()(node_emb(node)),
-                  left_node_vec])) for node in neighbor_node_indices
+      sig(Dot(1)([Flatten()(node_emb(node)), left_node_vec]))
+      for node in neighbor_node_indices
   ]
   edges_dot_sigs = [
-      sig(Dot(1)([Flatten()(edge_emb(edge)),
-                  right_edge_vec])) for edge in neighbor_edge_indices
+      sig(Dot(1)([Flatten()(edge_emb(edge)), right_edge_vec]))
+      for edge in neighbor_edge_indices
   ]
 
   node_sig_avg = Average()(nodes_dot_sigs)
@@ -135,17 +125,12 @@ def UnweightedFloatModel(hypergraph, dimension, num_neighbors):
   right_node_idx = Input((1,), name="right_node_idx", dtype=np.int32)
   right_edge_idx = Input((1,), name="right_edge_idx", dtype=np.int32)
   neighbor_edge_indices = [
-      Input((1,
-            ),
-            dtype=np.int32,
-            name="edges_containing_node_{}".format(i))
+      Input((1,), dtype=np.int32, name="edges_containing_node_{}".format(i))
       for i in range(num_neighbors)
   ]
   neighbor_node_indices = [
-      Input((1,
-            ),
-            dtype=np.int32,
-            name="nodes_in_edge_{}".format(i)) for i in range(num_neighbors)
+      Input((1,), dtype=np.int32, name="nodes_in_edge_{}".format(i))
+      for i in range(num_neighbors)
   ]
 
   node_emb = Embedding(
@@ -167,25 +152,21 @@ def UnweightedFloatModel(hypergraph, dimension, num_neighbors):
 
   # calculate expected probabilities
   node_node_prob = Activation(
-      "relu",
-      name="node_node_prob")(
-          Dot(1)([left_node_vec,
-                  right_node_vec]))
+      "relu", name="node_node_prob")(
+          Dot(1)([left_node_vec, right_node_vec]))
   edge_edge_prob = Activation(
-      "relu",
-      name="edge_edge_prob")(
-          Dot(1)([left_edge_vec,
-                  right_edge_vec]))
+      "relu", name="edge_edge_prob")(
+          Dot(1)([left_edge_vec, right_edge_vec]))
 
   # Get neighborhood embeddings
   sig = Activation("relu")
   nodes_dot_sigs = [
-      sig(Dot(1)([Flatten()(node_emb(node)),
-                  left_node_vec])) for node in neighbor_node_indices
+      sig(Dot(1)([Flatten()(node_emb(node)), left_node_vec]))
+      for node in neighbor_node_indices
   ]
   edges_dot_sigs = [
-      sig(Dot(1)([Flatten()(edge_emb(edge)),
-                  right_edge_vec])) for edge in neighbor_edge_indices
+      sig(Dot(1)([Flatten()(edge_emb(edge)), right_edge_vec]))
+      for edge in neighbor_edge_indices
   ]
 
   node_sig_avg = Average()(nodes_dot_sigs)

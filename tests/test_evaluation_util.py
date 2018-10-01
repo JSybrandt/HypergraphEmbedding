@@ -57,15 +57,11 @@ class TestRemoveRandomConnections(unittest.TestCase):
     self.assertEqual(actual_hg, Hypergraph())
     # better not remove the original
     self.assertNotEqual(actual_hg, _input)
-    self.assertEqual(set(removed_list),
-                     set([
-                         (0,
-                          0),
-                         (0,
-                          1),
-                         (1,
-                          1),
-                     ]))
+    self.assertEqual(set(removed_list), set([
+        (0, 0),
+        (0, 1),
+        (1, 1),
+    ]))
 
   def test_remove_none(self):
     _input = Hypergraph()
@@ -110,18 +106,15 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
 
   def test_typical(self):
     predicted = [
-        (1, 2), # good prediction
+        (1, 2),  # good prediction
         (2, 1),  # bad prediction
         (2, 3),  # bad prediction
         (2, 4)  # good prediction
-        ]
+    ]
     good_links = [
-        (1,
-         2),
-        (2,
-         4),
-        (2,
-         5)  # missed this one
+        (1, 2),
+        (2, 4),
+        (2, 5)  # missed this one
     ]
     bad_links = [
         (3, 0),  # properly identified!
@@ -129,10 +122,8 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
         (2, 1),  # bad prediction
         (2, 3),  # bad prediction
     ]
-    actual = CalculateCommunityPredictionMetrics(
-        predicted,
-        good_links,
-        bad_links)
+    actual = CalculateCommunityPredictionMetrics(predicted, good_links,
+                                                 bad_links)
 
     # accuracy = # good / all = (2 + 2) / 7
     self.assertTrue(isclose(actual.accuracy, 4 / 7, abs_tol=1e-4))
@@ -155,14 +146,11 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
 
   def test_no_predictions(self):
     predicted = []
-    good_links = [(1,
-                   2)  # missed
+    good_links = [(1, 2)  # missed
                  ]
     bad_links = [(2, 3)]
-    actual = CalculateCommunityPredictionMetrics(
-        predicted,
-        good_links,
-        bad_links)
+    actual = CalculateCommunityPredictionMetrics(predicted, good_links,
+                                                 bad_links)
     self.assertTrue(isclose(actual.accuracy, 0.5))
     # precision = # found / # guessed = NAN
     # SHOULD NOT CRASH
@@ -179,10 +167,8 @@ class TestCalculateCommunityPredictionMetrics(unittest.TestCase):
     predicted = [(1, 2)]
     good_links = []
     bad_links = [(1, 2)]
-    actual = CalculateCommunityPredictionMetrics(
-        predicted,
-        good_links,
-        bad_links)
+    actual = CalculateCommunityPredictionMetrics(predicted, good_links,
+                                                 bad_links)
 
     self.assertTrue(actual.accuracy == 0)
     # recall = # found / # num to find = NAN
@@ -350,20 +336,14 @@ class TestPersonalizedEdgeClassifiers(unittest.TestCase):
       hypergraph = CreateRandomHyperGraph(100, 100, 0.25)
       embedding = EmbedRandom(hypergraph, 2)
       actual_edge = GetPersonalizedClassifiers(
-          hypergraph,
-          embedding,
-          per_edge=True,
-          disable_pbar=True)
+          hypergraph, embedding, per_edge=True, disable_pbar=True)
       self.assertEqual(len(actual_edge), len(hypergraph.edge))
       for edge_idx in hypergraph.edge:
         self.assertTrue(edge_idx in actual_edge)
         self.assertTrue(hasattr(actual_edge[edge_idx], "predict"))
 
       actual_node = GetPersonalizedClassifiers(
-          hypergraph,
-          embedding,
-          per_edge=False,
-          disable_pbar=True)
+          hypergraph, embedding, per_edge=False, disable_pbar=True)
       self.assertEqual(len(actual_node), len(hypergraph.node))
       for node_idx in hypergraph.node:
         self.assertTrue(node_idx in actual_node)
@@ -417,10 +397,7 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
       all_pairs = list(product(hypergraph.node, hypergraph.edge))
       potential_links = sample(all_pairs, randint(0, len(all_pairs) - 1))
       predicted_links = NodeEdgeEmbeddingPrediction(
-          hypergraph,
-          embedding,
-          potential_links,
-          disable_pbar=True)
+          hypergraph, embedding, potential_links, disable_pbar=True)
       # All predicted links must have existed in input
       self.assertEqual(
           len(set(predicted_links).intersection(set(potential_links))),
@@ -478,11 +455,7 @@ class TestNodeEdgeClassifierPrediction(unittest.TestCase):
     embedding.edge[0].values.extend([0])
     potential_links = [[0, 0], [0, 1], [1, 0], [1, 1]]
     actual = NodeEdgeEmbeddingPrediction(
-        hypergraph,
-        embedding,
-        potential_links,
-        AcceptAll(),
-        disable_pbar=True)
+        hypergraph, embedding, potential_links, AcceptAll(), disable_pbar=True)
     expected = [(0, 0)]
     self.assertEqual(set(actual), set(expected))
 
@@ -494,11 +467,8 @@ class AddPredictionRecordsTest(unittest.TestCase):
     bad_links = [(1, 0), (1, 1)]
     predicted_links = [(0, 0), (1, 1)]
 
-    actual = AddPredictionRecords(
-        EvaluationMetrics(),
-        good_links,
-        bad_links,
-        predicted_links)
+    actual = AddPredictionRecords(EvaluationMetrics(), good_links, bad_links,
+                                  predicted_links)
     expected = ParseProto(
         """
       records {
@@ -524,6 +494,5 @@ class AddPredictionRecordsTest(unittest.TestCase):
         edge_idx: 1
         label: false
         prediction: true
-      }""",
-        EvaluationMetrics())
+      }""", EvaluationMetrics())
     self.assertEqual(actual, expected)

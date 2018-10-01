@@ -121,10 +121,12 @@ class HypergraphUtilTest(unittest.TestCase):
     _input = Hypergraph()
     AddNodeToEdge(_input, 1, 2)
     actual = ToCsrMatrix(_input)
-    expected = csr_matrix([
-        [0, 0, 0],  # node 0 not listed
-        [0, 0, 1]  # node 1 in edge 2
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0, 0],  # node 0 not listed
+            [0, 0, 1]  # node 1 in edge 2
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToEdgeCsrMatrix_one(self):
@@ -132,11 +134,13 @@ class HypergraphUtilTest(unittest.TestCase):
     _input = Hypergraph()
     AddNodeToEdge(_input, 1, 2)
     actual = ToEdgeCsrMatrix(_input)
-    expected = csr_matrix([
-        [0, 0],  # node 0 not listed
-        [0, 0],
-        [0, 1]   # node 1 in edge 2
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0],  # node 0 not listed
+            [0, 0],
+            [0, 1]  # node 1 in edge 2
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToCsrMatrix_multiple(self):
@@ -146,11 +150,13 @@ class HypergraphUtilTest(unittest.TestCase):
     AddNodeToEdge(_input, 1, 2)
     AddNodeToEdge(_input, 2, 0)
     actual = ToCsrMatrix(_input)
-    expected = csr_matrix([
-        [0, 0, 0],  # node 0 not listed
-        [0, 1, 1],  # node 1 in edge 1 & 2
-        [1, 0, 0]  # node 2 in edge 0
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0, 0],  # node 0 not listed
+            [0, 1, 1],  # node 1 in edge 1 & 2
+            [1, 0, 0]  # node 2 in edge 0
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToCsrMatrix_empty(self):
@@ -208,10 +214,12 @@ class HypergraphUtilTest(unittest.TestCase):
     _input = Hypergraph()
     AddNodeToEdge(_input, 1, 2)
     actual = ToCscMatrix(_input)
-    expected = csr_matrix([
-        [0, 0, 0],  # node 0 not listed
-        [0, 0, 1]  # node 1 in edge 2
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0, 0],  # node 0 not listed
+            [0, 0, 1]  # node 1 in edge 2
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToCscMatrix_multiple(self):
@@ -221,11 +229,13 @@ class HypergraphUtilTest(unittest.TestCase):
     AddNodeToEdge(_input, 1, 2)
     AddNodeToEdge(_input, 2, 0)
     actual = ToCscMatrix(_input)
-    expected = csr_matrix([
-        [0, 0, 0],  # node 0 not listed
-        [0, 1, 1],  # node 1 in edge 1 & 2
-        [1, 0, 0]  # node 2 in edge 0
-    ], dtype=np.bool)
+    expected = csr_matrix(
+        [
+            [0, 0, 0],  # node 0 not listed
+            [0, 1, 1],  # node 1 in edge 1 & 2
+            [1, 0, 0]  # node 2 in edge 0
+        ],
+        dtype=np.bool)
     SparseArrayEquals(self, actual, expected)
 
   def test_ToCscMatrix_empty(self):
@@ -312,6 +322,52 @@ class HypergraphUtilTest(unittest.TestCase):
     expected.add_edge(2, 3)
 
     self.assertTrue(nx.is_isomorphic(actual, expected))
+
+
+class RelabelAndCompressionTest(unittest.TestCase):
+
+  def test_typical(self):
+    _input = Hypergraph()
+    AddNodeToEdge(_input, 0, 1)
+    AddNodeToEdge(_input, 1, 1)
+    AddNodeToEdge(_input, 1, 2)
+
+    node_map = {0: 100, 1: 200}
+    edge_map = {1: 50, 2: 150}
+
+    actual = Relabel(_input, node_map, edge_map)
+
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 100, 50)
+    AddNodeToEdge(expected, 200, 50)
+    AddNodeToEdge(expected, 200, 150)
+
+    self.assertEqual(actual, expected)
+
+  def test_compress_range(self):
+    original = Hypergraph()
+    AddNodeToEdge(original, 100, 50)
+    AddNodeToEdge(original, 200, 50)
+    AddNodeToEdge(original, 200, 150)
+
+    compressed, node_map, edge_map = CompressRange(original)
+    restored = Relabel(compressed, node_map, edge_map)
+    SparseArrayEquals(self, ToCsrMatrix(original), ToCsrMatrix(restored))
+    self.assertEqual(len(compressed.node), max(compressed.node) + 1)
+    self.assertEqual(len(compressed.node), len(original.node))
+    self.assertEqual(len(compressed.edge), max(compressed.edge) + 1)
+    self.assertEqual(len(compressed.edge), len(original.edge))
+
+  def test_compress_range_fuzz(self):
+    for _ in range(10):
+      original = CreateRandomHyperGraph(100, 100, 0.01)
+      compressed, node_map, edge_map = CompressRange(original)
+      restored = Relabel(compressed, node_map, edge_map)
+      SparseArrayEquals(self, ToCsrMatrix(original), ToCsrMatrix(restored))
+      self.assertEqual(len(compressed.node), max(compressed.node) + 1)
+      self.assertEqual(len(compressed.node), len(original.node))
+      self.assertEqual(len(compressed.edge), max(compressed.edge) + 1)
+      self.assertEqual(len(compressed.edge), len(original.edge))
 
 
 if __name__ == "__main__":

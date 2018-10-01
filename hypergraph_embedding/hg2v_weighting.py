@@ -31,24 +31,20 @@ log = logging.getLogger()
 _shared_info = {}
 
 
-def WeightBySameTypeDistance(
-    hypergraph,
-    alpha,
-    ref_embedding,
-    norm,
-    disable_pbar):
+def WeightBySameTypeDistance(hypergraph, alpha, ref_embedding, norm,
+                             disable_pbar):
 
   def do_half(adj_mat, type_emb):
     vectors = {idx: np.array(emb.values) for idx, emb in type_emb.items()}
     indices2dist = {}
     rows, cols = adj_mat.nonzero()
     log.info("Calculating distances")
-    for row, col in tqdm(zip(rows, cols), total=adj_mat.nnz, disable=disable_pbar):
+    for row, col in tqdm(
+        zip(rows, cols), total=adj_mat.nnz, disable=disable_pbar):
       indices2dist[(row, col)] = norm(vectors[row] - vectors[col])
     log.info("Scaling")
     indices2dist = AlphaScaleValues(
-        OneMinusValues(ZeroOneScaleValues(indices2dist)),
-        alpha)
+        OneMinusValues(ZeroOneScaleValues(indices2dist)), alpha)
     tmp = lil_matrix(adj_mat.shape, dtype=np.float32)
     log.info("Converting")
     for (row, col), value in indices2dist.items():
@@ -96,8 +92,7 @@ def WeightByDistance(hypergraph, alpha, ref_embedding, norm, disable_pbar):
 
   log.info("Scaling distances")
   node_edge2dist = AlphaScaleValues(
-      OneMinusValues(ZeroOneScaleValues(node_edge2dist)),
-      alpha)
+      OneMinusValues(ZeroOneScaleValues(node_edge2dist)), alpha)
 
   log.info("Recording results in matrix")
   node2edge_dist = lil_matrix((num_nodes, num_edges), dtype=np.float32)
@@ -122,8 +117,7 @@ def WeightByDistanceCluster(hypergraph, alpha, ref_embedding, norm, dim):
 
   log.info("Scaling distances")
   node_edge2dist = AlphaScaleValues(
-      OneMinusValues(ZeroOneScaleValues(node_edge2dist)),
-      alpha)
+      OneMinusValues(ZeroOneScaleValues(node_edge2dist)), alpha)
 
   log.info("Recording results in matrix")
   node2edge_dist = lil_matrix((num_nodes, num_edges), dtype=np.float32)
@@ -144,12 +138,10 @@ def WeightByNeighborhood(hypergraph, alpha):
   "The goal is that larger neighborhoods contribute less"
   log.info("Getting neighboorhood sizes for all nodes / edges")
   node_neighborhood = {
-      idx: len(node.edges) for idx,
-      node in hypergraph.node.items()
+      idx: len(node.edges) for idx, node in hypergraph.node.items()
   }
   edge_neighborhood = {
-      idx: len(edge.nodes) for idx,
-      edge in hypergraph.edge.items()
+      idx: len(edge.nodes) for idx, edge in hypergraph.edge.items()
   }
 
   log.info("Zero one scaling")
@@ -241,11 +233,10 @@ def _compute_span(idx, idx2neighbors=None, idx_emb=None, neigh_emb=None):
   return idx, span_greater_than - span_less_than
 
 
-def ComputeSpans(
-    hypergraph,
-    embedding=None,
-    run_in_parallel=True,
-    disable_pbar=False):
+def ComputeSpans(hypergraph,
+                 embedding=None,
+                 run_in_parallel=True,
+                 disable_pbar=False):
   """
   Computes the span of each node / edge in the provided embedding.
   Radius is defined as the L2 norm of the distance between an entity's
@@ -279,11 +270,10 @@ def ComputeSpans(
 
   node2edge = ToCsrMatrix(hypergraph)
   node2span = {}
-  with Pool(workers,
-            initializer=_init_compute_span,
-            initargs=(node2edge,
-                      embedding.node,
-                      embedding.edge)) as pool:
+  with Pool(
+      workers,
+      initializer=_init_compute_span,
+      initargs=(node2edge, embedding.node, embedding.edge)) as pool:
     with tqdm(total=len(hypergraph.node), disable=disable_pbar) as pbar:
       for node_idx, span in pool.imap(_compute_span, hypergraph.node):
         node2span[node_idx] = span
@@ -292,11 +282,10 @@ def ComputeSpans(
   log.info("Computing span per edge wrt node %s", embedding.method_name)
   edge2node = ToEdgeCsrMatrix(hypergraph)
   edge2span = {}
-  with Pool(workers,
-            initializer=_init_compute_span,
-            initargs=(edge2node,
-                      embedding.edge,
-                      embedding.node)) as pool:
+  with Pool(
+      workers,
+      initializer=_init_compute_span,
+      initargs=(edge2node, embedding.edge, embedding.node)) as pool:
     with tqdm(total=len(hypergraph.edge), disable=disable_pbar) as pbar:
       for edge_idx, span in pool.imap(_compute_span, hypergraph.edge):
         edge2span[edge_idx] = span
@@ -341,11 +330,10 @@ def ZeroOneScaleValues(idx2value, run_in_parallel=True, disable_pbar=False):
   min_val = min(idx2value.values())
   max_val = max(idx2value.values())
   delta_val = max_val - min_val
-  with Pool(workers,
-            initializer=_init_zero_one_scale_key,
-            initargs=(idx2value,
-                      min_val,
-                      delta_val)) as pool:
+  with Pool(
+      workers,
+      initializer=_init_zero_one_scale_key,
+      initargs=(idx2value, min_val, delta_val)) as pool:
     with tqdm(total=len(idx2value), disable=disable_pbar) as pbar:
       for idx, val in pool.imap(_zero_one_scale_key, idx2value):
         result[idx] = val
