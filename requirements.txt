@@ -8,4 +8,4 @@ keras
 tensorflow
 tqdm
 matplotlib
-cv2
+opencv-python

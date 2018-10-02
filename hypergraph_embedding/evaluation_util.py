@@ -43,19 +43,37 @@ def PrepLinkPredictionExperiment(hypergraph, args):
   connections. Output is stored in a LinkPredictionData namedtuple
   """
 
-  log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
-  assert args.experiment_lp_probability >= 0
-  assert args.experiment_lp_probability <= 1
+  if args.experiment_rerun is not None:
+    log.info("Recovering information from %s", args.experiment_rerun)
+    exp = ExperimentalResult()
+    with open(args.experiment_rerun, 'rb') as proto:
+      exp.ParseFromString(proto.read())
+    log.info("Checking Experimental Result")
+    assert len(exp.metrics) > 0
+    assert len(exp.metrics[0].records) > 0
+    assert exp.HasField("hypergraph")
 
-  log.info("Creating subgraph with removal prob. %f",
-           args.experiment_lp_probability)
-  new_graph, good_links = RemoveRandomConnections(
-      hypergraph, args.experiment_lp_probability)
-  log.info("Removed %i links", len(good_links))
+    new_graph = exp.hypergraph
+    good_links = [(r.node_idx, r.edge_idx)
+                  for r in exp.metrics[0].records
+                  if r.label]
+    bad_links = [(r.node_idx, r.edge_idx)
+                 for r in exp.metrics[0].records
+                 if not r.label]
+  else:
+    log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
+    assert args.experiment_lp_probability >= 0
+    assert args.experiment_lp_probability <= 1
 
-  log.info("Sampling missing links for evaluation")
-  bad_links = SampleMissingConnections(hypergraph, len(good_links))
-  log.info("Sampled %i links", len(bad_links))
+    log.info("Creating subgraph with removal prob. %f",
+             args.experiment_lp_probability)
+    new_graph, good_links = RemoveRandomConnections(
+        hypergraph, args.experiment_lp_probability)
+    log.info("Removed %i links", len(good_links))
+
+    log.info("Sampling missing links for evaluation")
+    bad_links = SampleMissingConnections(hypergraph, len(good_links))
+    log.info("Sampled %i links", len(bad_links))
 
   log.info("Embedding new hypergraph")
   embedding = Embed(args, new_graph)
