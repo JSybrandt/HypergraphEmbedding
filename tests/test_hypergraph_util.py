@@ -343,6 +343,7 @@ class RelabelAndCompressionTest(unittest.TestCase):
     AddNodeToEdge(_input, 0, 1)
     AddNodeToEdge(_input, 1, 1)
     AddNodeToEdge(_input, 1, 2)
+    _input.name = "KEEP ME"
 
     node_map = {0: 100, 1: 200}
     edge_map = {1: 50, 2: 150}
@@ -350,6 +351,7 @@ class RelabelAndCompressionTest(unittest.TestCase):
     actual = Relabel(_input, node_map, edge_map)
 
     expected = Hypergraph()
+    expected.name = "KEEP ME"
     AddNodeToEdge(expected, 100, 50)
     AddNodeToEdge(expected, 200, 50)
     AddNodeToEdge(expected, 200, 150)
@@ -361,6 +363,7 @@ class RelabelAndCompressionTest(unittest.TestCase):
     AddNodeToEdge(original, 100, 50)
     AddNodeToEdge(original, 200, 50)
     AddNodeToEdge(original, 200, 150)
+    original.name = "KEEP ME"
 
     compressed, node_map, edge_map = CompressRange(original)
     restored = Relabel(compressed, node_map, edge_map)
@@ -369,6 +372,7 @@ class RelabelAndCompressionTest(unittest.TestCase):
     self.assertEqual(len(compressed.node), len(original.node))
     self.assertEqual(len(compressed.edge), max(compressed.edge) + 1)
     self.assertEqual(len(compressed.edge), len(original.edge))
+    self.assertEqual(compressed.name, "KEEP ME")
 
   def test_compress_range_fuzz(self):
     for _ in range(10):
@@ -387,6 +391,7 @@ class ToBlockDiagonalTest(unittest.TestCase):
     AddNodeToEdge(original, 100, 50)
     AddNodeToEdge(original, 200, 50)
     AddNodeToEdge(original, 200, 150)
+    original.name = "KEEP ME"
 
     compressed, node_map, edge_map = ToBlockDiagonal(original)
     self.assertEqual(len(compressed.node), max(compressed.node) + 1)
@@ -396,6 +401,7 @@ class ToBlockDiagonalTest(unittest.TestCase):
 
     restored = Relabel(compressed, node_map, edge_map)
     SparseArrayEquals(self, ToCsrMatrix(original), ToCsrMatrix(restored))
+    self.assertEqual(restored.name, "KEEP ME")
 
   def test_fuzz(self):
     for _ in range(10):
