@@ -53,7 +53,8 @@ def PlotDegreeDistributions(hypergraph, path):
   edge_dist.set_yscale("log")
 
   fig.suptitle(hypergraph.name)
-  fig.subplots_adjust(top=0.9)
+  fig.tight_layout()
+  fig.subplots_adjust(top=0.85)
   fig.savefig(path)
 
 
