@@ -342,18 +342,11 @@ def EmbedHg2vAlgDist(hypergraph,
 
   def sampler_fn(hypergraph):
     log.info("Embedding weighted by algebraic distance.")
-    alg_emb = EmbedAlgebraicDistance(hypergraph, dimension=10, iterations=20)
-    euc_norm = lambda x: np.linalg.norm(x, ord=2)
-    node2edge_weight, edge2node_weight = WeightByDistance(
-        hypergraph, alpha, alg_emb, euc_norm, disable_pbar)
-    node2node_weight, edge2edge_weight = WeightBySameTypeDistance(
-        hypergraph, alpha, alg_emb, euc_norm, disable_pbar=disable_pbar)
+    alg_emb = EmbedAlgebraicDistance(
+        hypergraph, dimension=10, iterations=20, disable_pbar=disable_pbar)
     return AlgebraicDistanceSamples(
         hypergraph,
-        node2edge_weight,
-        edge2node_weight,
-        node2node_weight,
-        edge2edge_weight,
+        alg_emb,
         num_neighbors=num_neighbors,
         num_samples=num_samples,
         disable_pbar=disable_pbar)

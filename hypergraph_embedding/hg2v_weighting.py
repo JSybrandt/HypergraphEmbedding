@@ -311,8 +311,10 @@ def ZeroOneScaleValues(idx2value, disable_pbar=False):
   if delta_val == 0:
     return {idx: 1 for idx in idx2value}
   else:
-    return {idx: (val-min_val)/delta_val
-            for idx, val in tqdm(idx2value.items(), disable=disable_pbar)}
+    return {
+        idx: (val - min_val) / delta_val
+        for idx, val in tqdm(idx2value.items(), disable=disable_pbar)
+    }
 
 
 ################################################################################

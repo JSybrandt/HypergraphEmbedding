@@ -54,12 +54,12 @@ def PrepLinkPredictionExperiment(hypergraph, args):
     assert exp.HasField("hypergraph")
 
     new_graph = exp.hypergraph
-    good_links = [(r.node_idx, r.edge_idx)
-                  for r in exp.metrics[0].records
-                  if r.label]
-    bad_links = [(r.node_idx, r.edge_idx)
-                 for r in exp.metrics[0].records
-                 if not r.label]
+    good_links = [
+        (r.node_idx, r.edge_idx) for r in exp.metrics[0].records if r.label
+    ]
+    bad_links = [
+        (r.node_idx, r.edge_idx) for r in exp.metrics[0].records if not r.label
+    ]
   else:
     log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
     assert args.experiment_lp_probability >= 0

@@ -55,12 +55,12 @@ def ParseArgs():
       "--bar-chart-path",
       type=str,
       help=("If set, --cumulative and --bar-chart-experiment must also be set."
-           "Location to write resulting bar chart with error bounds."))
+            "Location to write resulting bar chart with error bounds."))
   parser.add_argument(
       "--bar-chart-experiment",
       type=str,
       help=("If set, --cumulative and --bar-chart-path must also be set."
-           "Experiment name to collect bar chart for."))
+            "Experiment name to collect bar chart for."))
   parser.add_argument(
       "protos", type=str, help="Path to the results proto buffer", nargs="+")
   return parser.parse_args()
@@ -116,6 +116,7 @@ def ExperimentKey(result, metric):
       experiment=metric.experiment_name,
       method=result.embedding.method_name,
       dim=result.embedding.dim)
+
 
 def KeyToMethod(key):
   toks = key.split()
@@ -192,6 +193,7 @@ def PrintPicture(result, path, num_samples):
   fig.subplots_adjust(top=0.9)
   fig.savefig(path)
 
+
 def WriteBarChart(bar_chart_path, experiment2metrics, select_exp_name):
   log.info("Selecting accuracies for each method from accumulated data")
   method2vals = {}
@@ -199,8 +201,9 @@ def WriteBarChart(bar_chart_path, experiment2metrics, select_exp_name):
     method = KeyToMethod(key)
     if method not in method2vals:
       method2vals[method] = []
-    select_vals = [m.accuracy for m in all_metrics
-                   if m.experiment_name == select_exp_name]
+    select_vals = [
+        m.accuracy for m in all_metrics if m.experiment_name == select_exp_name
+    ]
     method2vals[method].extend(select_vals)
 
   log.info("Checking that we have any metrics for provided experiment type.")
@@ -213,32 +216,28 @@ def WriteBarChart(bar_chart_path, experiment2metrics, select_exp_name):
   ax = fig.add_subplot(111)
   for i, m in enumerate(methods):
     ax.bar(
-           x=1.2*i+1,
-           height=sum(method2vals[m])/len(method2vals[m]),
-           width=0.8,
-           label=m
-          )
+        x=1.2 * i + 1,
+        height=sum(method2vals[m]) / len(method2vals[m]),
+        width=0.8,
+        label=m)
   ax.bar(
-      x=[1.2*i+1 for i, _ in enumerate(methods)],
-      height=[max(method2vals[m])-min(method2vals[m]) for m in methods],
+      x=[1.2 * i + 1 for i, _ in enumerate(methods)],
+      height=[max(method2vals[m]) - min(method2vals[m]) for m in methods],
       width=1,
       bottom=[min(method2vals[m]) for m in methods],
       alpha=0.5,
-      color="grey"
-    )
+      color="grey")
 
   box = ax.get_position()
   ax.set_position([box.x0, box.y0, box.width * 0.5, box.height])
   ax.get_xaxis().set_visible(False)
 
-
   # Put a legend to the right of the current axis
   lgd = ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
   title = fig.suptitle(select_exp_name)
   fig.subplots_adjust(top=0.85)
-  fig.savefig(bar_chart_path,
-              bbox_extra_artists=(lgd, title),
-              bbox_inches='tight')
+  fig.savefig(
+      bar_chart_path, bbox_extra_artists=(lgd, title), bbox_inches='tight')
 
 
 if __name__ == "__main__":
@@ -295,7 +294,6 @@ if __name__ == "__main__":
             experiment2metrics[key] = []
           experiment2metrics[key].append(metric)
 
-
       if args.picture:
         PrintPicture(result, picture_path, args.picture_samples)
 
@@ -303,4 +301,5 @@ if __name__ == "__main__":
     for key, metric in experiment2metrics.items():
       PrintCumulativeResult(key, metric)
     if args.bar_chart_path is not None:
-      WriteBarChart(bar_chart_path, experiment2metrics, args.bar_chart_experiment)
+      WriteBarChart(bar_chart_path, experiment2metrics,
+                    args.bar_chart_experiment)

@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from hypergraph_embedding import ExperimentalResult
 
+
 def ParseArgs():
   parser = argparse.ArgumentParser()
   parser.add_argument(
@@ -22,6 +23,7 @@ def ParseArgs():
 
   return parser.parse_args()
 
+
 def ToInterestingRecords(result, exp_name, take_correct):
 
   def take_rec(r):
@@ -31,9 +33,8 @@ def ToInterestingRecords(result, exp_name, take_correct):
       return r.label != r.prediction
 
   metric = [m for m in result.metrics if m.experiment_name == exp_name][0]
-  return set((r.node_idx, r.edge_idx)
-          for r in metric.records
-          if take_rec(r))
+  return set((r.node_idx, r.edge_idx) for r in metric.records if take_rec(r))
+
 
 if __name__ == "__main__":
   args = ParseArgs()
@@ -53,10 +54,9 @@ if __name__ == "__main__":
   with res2_path.open("rb") as proto:
     result2.ParseFromString(proto.read())
 
-  shared_experiments = set(m.experiment_name
-                           for m in result1.metrics).intersection(
-                               set(m.experiment_name
-                                   for m in result2.metrics))
+  shared_experiments = set(
+      m.experiment_name for m in result1.metrics).intersection(
+          set(m.experiment_name for m in result2.metrics))
   assert len(shared_experiments) > 0
 
   for name in shared_experiments:

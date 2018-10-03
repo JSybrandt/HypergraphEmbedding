@@ -101,12 +101,14 @@ class TestSnapCommunityToHypergraph(unittest.TestCase):
     AddNodeToEdge(expected, 7, 1)
     self.assertEqual(actual, expected)
 
+
 class TestCleanHypergraph(unittest.TestCase):
+
   def test_typical(self):
     _input = Hypergraph()
     AddNodeToEdge(_input, 0, 0)
     AddNodeToEdge(_input, 0, 1)
-    AddNodeToEdge(_input, 0, 2) # delete me
+    AddNodeToEdge(_input, 0, 2)  # delete me
     AddNodeToEdge(_input, 1, 0)
     AddNodeToEdge(_input, 1, 1)
     # Here node/edge 0/1 each have degree 1
@@ -122,8 +124,8 @@ class TestCleanHypergraph(unittest.TestCase):
 
   def test_two_iterations(self):
     _input = Hypergraph()
-    AddNodeToEdge(_input, 0, 0) # deleted on iter 1
-    AddNodeToEdge(_input, 0, 1) # deleted on iter 2
+    AddNodeToEdge(_input, 0, 0)  # deleted on iter 1
+    AddNodeToEdge(_input, 0, 1)  # deleted on iter 2
     AddNodeToEdge(_input, 1, 1)
     AddNodeToEdge(_input, 1, 2)
     AddNodeToEdge(_input, 2, 1)

@@ -240,6 +240,23 @@ class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
     self.help_test_fuzz(embed)
 
 
+class EmbedHg2vAlgDistTest(EmbeddingTestCase):
+
+  def test_typical(self):
+    dim = 2
+    _input = TestHypergraph()
+    actual = EmbedHg2vAlgDist(
+        _input,
+        dim,
+        num_neighbors=2,
+        num_samples=2,
+        batch_size=1,
+        epochs=1,
+        disable_pbar=True)
+    self.checkEmbedding(actual, _input, dim)
+    self.assertEqual(actual.method_name, "Hypergraph2Vec Algebraic Distance")
+
+
 class EmbedAutoEncoderTest(EmbeddingTestCase):
 
   def assertArrayAlmostEqual(self, actual, expected, tol=1e-5):

@@ -16,6 +16,7 @@ from tqdm import tqdm
 from scipy.sparse import csr_matrix
 from scipy.sparse import csc_matrix
 from scipy.sparse import coo_matrix
+import math
 
 import matplotlib as mpl
 mpl.use('Agg')
@@ -435,29 +436,54 @@ def WeightedJaccardSamples(hypergraph,
 ################################################################################
 
 
-def SameTypeDistanceSample(indices, idx2features=None, is_edge=None):
+def _init_same_type_distance_sample(idx2target, source_half_emb,
+                                    target_half_emb, is_edge):
+  _shared_info.clear()
+  _shared_info['idx2target'] = idx2target
+  _shared_info['source_half_emb'] = source_half_emb
+  _shared_info['target_half_emb'] = target_half_emb
+  _shared_info['is_edge'] = is_edge
+
+
+def _same_type_dist_calc(indices, idx2target, source_half_emb, target_half_emb):
+  shared_targets = set(idx2target[indices[0]].nonzero()[1]).intersection(
+      set(idx2target[indices[1]].nonzero()[1]))
+  if len(shared_targets) == 0:
+    return 0
+
+  emb_i = np.array(source_half_emb[indices[0]].values, dtype=np.float32)
+  emb_j = np.array(source_half_emb[indices[1]].values, dtype=np.float32)
+
+  prob = 0
+  max_dist = math.sqrt(len(emb_i))
+  for target_idx in shared_targets:
+    emb_k = np.array(target_half_emb[target_idx].values, dtype=np.float32)
+    weight_ik = (max_dist - np.linalg.norm(emb_i - emb_k, ord=2)) / max_dist
+    weight_jk = (max_dist - np.linalg.norm(emb_j - emb_k, ord=2)) / max_dist
+    prob = max(prob, min(weight_ik, weight_jk))
+  return prob
+
+
+def SameTypeDistanceSample(indices,
+                           idx2target=None,
+                           source_half_emb=None,
+                           target_half_emb=None,
+                           is_edge=None):
   """
   Instead of calculating weighted jaccard, we are going to calculate the
   max/min connection.
   """
-  if idx2features is None:
-    idx2features = _shared_info["idx2features"]
+  if idx2target is None:
+    idx2target = _shared_info["idx2target"]
+  if source_half_emb is None:
+    source_half_emb = _shared_info["source_half_emb"]
+  if target_half_emb is None:
+    target_half_emb = _shared_info["target_half_emb"]
   if is_edge is None:
     is_edge = _shared_info["is_edge"]
 
-  features_i = idx2features[indices[0]]
-  features_j = idx2features[indices[1]]
-  shared_cols = list(
-      set(features_i.nonzero()[1]).intersection(set(features_j.nonzero()[1])))
-  prob = 0
-  if len(shared_cols) > 0:
-    prob = np.max(
-        np.min(
-            np.vstack([
-                features_i[0, shared_cols].todense(),
-                features_j[0, shared_cols].todense()
-            ]),
-            axis=0))
+  prob = _same_type_dist_calc(indices, idx2target, source_half_emb,
+                              target_half_emb)
 
   if is_edge:
     return SimilarityRecord(
@@ -471,12 +497,20 @@ def SameTypeDistanceSample(indices, idx2features=None, is_edge=None):
         node_node_prob=_alpha_scale(prob))
 
 
+def _init_diff_type_distance_sample(node2edge, edge2node, num_neighbors,
+                                    algebraic_embedding):
+  _shared_info.clear()
+  _shared_info["node2edge"] = node2edge
+  _shared_info["edge2node"] = edge2node
+  _shared_info["num_neighbors"] = num_neighbors
+  _shared_info["algebraic_embedding"] = algebraic_embedding
+
+
 def DiffTypeDistanceSample(indices,
                            node2edge=None,
                            edge2node=None,
                            num_neighbors=None,
-                           node2edge_weight=None,
-                           edge2edge_weight=None):
+                           algebraic_embedding=None):
 
   node_idx, edge_idx = indices
   if node2edge is None:
@@ -485,38 +519,39 @@ def DiffTypeDistanceSample(indices,
     edge2node = _shared_info["edge2node"]
   if num_neighbors is None:
     num_neighbors = _shared_info["num_neighbors"]
-  if node2edge_weight is None:
-    node2edge_weight = _shared_info["node2features"]
-  if edge2edge_weight is None:
-    edge2edge_weight = _shared_info["edge2features"]
+  if algebraic_embedding is None:
+    algebraic_embedding = _shared_info["algebraic_embedding"]
 
   neighbor_edge_indices = _sample_neighbors(node_idx, node2edge, num_neighbors)
   neighbor_node_indices = _sample_neighbors(edge_idx, edge2node, num_neighbors)
 
-  features_node = node2edge_weight[node_idx]
-  features_edge = edge2edge_weight[edge_idx]
-  shared_cols = list(
-      set(features_node.nonzero()[1]).intersection(
-          set(features_edge.nonzero()[1])))
-  prob = 0
-  for col_idx in shared_cols:
-    tmp = min(features_node[0, col_idx], features_edge[0, col_idx])
-    if tmp > prob:
-      prob = tmp
-
+  node_prob = 0
+  """
+  # This couple of lines may lead to a more accurate, but less feasible solution.
+  for other_node_idx in edge2node[edge_idx].nonzero()[1]:
+    node_prob = max(node_prob,
+                  _same_type_dist_calc((node_idx, other_node_idx),
+                                       node2edge,
+                                       algebraic_embedding.node,
+                                       algebraic_embedding.edge))
+  """
+  edge_prob = 0
+  for other_edge_idx in node2edge[node_idx].nonzero()[1]:
+    edge_prob = max(
+        edge_prob,
+        _same_type_dist_calc((edge_idx, other_edge_idx), edge2node,
+                             algebraic_embedding.edge,
+                             algebraic_embedding.node))
   return SimilarityRecord(
       left_node_idx=node_idx,
       right_edge_idx=edge_idx,
       neighbor_node_indices=neighbor_node_indices,
       neighbor_edge_indices=neighbor_edge_indices,
-      node_edge_prob=_alpha_scale(prob))
+      node_edge_prob=_alpha_scale(max(node_prob, edge_prob)))
 
 
 def AlgebraicDistanceSamples(hypergraph,
-                             node2edge_weight,
-                             edge2node_weight,
-                             node2node_weight,
-                             edge2edge_weight,
+                             algebraic_embedding,
                              num_neighbors,
                              num_samples,
                              run_in_parallel=True,
@@ -537,17 +572,21 @@ def AlgebraicDistanceSamples(hypergraph,
   # return value
   similarity_records = []
 
-  log.info("Getting node-node samples")
   node2edge = ToCsrMatrix(hypergraph)
-  node2node = node2edge * node2edge.T
-  samples = _sample_adj_matrix(node2node, hypergraph.node, num_samples,
-                               disable_pbar)
+  edge2node = ToEdgeCsrMatrix(hypergraph)
+
+  log.info("Getting node-node samples")
+  samples = _sample_adj_matrix(node2edge * node2edge.T, hypergraph.node,
+                               num_samples, disable_pbar)
+
   log.info("Sampling node-node probabilities")
   with Pool(
       workers,
-      initializer=_init_same_type_sample,
+      initializer=_init_same_type_distance_sample,
       initargs=(
-          node2edge_weight,  # idx2features
+          node2edge,  # idx2target
+          algebraic_embedding.node,  # source half
+          algebraic_embedding.edge,  # target half
           False  # is_edge
       )) as pool:
     for record in tqdm(
@@ -557,16 +596,16 @@ def AlgebraicDistanceSamples(hypergraph,
       similarity_records.append(record)
 
   log.info("Getting edge-edge samples")
-  edge2node = ToEdgeCsrMatrix(hypergraph)
-  edge2edge = edge2node * edge2node.T
-  samples = _sample_adj_matrix(edge2edge_weight, hypergraph.edge, num_samples,
-                               disable_pbar)
+  samples = _sample_adj_matrix(edge2node * edge2node.T, hypergraph.edge,
+                               num_samples, disable_pbar)
   log.info("Sampling edge-edge probabilities")
   with Pool(
       workers,
-      initializer=_init_same_type_sample,
+      initializer=_init_same_type_distance_sample,
       initargs=(
-          edge2node_weight,  # idx2features
+          edge2node,  # idx2target
+          algebraic_embedding.edge,  # source emb
+          algebraic_embedding.node,  # target emb
           True  # is_edge
       )) as pool:
     for record in tqdm(
@@ -576,23 +615,21 @@ def AlgebraicDistanceSamples(hypergraph,
       similarity_records.append(record)
 
   log.info("Getting node-edge samples")
-  node2second_edge = node2node * node2edge
-  samples = _sample_adj_matrix(node2second_edge, hypergraph.node, num_samples,
-                               disable_pbar)
-
+  samples = _sample_adj_matrix(node2edge * node2edge.T * node2edge,
+                               hypergraph.node, num_samples, disable_pbar)
   log.info("Getting edge-node samples")
-  edge2second_node = edge2edge * edge2node
-  edge_node_samples = _sample_adj_matrix(edge2second_node, hypergraph.edge,
-                                         num_samples, disable_pbar)
-  samples.extend([(n, e) for e, n in edge_node_samples])
-
+  samples += [
+      (n, e)
+      for e, n in _sample_adj_matrix(edge2node * edge2node.T * edge2node,
+                                     hypergraph.edge, num_samples, disable_pbar)
+  ]
   with Pool(
       workers,
-      initializer=_init_diff_type_sample,
-      initargs=(node2edge, edge2node, num_neighbors, node2edge_weight,
-                edge2edge_weight, None, None)) as pool:
+      initializer=_init_diff_type_distance_sample,
+      initargs=(node2edge, edge2node, num_neighbors,
+                algebraic_embedding)) as pool:
     for record in tqdm(
-        pool.imap(DiffTypeDistanceSample, samples, chunksize=num_samples),
+        pool.imap(DiffTypeDistanceSample, samples),
         total=len(samples),
         disable=disable_pbar):
       similarity_records.append(record)
