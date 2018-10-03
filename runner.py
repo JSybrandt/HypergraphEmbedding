@@ -88,6 +88,11 @@ def ParseArgs():
       help=("Used to determine the proportion of removed node-edge connections "
             "for LP_* experiments"),
       default=0.1)
+  parser.add_argument(
+      "--experiment-rerun",
+      type=str,
+      help=("If set, supply a path to a previously run experiment."
+            "Instead of sampling from the hg, we will just use this one."))
 
   # Required hypergraph argument
   parser.add_argument(
@@ -172,6 +177,10 @@ if __name__ == "__main__":
     log.info("Checking that experiment is valid")
     for experiment in args.experiment:
       assert experiment in EXPERIMENT_OPTIONS
+    if args.experiment_rerun is not None:
+      log.info("Checking that rerun path is valid.")
+      rerun_path = Path(args.experiment_rerun)
+      assert rerun_path.is_file()
 
   if args.embedding_debug_summary:
     log.info("--embedding_debug_summary set, checking for appropriate method")

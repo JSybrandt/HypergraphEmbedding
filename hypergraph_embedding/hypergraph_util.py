@@ -202,6 +202,9 @@ def Relabel(original_hg, node_map, edge_map):
   """
 
   relabed_hg = Hypergraph()
+  if original_hg.HasField("name"):
+    relabed_hg.name = original_hg.name
+
   for node_idx, node in original_hg.node.items():
     for edge_idx in node.edges:
       assert node_idx in node_map
@@ -219,6 +222,8 @@ def CompressRange(original_hg):
   """
 
   compressed_hg = Hypergraph()
+  if original_hg.HasField("name"):
+    compressed_hg.name = original_hg.name
 
   node_map = {}
   edge_map = {}
