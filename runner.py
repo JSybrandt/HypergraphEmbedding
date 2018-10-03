@@ -133,9 +133,13 @@ if __name__ == "__main__":
   if args.raw_data:
     log.info("Checking for valid raw-data-format")
     assert args.raw_data_format in PARSING_OPTIONS
-    raw_data_path = Path(args.raw_data)
-    log.info("Checking raw-data exists")
-    assert raw_data_path.is_file()
+    if args.raw_data_format == "DL_MAD_GRADES":
+      log.info("Downloading from MADGRADES using supplied API key.")
+      raw_data_path = args.raw_data
+    else:
+      raw_data_path = Path(args.raw_data)
+      log.info("Checking raw-data exists")
+      assert raw_data_path.is_file()
     log.info("Checking its safe to write hypergraph")
     assert not hypergraph_path.exists()
     assert hypergraph_path.parent.is_dir()

@@ -100,3 +100,40 @@ class TestSnapCommunityToHypergraph(unittest.TestCase):
     AddNodeToEdge(expected, 5, 1)
     AddNodeToEdge(expected, 7, 1)
     self.assertEqual(actual, expected)
+
+class TestCleanHypergraph(unittest.TestCase):
+  def test_typical(self):
+    _input = Hypergraph()
+    AddNodeToEdge(_input, 0, 0)
+    AddNodeToEdge(_input, 0, 1)
+    AddNodeToEdge(_input, 0, 2) # delete me
+    AddNodeToEdge(_input, 1, 0)
+    AddNodeToEdge(_input, 1, 1)
+    # Here node/edge 0/1 each have degree 1
+    # Edge 2 has degree 1
+    actual = CleanHypergraph(_input, min_degree=2)
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 0, 0)
+    AddNodeToEdge(expected, 0, 1)
+    AddNodeToEdge(expected, 1, 0)
+    AddNodeToEdge(expected, 1, 1)
+    self.assertEqual(actual, expected)
+    self.assertNotEqual(actual, _input)
+
+  def test_two_iterations(self):
+    _input = Hypergraph()
+    AddNodeToEdge(_input, 0, 0) # deleted on iter 1
+    AddNodeToEdge(_input, 0, 1) # deleted on iter 2
+    AddNodeToEdge(_input, 1, 1)
+    AddNodeToEdge(_input, 1, 2)
+    AddNodeToEdge(_input, 2, 1)
+    AddNodeToEdge(_input, 2, 2)
+    actual = CleanHypergraph(_input, min_degree=2)
+
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 1, 1)
+    AddNodeToEdge(expected, 1, 2)
+    AddNodeToEdge(expected, 2, 1)
+    AddNodeToEdge(expected, 2, 2)
+    self.assertEqual(actual, expected)
+    self.assertNotEqual(actual, _input)

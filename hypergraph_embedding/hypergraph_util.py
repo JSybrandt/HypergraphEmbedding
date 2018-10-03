@@ -276,3 +276,19 @@ def ToBlockDiagonal(original_hg):
   inv_edge_map = {y: x for x, y in edge_map.items()}
   new_hg = Relabel(original_hg, node_map, edge_map)
   return new_hg, inv_node_map, inv_edge_map
+
+def RemoveNode(hypergraph, node_idx):
+  "Removes all instances of node_idx from hypergraph"
+  assert node_idx in hypergraph.node
+  # need a copy, we're gonna be changing .edges
+  edges = list(hypergraph.node[node_idx].edges)
+  for edge_idx in edges:
+    RemoveNodeFromEdge(hypergraph, node_idx, edge_idx)
+
+def RemoveEdge(hypergraph, edge_idx):
+  "Removes all instance of edge_idx from hypergraph"
+  assert edge_idx in hypergraph.edge
+  # need a copy, we're gonna be changing .nodes
+  nodes = list(hypergraph.edge[edge_idx].nodes)
+  for node_idx in nodes:
+    RemoveNodeFromEdge(hypergraph, node_idx, edge_idx)

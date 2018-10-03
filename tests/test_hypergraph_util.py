@@ -409,6 +409,58 @@ class ToBlockDiagonalTest(unittest.TestCase):
       restored = Relabel(compressed, node_map, edge_map)
       SparseArrayEquals(self, ToCsrMatrix(original), ToCsrMatrix(restored))
 
+class TestRemoveNode(unittest.TestCase):
+  def test_typical(self):
+    actual = Hypergraph()
+    AddNodeToEdge(actual, 0, 0) # remove me
+    AddNodeToEdge(actual, 0, 1) # remove me
+    AddNodeToEdge(actual, 1, 0)
+    AddNodeToEdge(actual, 1, 1)
+    RemoveNode(actual, 0)
+
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 1, 0)
+    AddNodeToEdge(expected, 1, 1)
+    self.assertEqual(actual, expected)
+
+  def test_removes_edge(self):
+    "Removing a node should automatically remove degree 0 edges"
+    actual = Hypergraph()
+    AddNodeToEdge(actual, 0, 0) # remove me
+    AddNodeToEdge(actual, 0, 1) # remove me
+    AddNodeToEdge(actual, 1, 0)
+    RemoveNode(actual, 0)
+
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 1, 0)
+    self.assertEqual(actual, expected)
+
+class TestRemoveEdge(unittest.TestCase):
+  def test_typical(self):
+    actual = Hypergraph()
+    AddNodeToEdge(actual, 0, 0) # remove me
+    AddNodeToEdge(actual, 0, 1)
+    AddNodeToEdge(actual, 1, 0) # remove me
+    AddNodeToEdge(actual, 1, 1)
+    RemoveEdge(actual, 0)
+
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 0, 1)
+    AddNodeToEdge(expected, 1, 1)
+    self.assertEqual(actual, expected)
+
+  def test_removes_node(self):
+    "Removing an edge should automatically remove degree 0 nodes"
+    actual = Hypergraph()
+    AddNodeToEdge(actual, 0, 0) # remove me
+    AddNodeToEdge(actual, 0, 1)
+    AddNodeToEdge(actual, 1, 0) # remove me
+    RemoveEdge(actual, 0)
+
+    expected = Hypergraph()
+    AddNodeToEdge(expected, 0, 1)
+    self.assertEqual(actual, expected)
+
 
 
 if __name__ == "__main__":
