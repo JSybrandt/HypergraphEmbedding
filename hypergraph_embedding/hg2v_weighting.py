@@ -298,47 +298,21 @@ def ComputeSpans(hypergraph,
 ################################################################################
 
 
-def _init_zero_one_scale_key(idx2value, min_val, delta_val):
-  _shared_info.clear()
-  _shared_info["idx2value"] = idx2value
-  _shared_info["min_val"] = min_val
-  _shared_info["delta_val"] = delta_val
-
-
-def _zero_one_scale_key(idx, idx2value=None, min_val=None, delta_val=None):
-  if idx2value is None:
-    idx2value = _shared_info["idx2value"]
-  if min_val is None:
-    min_val = _shared_info["min_val"]
-  if delta_val is None:
-    delta_val = _shared_info["delta_val"]
-  if delta_val == 0:
-    return idx, 1
-  else:
-    return idx, (idx2value[idx] - min_val) / delta_val
-
-
-def ZeroOneScaleValues(idx2value, run_in_parallel=True, disable_pbar=False):
+def ZeroOneScaleValues(idx2value, disable_pbar=False):
   """
     Scales input dict idx2value to the 0-1 interval. If only one value,
     return 1.
   """
   if len(idx2value) == 0:
     return {}
-  workers = multiprocessing.cpu_count() if run_in_parallel else 1
-  result = {}
   min_val = min(idx2value.values())
   max_val = max(idx2value.values())
   delta_val = max_val - min_val
-  with Pool(
-      workers,
-      initializer=_init_zero_one_scale_key,
-      initargs=(idx2value, min_val, delta_val)) as pool:
-    with tqdm(total=len(idx2value), disable=disable_pbar) as pbar:
-      for idx, val in pool.imap(_zero_one_scale_key, idx2value):
-        result[idx] = val
-        pbar.update(1)
-  return result
+  if delta_val == 0:
+    return {idx: 1 for idx in idx2value}
+  else:
+    return {idx: (val-min_val)/delta_val
+            for idx, val in tqdm(idx2value.items(), disable=disable_pbar)}
 
 
 ################################################################################

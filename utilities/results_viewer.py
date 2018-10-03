@@ -221,19 +221,24 @@ def WriteBarChart(bar_chart_path, experiment2metrics, select_exp_name):
   ax.bar(
       x=[1.2*i+1 for i, _ in enumerate(methods)],
       height=[max(method2vals[m])-min(method2vals[m]) for m in methods],
-      width=1.2,
+      width=1,
       bottom=[min(method2vals[m]) for m in methods],
       alpha=0.5,
       color="grey"
     )
 
-  # Shrink current axis by 20%
   box = ax.get_position()
-  ax.set_position([box.x0, box.y0, box.width * 0.7, box.height])
+  ax.set_position([box.x0, box.y0, box.width * 0.5, box.height])
+  ax.get_xaxis().set_visible(False)
+
 
   # Put a legend to the right of the current axis
-  ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-  fig.savefig(bar_chart_path)
+  lgd = ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+  title = fig.suptitle(select_exp_name)
+  fig.subplots_adjust(top=0.85)
+  fig.savefig(bar_chart_path,
+              bbox_extra_artists=(lgd, title),
+              bbox_inches='tight')
 
 
 if __name__ == "__main__":
