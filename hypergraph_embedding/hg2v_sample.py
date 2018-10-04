@@ -567,7 +567,8 @@ def AlgebraicDistanceSamples(hypergraph,
   assert num_neighbors >= 0
   assert num_samples >= 0
 
-  workers = multiprocessing.cpu_count() if run_in_parallel else 1
+  # workers = multiprocessing.cpu_count() if run_in_parallel else 1
+  workers = min(8, multiprocessing.cpu_count()) if run_in_parallel else 1
 
   # return value
   similarity_records = []

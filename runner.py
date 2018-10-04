@@ -265,3 +265,4 @@ if __name__ == "__main__":
       proto.write(result.SerializeToString())
 
   log.info("Done!")
+  log.info(str(args))
