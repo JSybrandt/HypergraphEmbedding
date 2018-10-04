@@ -66,7 +66,8 @@ def _helper_update_embeddings(hypergraph, node_embeddings, edge_embeddings,
           edge_embeddings  #B2emb
       )) as pool:
     with tqdm(total=len(hypergraph.node), disable=disable_pbar) as pbar:
-      for idx, emb in pool.imap(_update_alg_dist, hypergraph.node):
+      for idx, emb in pool.imap(
+          _update_alg_dist, hypergraph.node, chunksize=128):
         new_node_embeddings[idx, :] = emb
         pbar.update(1)
 
@@ -83,35 +84,14 @@ def _helper_update_embeddings(hypergraph, node_embeddings, edge_embeddings,
           new_node_embeddings  #B2emb
       )) as pool:
     with tqdm(total=len(hypergraph.edge), disable=disable_pbar) as pbar:
-      for idx, emb in pool.imap(_update_alg_dist, hypergraph.edge):
+      for idx, emb in pool.imap(
+          _update_alg_dist, hypergraph.edge, chunksize=128):
         new_edge_embeddings[idx, :] = emb
         pbar.update(1)
   return new_node_embeddings, new_edge_embeddings
 
 
 ## Helper functions to scale embeddings ########################################
-
-
-def _init_scale_alg_dist(embedding, min_embedding, delta_embedding):
-  _shared_info.clear()
-  assert embedding.shape[1] == len(min_embedding)
-  assert embedding.shape[1] == len(delta_embedding)
-  _shared_info["embedding"] = embedding
-  _shared_info["min_embedding"] = min_embedding
-  _shared_info["delta_embedding"] = delta_embedding
-
-
-def _scale_alg_dist(idx,
-                    embedding=None,
-                    min_embedding=None,
-                    delta_embedding=None):
-  if embedding is None:
-    embedding = _shared_info["embedding"]
-  if min_embedding is None:
-    min_embedding = _shared_info["min_embedding"]
-  if delta_embedding is None:
-    delta_embedding = _shared_info["delta_embedding"]
-  return idx, (embedding[idx, :] - min_embedding) / delta_embedding
 
 
 def _helper_scale_embeddings(hypergraph, node_embeddings, edge_embeddings,
@@ -130,33 +110,16 @@ def _helper_scale_embeddings(hypergraph, node_embeddings, edge_embeddings,
 
   if not disable_pbar:
     log.info("Scaling nodes to 0-1 hypercube")
-  with Pool(
-      workers,
-      initializer=_init_scale_alg_dist,
-      initargs=(
-          node_embeddings,  #embedding
-          min_embedding,  #min_embedding
-          delta_embedding  #delta_embedding
-      )) as pool:
-    with tqdm(total=len(hypergraph.node), disable=disable_pbar) as pbar:
-      for idx, emb in pool.imap(_scale_alg_dist, hypergraph.node):
-        node_embeddings[idx, :] = emb
-        pbar.update(1)
+  for idx in tqdm(hypergraph.node, disable=disable_pbar):
+    node_embeddings[idx, :] -= min_embedding
+    node_embeddings[idx, :] /= delta_embedding
 
   if not disable_pbar:
     log.info("Scaling edges to 0-1 hypercube")
-  with Pool(
-      workers,
-      initializer=_init_scale_alg_dist,
-      initargs=(
-          edge_embeddings,  #embedding
-          min_embedding,  #min_embedding
-          delta_embedding  #delta_embedding
-      )) as pool:
-    with tqdm(total=len(hypergraph.edge), disable=disable_pbar) as pbar:
-      for idx, emb in pool.imap(_scale_alg_dist, hypergraph.edge):
-        edge_embeddings[idx, :] = emb
-        pbar.update(1)
+  for idx in tqdm(hypergraph.edge, disable=disable_pbar):
+    edge_embeddings[idx, :] -= min_embedding
+    edge_embeddings[idx, :] /= delta_embedding
+
   return node_embeddings, edge_embeddings
 
 
@@ -166,6 +129,8 @@ def EmbedAlgebraicDistance(hypergraph,
                            run_in_parallel=True,
                            disable_pbar=False):
   workers = multiprocessing.cpu_count() if run_in_parallel else 1
+
+  hypergraph, node_map, edge_map = CompressRange(hypergraph)
 
   num_nodes = max(hypergraph.node) + 1
   num_edges = max(hypergraph.edge) + 1
@@ -202,7 +167,9 @@ def EmbedAlgebraicDistance(hypergraph,
   embedding.dim = dimension
   embedding.method_name = "AlgebraicDistance"
   for node_idx in hypergraph.node:
-    embedding.node[node_idx].values.extend(node_embeddings[node_idx, :])
+    embedding.node[node_map[node_idx]].values.extend(
+        node_embeddings[node_idx, :])
   for edge_idx in hypergraph.edge:
-    embedding.edge[edge_idx].values.extend(edge_embeddings[edge_idx, :])
+    embedding.edge[edge_map[edge_idx]].values.extend(
+        edge_embeddings[edge_idx, :])
   return embedding

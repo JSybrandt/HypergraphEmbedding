@@ -7,6 +7,7 @@ import logging
 import logging.handlers
 from pathlib import Path
 from hypergraph_embedding import *
+from datetime import date
 
 log = logging.getLogger()
 
@@ -26,6 +27,11 @@ def ParseArgs():
       help=("Specifies level of logging verbosity. "
             "Options: CRITICAL, ERROR, WARNING, INFO, DEBUG, NONE"),
       default="INFO")
+  parser.add_argument(
+      "--log-dir",
+      type=str,
+      help="Specifies root directory to store log information.",
+      default="./")
 
   # Raw data options (convert to hypergraph)
   parser.add_argument(
@@ -126,11 +132,43 @@ def ConfigureLogger(args):
   handler = logging.StreamHandler()
   handler.setFormatter(formatter)
   log.addHandler(handler)
+  log_dir_path = Path(args.log_dir)
+  assert log_dir_path.is_dir()
+
+  def get_uniq_log_name():
+    day = str(date.today())
+    hypergraph_name = Path(args.hypergraph).stem
+    emb_name = args.embedding_method if args.embedding_method is not None else ""
+
+    for log_count in range(1, 200):
+      name = "{d}.{h}.{e}.{c}.log".format(
+          d=day, h=hypergraph_name, e=emb_name, c=log_count)
+      path = log_dir_path.joinpath(name)
+      if not path.exists():
+        return str(path)
+    print("Failed to generate log file!", file=sys.stderr)
+    exit(1)
+
+  if args.experiment_result is not None:
+    log_path = str(
+        log_dir_path.joinpath("{d}.{e}.log".format(
+            d=str(date.today()), e=Path(args.experiment_result).stem)))
+  else:
+    log_path = get_uniq_log_name()
+
+  handler = logging.FileHandler(log_path)
+  handler.setFormatter(formatter)
+  log.addHandler(handler)
+  log.info("Logging to %s", log_path)
 
 
 if __name__ == "__main__":
   args = ParseArgs()
   ConfigureLogger(args)
+
+  log.info("=" * 80)
+  log.info(str(args))
+  log.info("=" * 80)
 
   log.info("Validating input arguments")
   hypergraph_path = Path(args.hypergraph)

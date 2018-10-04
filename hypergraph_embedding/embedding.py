@@ -93,18 +93,19 @@ def EmbedNMF(hypergraph, dimension):
   assert dimension < len(hypergraph.node)
   assert dimension < len(hypergraph.edge)
 
+  hypergraph, node_map, edge_map = CompressRange(hypergraph)
   embedding = HypergraphEmbedding()
   embedding.dim = dimension
   embedding.method_name = "NMF"
 
   matrix = ToCsrMatrix(hypergraph)
   nmf_model = NMF(dimension)
-  W = nmf_model.fit_transform(matrix)
+  W = nmf_model.fit_transform(matrix.todense())
   H = nmf_model.components_
   for node_idx in hypergraph.node:
-    embedding.node[node_idx].values.extend(W[node_idx, :])
+    embedding.node[node_map[node_idx]].values.extend(W[node_idx, :])
   for edge_idx in hypergraph.edge:
-    embedding.edge[edge_idx].values.extend(H[:, edge_idx])
+    embedding.edge[edge_map[edge_idx]].values.extend(H[:, edge_idx])
 
   return embedding
 
@@ -140,8 +141,8 @@ def EmbedNode2VecBipartide(hypergraph,
       dimensions=dimension,
       walk_length=walk_length,
       num_walks=num_walks_per_node,
-      workers=workers,
-      quiet=disable_pbar)
+      workers=workers)
+  #quiet=disable_pbar)
   model = embedder.fit(window=window, min_count=1, batch_words=4)
 
   max_node_idx = max(i for i, _ in hypergraph.node.items())
