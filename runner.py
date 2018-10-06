@@ -63,8 +63,8 @@ def ParseArgs():
       nargs="*",
       help=("Specifies the manner in which the provided hypergraph should be "
             "embedded. If multiple are supplied, we train each and them merge "
-            "via a linear combination. Options: "
-            + " ".join([o for o in EMBEDDING_OPTIONS])))
+            "via a linear combination. Options: " + " ".join(
+                [o for o in EMBEDDING_OPTIONS])))
   parser.add_argument(
       "--embedding-dimension",
       type=int,
@@ -141,7 +141,12 @@ def ConfigureLogger(args):
   def get_uniq_log_name():
     day = str(date.today())
     hypergraph_name = Path(args.hypergraph).stem
-    emb_name = args.embedding_method if args.embedding_method is not None else ""
+    emb_name = ""
+    if args.embedding_method is not None:
+      if len(args.embedding_method) == 1:
+        emb_name = args.embedding_method[0]
+      else:
+        emb_name = "_".join(args.embedding_method)
 
     for log_count in range(1, 200):
       name = "{d}.{h}.{e}.{c}.log".format(
@@ -163,6 +168,56 @@ def ConfigureLogger(args):
   handler.setFormatter(formatter)
   log.addHandler(handler)
   log.info("Logging to %s", log_path)
+
+
+def PrepLinkPredictionExperiment(hypergraph, args):
+  """
+  Given data from command line arguments, create a subgraph by removing
+  random node-edge connections, embed that hypergraph, and return a list
+  of node-edge connections consisting of the removed and negative sampled
+  connections. Output is stored in a LinkPredictionData namedtuple
+  """
+
+  if args.experiment_rerun is not None:
+    log.info("Recovering information from %s", args.experiment_rerun)
+    exp = ExperimentalResult()
+    with open(args.experiment_rerun, 'rb') as proto:
+      exp.ParseFromString(proto.read())
+    log.info("Checking Experimental Result")
+    assert len(exp.metrics) > 0
+    assert len(exp.metrics[0].records) > 0
+    assert exp.HasField("hypergraph")
+
+    new_graph = exp.hypergraph
+    good_links = [
+        (r.node_idx, r.edge_idx) for r in exp.metrics[0].records if r.label
+    ]
+    bad_links = [
+        (r.node_idx, r.edge_idx) for r in exp.metrics[0].records if not r.label
+    ]
+  else:
+    log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
+    assert args.experiment_lp_probability >= 0
+    assert args.experiment_lp_probability <= 1
+
+    log.info("Creating subgraph with removal prob. %f",
+             args.experiment_lp_probability)
+    new_graph, good_links = RemoveRandomConnections(
+        hypergraph, args.experiment_lp_probability)
+    log.info("Removed %i links", len(good_links))
+
+    log.info("Sampling missing links for evaluation")
+    bad_links = SampleMissingConnections(hypergraph, len(good_links))
+    log.info("Sampled %i links", len(bad_links))
+
+  log.info("Embedding new hypergraph")
+  embedding = Embed(args, new_graph)
+
+  return LinkPredictionData(
+      hypergraph=new_graph,
+      embedding=embedding,
+      good_links=good_links,
+      bad_links=bad_links)
 
 
 if __name__ == "__main__":

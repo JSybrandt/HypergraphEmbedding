@@ -32,7 +32,9 @@ __all__ = [
 
     # Experiments
     "EXPERIMENT_OPTIONS",
-    "PrepLinkPredictionExperiment",
+    "LinkPredictionData",
+    "RemoveRandomConnections",
+    "SampleMissingConnections",
     "RunLinkPredictionExperiment",
     "LinkPredictionDataToResultProto"
 ]
