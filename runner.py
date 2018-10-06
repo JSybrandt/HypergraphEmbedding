@@ -60,8 +60,11 @@ def ParseArgs():
   parser.add_argument(
       "--embedding-method",
       type=str,
+      nargs="*",
       help=("Specifies the manner in which the provided hypergraph should be "
-            "embedded. Options: " + " ".join([o for o in EMBEDDING_OPTIONS])))
+            "embedded. If multiple are supplied, we train each and them merge "
+            "via a linear combination. Options: "
+            + " ".join([o for o in EMBEDDING_OPTIONS])))
   parser.add_argument(
       "--embedding-dimension",
       type=int,
@@ -195,7 +198,9 @@ if __name__ == "__main__":
     log.info("Performing checks for writing embedding")
     embedding_path = Path(args.embedding)
     log.info("Checking for valid embedding-method")
-    assert args.embedding_method in EMBEDDING_OPTIONS
+    assert len(args.embedding_method) >= 1
+    for method in args.embedding_method:
+      assert method in EMBEDDING_OPTIONS
     log.info("Checking for positive dimension")
     assert args.embedding_dimension > 0
     log.info("Checking its safe to write embedding")
@@ -207,7 +212,9 @@ if __name__ == "__main__":
   assert bool(args.experiment) == bool(args.experiment_result)
   if args.experiment is not None:
     log.info("Checking that embedding is also specified")
-    assert args.embedding_method
+    assert len(args.embedding_method) >= 1
+    for method in args.embedding_method:
+      assert method in EMBEDDING_OPTIONS
     log.info("Checking for --experiment-result")
     experiment_result_path = Path(args.experiment_result)
     assert not experiment_result_path.exists()

@@ -33,23 +33,33 @@ log = logging.getLogger()
 global EMBEDDING_OPTIONS
 global DEBUG_SUMMARY_OPTIONS
 
+def CombineEmbeddings(embeddings, hypergraph):
+  assert len(embeddings) >= 1
+  if len(embeddings) == 1:
+    return embeddings[0]
+  else:
+    log.error("MultiEmbeddings not yet suported!")
+    return embeddings[0]
 
 def Embed(args, hypergraph):
   log.info("Checking embedding dimensionality is smaller than # nodes/edges")
-  assert min(len(hypergraph.node), len(
-      hypergraph.edge)) > args.embedding_dimension
-  log.info("Embedding using method %s with %i dim", args.embedding_method,
-           args.embedding_dimension)
-  if args.embedding_debug_summary:
-    debug_summary_path = Path(args.embedding_debug_summary)
-    log.info("... and writing summary to %s", debug_summary_path)
-    embedding = EMBEDDING_OPTIONS[args.embedding_method](
-        hypergraph,
-        args.embedding_dimension,
-        debug_summary_path=debug_summary_path)
-  else:
-    embedding = EMBEDDING_OPTIONS[args.embedding_method](
-        hypergraph, args.embedding_dimension)
+  assert min(len(hypergraph.node),
+             len(hypergraph.edge)) > args.embedding_dimension
+  assert len(args.embedding_method) >= 1
+  embeddings = []
+  for method in args.embedding_method:
+    log.info("Embedding using method %s with %i dim", method,
+             args.embedding_dimension)
+    if args.embedding_debug_summary:
+      debug_summary_path = Path(args.embedding_debug_summary)
+      log.info("... and writing summary to %s", debug_summary_path)
+      embeddings.append(EMBEDDING_OPTIONS[method](
+        hypergraph, args.embedding_dimension,
+        debug_summary_path=debug_summary_path))
+    else:
+      embeddings.append(EMBEDDING_OPTIONS[method](
+        hypergraph, args.embedding_dimension))
+  embedding = CombineEmbeddings(embeddings, hypergraph)
   log.info("Embedding contains %i node and %i edge vectors",
            len(embedding.node), len(embedding.edge))
   return embedding
@@ -387,3 +397,4 @@ DEBUG_SUMMARY_OPTIONS = {
     "HG2V_NEIGH_JAC",
     "HG2V_ALG_DIST",
 }
+
