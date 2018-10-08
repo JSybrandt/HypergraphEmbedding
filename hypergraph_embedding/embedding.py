@@ -30,6 +30,7 @@ from time import time
 from keras.callbacks import EarlyStopping
 from keras.layers import Input
 from keras.layers import Dense
+from keras.layers import Dropout
 from keras.models import Model
 from keras.layers import Concatenate
 
@@ -49,23 +50,25 @@ def _combine_embeddings_via_node_edge_classifer(hypergraph, embeddings,
   input_size = sum([emb.dim for emb in embeddings])
   assert desired_dim > 0
 
-  concatinated_node = Input(
+  concatenated_node = Input(
       (input_size,), dtype=np.float32, name="ConcatinatedNode")
-  concatinated_edge = Input(
+  concatenated_edge = Input(
       (input_size,), dtype=np.float32, name="ConcatinatedEdge")
+
+
 
   joint_node = Dense(
       desired_dim, dtype=np.float32, activation="relu", name="JointNode")(
-          concatinated_node)
+          Dropout(.5)(concatenated_node))
   joint_edge = Dense(
       desired_dim, dtype=np.float32, activation="relu", name="JointEdge")(
-          concatinated_edge)
+          Dropout(.5)(concatenated_edge))
 
   merged = Concatenate(axis=1)([joint_node, joint_edge])
   out = Dense(1, activation="sigmoid")(merged)
 
   emb_trainer = Model(
-      inputs=[concatinated_node, concatinated_edge], outputs=[out])
+      inputs=[concatenated_node, concatenated_edge], outputs=[out])
   emb_trainer.compile(optimizer="adagrad", loss="mean_squared_error")
 
   log.info("Concatenating node embedding")
@@ -103,27 +106,25 @@ def _combine_embeddings_via_node_edge_classifer(hypergraph, embeddings,
     labels.append(0)
 
   log.info("Training model")
-  stopper = EarlyStopping(monitor="loss", min_delta=1e-3)
   emb_trainer.fit(
       [node_samples, edge_samples],
       labels,
       batch_size=256,
-      epochs=30,
-      callbacks=[stopper],
+      epochs=50,
       verbose=0 if disable_pbar else 1)
 
   embedding = HypergraphEmbedding()
   embedding.dim = desired_dim
 
   log.info("Interpreting model for compressed node embeddings")
-  node_predictor = Model(inputs=[concatinated_node], outputs=[joint_node])
+  node_predictor = Model(inputs=[concatenated_node], outputs=[joint_node])
   vecs = np.array([node2cat_emb[node_idx] for node_idx in hypergraph.node])
   compressed_embeddings = node_predictor.predict(vecs)
   for row_idx, node_idx in enumerate(hypergraph.node):
     embedding.node[node_idx].values.extend(compressed_embeddings[row_idx, :])
 
   log.info("Interpreting model for compressed edge embeddings")
-  edge_predictor = Model(inputs=[concatinated_edge], outputs=[joint_edge])
+  edge_predictor = Model(inputs=[concatenated_edge], outputs=[joint_edge])
   vecs = np.array([edge2cat_emb[edge_idx] for edge_idx in hypergraph.edge])
   compressed_embeddings = edge_predictor.predict(vecs)
   for row_idx, edge_idx in enumerate(hypergraph.edge):
