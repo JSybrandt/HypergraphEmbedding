@@ -13,6 +13,7 @@ from hypergraph_embedding.evaluation_util import *
 from hypergraph_embedding.hg2v_model import *
 from hypergraph_embedding.hg2v_sample import *
 from hypergraph_embedding.auto_encoder import *
+from hypergraph_embedding.combine_embeddings_util import *
 
 __all__ = [
     # proto
