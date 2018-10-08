@@ -98,7 +98,7 @@ class EmbedRandomTest(EmbeddingTestCase):
     _input = TestHypergraph()
     actual = EmbedRandom(_input, dim)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Random")
+    self.assertEqual(actual.method_name, "RANDOM")
 
   def test_fuzz(self):
     "Random embedding should never break"
@@ -126,7 +126,7 @@ class EmbedNode2VecBipartideTest(EmbeddingTestCase):
     _input = TestHypergraph()
     actual = EmbedNode2VecBipartide(_input, dim, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Node2VecBipartide(5)")
+    self.assertEqual(actual.method_name, "N2V5_BIPARTIDE")
 
   def test_fuzz(self):
     "N2V Bipartide embedding should never break"
@@ -143,7 +143,7 @@ class EmbedNode2VecBipartideTest(EmbeddingTestCase):
 
     actual = EmbedNode2VecBipartide(hg, dim, disable_pbar=True)
     self.checkEmbedding(actual, hg, dim)
-    self.assertEqual(actual.method_name, "Node2VecBipartide(5)")
+    self.assertEqual(actual.method_name, "N2V5_BIPARTIDE")
 
 
 class EmbedNode2VecCliqueTest(EmbeddingTestCase):
@@ -153,7 +153,7 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
     _input = TestHypergraph()
     actual = EmbedNode2VecClique(_input, dim, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Node2VecClique(5)")
+    self.assertEqual(actual.method_name, "N2V5_CLIQUE")
 
   def test_fuzz(self):
     "N2V Clique embedding should never break"
@@ -170,7 +170,7 @@ class EmbedNode2VecCliqueTest(EmbeddingTestCase):
 
     actual = EmbedNode2VecClique(hg, dim, disable_pbar=True)
     self.checkEmbedding(actual, hg, dim)
-    self.assertEqual(actual.method_name, "Node2VecClique(5)")
+    self.assertEqual(actual.method_name, "N2V5_CLIQUE")
 
 
 class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
@@ -181,7 +181,7 @@ class EmbedAlgebraicDistanceTest(EmbeddingTestCase):
     actual = EmbedAlgebraicDistance(
         _input, dim, iterations=3, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "AlgebraicDistance")
+    self.assertEqual(actual.method_name, "ALG_DIST")
 
 
 class EmbedHg2vBooleanTest(EmbeddingTestCase):
@@ -198,7 +198,7 @@ class EmbedHg2vBooleanTest(EmbeddingTestCase):
         epochs=1,
         disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Hypergraph2Vec Boolean")
+    self.assertEqual(actual.method_name, "HG2V_BOOLEAN")
 
   def test_fuzz(self):
     "Boolean embedding should never break"
@@ -226,7 +226,7 @@ class EmbedHg2vAdjJaccardTest(EmbeddingTestCase):
         epochs=1,
         disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Hypergraph2Vec AdjJaccard")
+    self.assertEqual(actual.method_name, "HG2V_ADJ_JAC")
 
   def test_fuzz(self):
     "AdjJacc embedding should never break"
@@ -254,7 +254,7 @@ class EmbedHg2vAlgDistTest(EmbeddingTestCase):
         epochs=1,
         disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "Hypergraph2Vec Algebraic Distance")
+    self.assertEqual(actual.method_name, "HG2V_ALG_DIST")
 
 
 class EmbedAutoEncoderTest(EmbeddingTestCase):
@@ -280,7 +280,7 @@ class EmbedAutoEncoderTest(EmbeddingTestCase):
     _input = TestHypergraph()
     actual = EmbedAutoEncoder(_input, dim, disable_pbar=True)
     self.checkEmbedding(actual, _input, dim)
-    self.assertEqual(actual.method_name, "AutoEncoder")
+    self.assertEqual(actual.method_name, "AUTO_ENCODER")
 
   def test_auto_encoder_sample(self):
     ac_original, ac_perturbed = ae._auto_encoder_sample(

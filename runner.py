@@ -102,7 +102,12 @@ def ParseArgs():
       type=str,
       help=("If set, supply a path to a previously run experiment."
             "Instead of sampling from the hg, we will just use this one."))
-
+  parser.add_argument(
+      "--experiment-shortcut",
+      type=str,
+      nargs="*",
+      help=("Paths to previously constructed embeddings. Used to shortcut the "
+            "combine testing process."))
   # Required hypergraph argument
   parser.add_argument(
       "hypergraph",
@@ -177,11 +182,10 @@ def PrepLinkPredictionExperiment(hypergraph, args):
   of node-edge connections consisting of the removed and negative sampled
   connections. Output is stored in a LinkPredictionData namedtuple
   """
-
-  if args.experiment_rerun is not None:
-    log.info("Recovering information from %s", args.experiment_rerun)
+  def load_experiment(path):
+    log.info("Recovering information from %s", path)
     exp = ExperimentalResult()
-    with open(args.experiment_rerun, 'rb') as proto:
+    with open(path, 'rb') as proto:
       exp.ParseFromString(proto.read())
     log.info("Checking Experimental Result")
     assert len(exp.metrics) > 0
@@ -195,6 +199,30 @@ def PrepLinkPredictionExperiment(hypergraph, args):
     bad_links = [
         (r.node_idx, r.edge_idx) for r in exp.metrics[0].records if not r.label
     ]
+    return (new_graph, good_links, bad_links, exp.embedding)
+
+  method_name2embedding = {}
+
+  if args.experiment_shortcut is not None:
+    log.info("Checking that all shortcuts come from the same experiment")
+    new_graph, good_links, bad_links, embedding = load_experiment(args.experiment_shortcut[0])
+    method_name2embedding[embedding.method_name] = embedding
+
+    for path in args.experiment_shortcut[1:]:
+      tmp_graph, tmp_good_links, tmp_bad_links, embedding = load_experiment(path)
+      assert tmp_graph == new_graph
+      assert tmp_good_links == good_links
+      assert tmp_bad_links == bad_links
+      assert embedding.method_name not in method_name2embedding
+      method_name2embedding[embedding.method_name] = embedding
+
+    log.info("Loaded shortcuts for:")
+    for method in method_name2embedding:
+      log.info("\t>\t%s", method)
+
+  elif args.experiment_rerun is not None:
+    new_graph, good_links, bad_links, _ = load_experiment(args.experiment_rerun)
+
   else:
     log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
     assert args.experiment_lp_probability >= 0
@@ -211,7 +239,7 @@ def PrepLinkPredictionExperiment(hypergraph, args):
     log.info("Sampled %i links", len(bad_links))
 
   log.info("Embedding new hypergraph")
-  embedding = Embed(args, new_graph)
+  embedding = Embed(args, new_graph, method_name2embedding)
 
   return LinkPredictionData(
       hypergraph=new_graph,
@@ -252,10 +280,13 @@ if __name__ == "__main__":
   if args.embedding:
     log.info("Performing checks for writing embedding")
     embedding_path = Path(args.embedding)
-    log.info("Checking for valid embedding-method")
+    log.info("Checking for valid embedding-method, and no duplicates")
     assert len(args.embedding_method) >= 1
+    seen_methods = set()
     for method in args.embedding_method:
       assert method in EMBEDDING_OPTIONS
+      assert method not in seen_methods
+      seen_methods.add(method)
     log.info("Checking for positive dimension")
     assert args.embedding_dimension > 0
     log.info("Checking its safe to write embedding")
@@ -281,6 +312,10 @@ if __name__ == "__main__":
       log.info("Checking that rerun path is valid.")
       rerun_path = Path(args.experiment_rerun)
       assert rerun_path.is_file()
+    if args.experiment_shortcut is not None:
+      log.info("Checking shortcuts")
+      for shortcut_path in [Path(p) for p in args.experiment_shortcut]:
+        assert shortcut_path.is_file()
 
   if args.embedding_debug_summary:
     log.info("--embedding_debug_summary set, checking for appropriate method")
