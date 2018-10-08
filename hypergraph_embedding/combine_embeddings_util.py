@@ -36,7 +36,7 @@ def _sample_hypergraph(hypergraph, node2emb, edge2emb):
 
   log.info("Collecting negative samples")
   for node_idx, edge_idx in SampleMissingConnections(hypergraph,
-                                                     10*num_pos_samples):
+                                                     20*num_pos_samples):
     node_samples.append(node2emb[node_idx])
     edge_samples.append(edge2emb[edge_idx])
     labels.append(0)
@@ -72,10 +72,10 @@ def CombineEmbeddingsViaNodeEdgeClassifier(hypergraph, embeddings,
   dropped_edge = Dropout(0.5)(concatenated_edge)
 
   joint_node = Dense(
-      desired_dim, activation="softmax", name="JointNode")(
+      desired_dim, activation="sigmoid", name="JointNode")(
           dropped_node)
   joint_edge = Dense(
-      desired_dim, activation="softmax", name="JointEdge")(
+      desired_dim, activation="sigmoid", name="JointEdge")(
           dropped_edge)
 
   recovered_node = Dense(input_size, activation="relu", name="RecoveredNode")(joint_node)
