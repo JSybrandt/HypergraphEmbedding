@@ -36,7 +36,7 @@ def _sample_hypergraph(hypergraph, node2emb, edge2emb):
 
   log.info("Collecting negative samples")
   for node_idx, edge_idx in SampleMissingConnections(hypergraph,
-                                                     5*num_pos_samples):
+                                                     10*num_pos_samples):
     node_samples.append(node2emb[node_idx])
     edge_samples.append(edge2emb[edge_idx])
     labels.append(0)
@@ -59,38 +59,48 @@ def CombineEmbeddingsViaNodeEdgeClassifier(hypergraph, embeddings,
   log.info("Concatenating edge embedding")
   edge2cat_emb = _concatenate_embeddings(hypergraph.edge, [emb.edge for emb in embeddings])
   node_samples, edge_samples, labels = _sample_hypergraph(hypergraph, node2cat_emb, edge2cat_emb)
+  input_size = sum([emb.dim for emb in embeddings])
 
   ## Constructing Model
   log.info("Constucting model")
-  input_size = sum([emb.dim for emb in embeddings])
 
   concatenated_node = Input(
       (input_size,), dtype=np.float32, name="ConcatinatedNode")
   concatenated_edge = Input(
       (input_size,), dtype=np.float32, name="ConcatinatedEdge")
+  dropped_node = Dropout(0.5)(concatenated_node)
+  dropped_edge = Dropout(0.5)(concatenated_edge)
 
   joint_node = Dense(
-      desired_dim, dtype=np.float32, activation="relu", name="JointNode")(
-          concatenated_node)
+      desired_dim, activation="softmax", name="JointNode")(
+          dropped_node)
   joint_edge = Dense(
-      desired_dim, dtype=np.float32, activation="relu", name="JointEdge")(
-          concatenated_edge)
+      desired_dim, activation="softmax", name="JointEdge")(
+          dropped_edge)
+
+  recovered_node = Dense(input_size, activation="relu", name="RecoveredNode")(joint_node)
+  recovered_edge = Dense(input_size, activation="relu", name="RecoveredEdge")(joint_edge)
 
   merged = Concatenate(axis=1)([joint_node, joint_edge])
-  out = Dense(1, activation="sigmoid")(merged)
+  hidden = Dense(desired_dim, activation="relu")(merged)
+  predicted_label = Dense(1, activation="sigmoid", name="PredictedLabel")(hidden)
 
   emb_trainer = Model(
-      inputs=[concatenated_node, concatenated_edge], outputs=[out])
-  emb_trainer.compile(optimizer="adagrad", loss="mean_squared_error")
+      inputs=[concatenated_node,
+              concatenated_edge],
+      outputs=[predicted_label,
+               recovered_node,
+               recovered_edge])
+  emb_trainer.compile(optimizer="adagrad", loss="mean_squared_error", loss_weights=[2, 1, 1])
 
   stopper = EarlyStopping(monitor="loss")
 
   log.info("Training model")
   emb_trainer.fit(
       [node_samples, edge_samples],
-      labels,
+      [labels, node_samples, edge_samples],
       batch_size=256,
-      epochs=50,
+      epochs=100,
       callbacks=[stopper],  # Stop if actually no improvement
       verbose=0 if disable_pbar else 1)
 
