@@ -6,6 +6,7 @@ from .hypergraph_util import *
 from .algebraic_distance import EmbedAlgebraicDistance
 from .auto_encoder import EmbedAutoEncoder
 from .combine_embeddings_util import CombineEmbeddingsViaNodeEdgeClassifier
+from .combine_embeddings_util import CombineEmbeddingsViaConcatenation
 
 from .hg2v_model import *
 from .hg2v_sample import *
@@ -38,16 +39,35 @@ log = logging.getLogger()
 
 global EMBEDDING_OPTIONS
 global DEBUG_SUMMARY_OPTIONS
+global COMBINATION_OPTIONS
+
+COMBINATION_OPTIONS = [
+    "N_E_SUPERVISED", # default @ 0
+    "N_E_SEMI_SUPERVISED",
+    "CONCATENATE",
+]
 
 def CombineEmbeddings(args, hypergraph, embeddings, disable_pbar=False):
   assert len(embeddings) >= 1
   if len(embeddings) == 1:
     return embeddings[0]
   else:
-    embeddings = CombineEmbeddingsViaNodeEdgeClassifier(
-        hypergraph, embeddings, args.embedding_dimension, disable_pbar)
-    embeddings.method_name = "_".join(args.embedding_method)
-    return embeddings
+    if args.embedding_combination_strategy == "CONCATENATE":
+      comb_emb = CombineEmbeddingsViaConcatenation(hypergraph, embeddings)
+      # Updating embedding dimension
+      args.embedding_dimension = comb_emb.dim
+    elif args.embedding_combination_strategy == "N_E_SUPERVISED":
+      comb_emb = CombineEmbeddingsViaNodeEdgeClassifier(
+        hypergraph, embeddings, args.embedding_dimension,
+        with_auto_encoder=False, disable_pbar=disable_pbar)
+    elif args.embedding_combination_strategy == "N_E_SEMI_SUPERVISED":
+      comb_emb = CombineEmbeddingsViaNodeEdgeClassifier(
+        hypergraph, embeddings, args.embedding_dimension,
+        with_auto_encoder=True, disable_pbar=disable_pbar)
+    else:
+      raise ValueError("Args contains an illegal embedding-combination-strategy")
+    comb_emb.method_name = "_".join(args.embedding_method)
+    return comb_emb
 
 
 def Embed(args, hypergraph, shortcut_embeddings=None):

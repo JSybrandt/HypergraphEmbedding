@@ -30,6 +30,7 @@ __all__ = [
     "Embed",
     "EMBEDDING_OPTIONS",
     "DEBUG_SUMMARY_OPTIONS",
+    "COMBINATION_OPTIONS",
 
     # Experiments
     "EXPERIMENT_OPTIONS",

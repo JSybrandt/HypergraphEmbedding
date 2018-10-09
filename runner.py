@@ -77,6 +77,12 @@ def ParseArgs():
           "If set, in combination with an appropriate embedding-method we will "
           "write a summary of our embedding information. For instance, we may "
           "provided a histogram of each sampled probabilities"))
+  parser.add_argument(
+      "--embedding-combination-strategy",
+      type=str,
+      default=COMBINATION_OPTIONS[0],
+      help=("If multiple embeddings are specified, how should we combine them?"
+            "Options:" + " ".join([o for o in COMBINATION_OPTIONS])))
 
   # experiment options
   parser.add_argument(
@@ -292,6 +298,9 @@ if __name__ == "__main__":
     log.info("Checking its safe to write embedding")
     assert not embedding_path.exists()
     assert embedding_path.parent.is_dir()
+
+  log.info("Checking for legal combination strategy")
+  assert args.embedding_combination_strategy in COMBINATION_OPTIONS
 
   log.info("Checking that experimental flags are appropriate")
   log.info("Checking that if experiment is set, experiment-result is too")
