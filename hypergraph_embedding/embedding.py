@@ -5,6 +5,8 @@ from . import HypergraphEmbedding
 from .hypergraph_util import *
 from .algebraic_distance import EmbedAlgebraicDistance
 from .auto_encoder import EmbedAutoEncoder
+from .combine_embeddings_util import CombineEmbeddingsViaNodeEdgeClassifier
+from .combine_embeddings_util import CombineEmbeddingsViaConcatenation
 
 from .hg2v_model import *
 from .hg2v_sample import *
@@ -27,29 +29,71 @@ from tqdm import tqdm
 from time import time
 
 from keras.callbacks import EarlyStopping
+from keras.layers import Input
+from keras.layers import Dense
+from keras.layers import Dropout
+from keras.models import Model
+from keras.layers import Concatenate
 
 log = logging.getLogger()
 
 global EMBEDDING_OPTIONS
 global DEBUG_SUMMARY_OPTIONS
+global COMBINATION_OPTIONS
+
+COMBINATION_OPTIONS = [
+    "N_E_SUPERVISED", # default @ 0
+    "N_E_SEMI_SUPERVISED",
+    "CONCATENATE",
+]
+
+def CombineEmbeddings(args, hypergraph, embeddings, disable_pbar=False):
+  assert len(embeddings) >= 1
+  if len(embeddings) == 1:
+    return embeddings[0]
+  else:
+    if args.embedding_combination_strategy == "CONCATENATE":
+      comb_emb = CombineEmbeddingsViaConcatenation(hypergraph, embeddings)
+      # Updating embedding dimension
+      args.embedding_dimension = comb_emb.dim
+    elif args.embedding_combination_strategy == "N_E_SUPERVISED":
+      comb_emb = CombineEmbeddingsViaNodeEdgeClassifier(
+        hypergraph, embeddings, args.embedding_dimension,
+        with_auto_encoder=False, disable_pbar=disable_pbar)
+    elif args.embedding_combination_strategy == "N_E_SEMI_SUPERVISED":
+      comb_emb = CombineEmbeddingsViaNodeEdgeClassifier(
+        hypergraph, embeddings, args.embedding_dimension,
+        with_auto_encoder=True, disable_pbar=disable_pbar)
+    else:
+      raise ValueError("Args contains an illegal embedding-combination-strategy")
+    comb_emb.method_name = "_".join(args.embedding_method)
+    return comb_emb
 
 
-def Embed(args, hypergraph):
+def Embed(args, hypergraph, shortcut_embeddings=None):
   log.info("Checking embedding dimensionality is smaller than # nodes/edges")
   assert min(len(hypergraph.node), len(
       hypergraph.edge)) > args.embedding_dimension
-  log.info("Embedding using method %s with %i dim", args.embedding_method,
-           args.embedding_dimension)
-  if args.embedding_debug_summary:
-    debug_summary_path = Path(args.embedding_debug_summary)
-    log.info("... and writing summary to %s", debug_summary_path)
-    embedding = EMBEDDING_OPTIONS[args.embedding_method](
-        hypergraph,
-        args.embedding_dimension,
-        debug_summary_path=debug_summary_path)
-  else:
-    embedding = EMBEDDING_OPTIONS[args.embedding_method](
-        hypergraph, args.embedding_dimension)
+  assert len(args.embedding_method) >= 1
+  embeddings = []
+  for method in args.embedding_method:
+    if shortcut_embeddings is not None and method in shortcut_embeddings:
+      log.info("Using saved embedding for %s", method)
+      embeddings.append(shortcut_embeddings[method])
+    else:
+      log.info("Embedding using method %s with %i dim", method,
+               args.embedding_dimension)
+      if args.embedding_debug_summary:
+        debug_summary_path = Path(args.embedding_debug_summary)
+        log.info("... and writing summary to %s", debug_summary_path)
+        embeddings.append(EMBEDDING_OPTIONS[method](
+            hypergraph,
+            args.embedding_dimension,
+            debug_summary_path=debug_summary_path))
+      else:
+        embeddings.append(EMBEDDING_OPTIONS[method](hypergraph,
+                                                    args.embedding_dimension))
+  embedding = CombineEmbeddings(args, hypergraph, embeddings)
   log.info("Embedding contains %i node and %i edge vectors",
            len(embedding.node), len(embedding.edge))
   return embedding
@@ -79,7 +123,7 @@ def EmbedRandom(hypergraph, dimension):
 
   embedding = HypergraphEmbedding()
   embedding.dim = dimension
-  embedding.method_name = "Random"
+  embedding.method_name = "RANDOM"
 
   for node_idx in hypergraph.node:
     embedding.node[node_idx].values.extend([random() for _ in range(dimension)])
@@ -131,7 +175,7 @@ def EmbedNode2VecBipartide(hypergraph,
 
   embedding = HypergraphEmbedding()
   embedding.dim = dimension
-  embedding.method_name = "Node2VecBipartide({})".format(walk_length)
+  embedding.method_name = "N2V{}_BIPARTIDE".format(walk_length)
 
   bipartide = ToBipartideNxGraph(hypergraph)
   embedder = Node2Vec(
@@ -179,7 +223,7 @@ def EmbedNode2VecClique(hypergraph,
 
   embedding = HypergraphEmbedding()
   embedding.dim = dimension
-  embedding.method_name = "Node2VecClique({})".format(walk_length)
+  embedding.method_name = "N2V{}_CLIQUE".format(walk_length)
 
   clique = ToCliqueNxGraph(hypergraph)
   embedder = Node2Vec(
@@ -270,7 +314,7 @@ def EmbedHg2vBoolean(hypergraph,
   embedding = _hypergraph2vec_skeleton(hypergraph, dimension, num_neighbors,
                                        sampler_fn, model_fn, batch_size, epochs,
                                        debug_summary_path, disable_pbar)
-  embedding.method_name = "Hypergraph2Vec Boolean"
+  embedding.method_name = "HG2V_BOOLEAN"
   return embedding
 
 
@@ -298,7 +342,7 @@ def EmbedHg2vAdjJaccard(hypergraph,
   embedding = _hypergraph2vec_skeleton(hypergraph, dimension, num_neighbors,
                                        sampler_fn, model_fn, batch_size, epochs,
                                        debug_summary_path, disable_pbar)
-  embedding.method_name = "Hypergraph2Vec AdjJaccard"
+  embedding.method_name = "HG2V_ADJ_JAC"
   return embedding
 
 
@@ -327,7 +371,7 @@ def EmbedHg2vNeighborhoodWeightedJaccard(hypergraph,
   embedding = _hypergraph2vec_skeleton(hypergraph, dimension, num_neighbors,
                                        sampler_fn, model_fn, batch_size, epochs,
                                        debug_summary_path, disable_pbar)
-  embedding.method_name = "Hypergraph2Vec Neighborhood Weighted Jaccard"
+  embedding.method_name = "HG2V_NEIGH_JAC"
   return embedding
 
 
@@ -357,7 +401,7 @@ def EmbedHg2vAlgDist(hypergraph,
   embedding = _hypergraph2vec_skeleton(hypergraph, dimension, num_neighbors,
                                        sampler_fn, model_fn, batch_size, epochs,
                                        debug_summary_path, disable_pbar)
-  embedding.method_name = "Hypergraph2Vec Algebraic Distance"
+  embedding.method_name = "HG2V_ALG_DIST"
   return embedding
 
 

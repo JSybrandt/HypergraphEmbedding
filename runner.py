@@ -60,8 +60,11 @@ def ParseArgs():
   parser.add_argument(
       "--embedding-method",
       type=str,
+      nargs="*",
       help=("Specifies the manner in which the provided hypergraph should be "
-            "embedded. Options: " + " ".join([o for o in EMBEDDING_OPTIONS])))
+            "embedded. If multiple are supplied, we train each and them merge "
+            "via a linear combination. Options: " + " ".join(
+                [o for o in EMBEDDING_OPTIONS])))
   parser.add_argument(
       "--embedding-dimension",
       type=int,
@@ -74,6 +77,12 @@ def ParseArgs():
           "If set, in combination with an appropriate embedding-method we will "
           "write a summary of our embedding information. For instance, we may "
           "provided a histogram of each sampled probabilities"))
+  parser.add_argument(
+      "--embedding-combination-strategy",
+      type=str,
+      default=COMBINATION_OPTIONS[0],
+      help=("If multiple embeddings are specified, how should we combine them?"
+            "Options:" + " ".join([o for o in COMBINATION_OPTIONS])))
 
   # experiment options
   parser.add_argument(
@@ -99,7 +108,12 @@ def ParseArgs():
       type=str,
       help=("If set, supply a path to a previously run experiment."
             "Instead of sampling from the hg, we will just use this one."))
-
+  parser.add_argument(
+      "--experiment-shortcut",
+      type=str,
+      nargs="*",
+      help=("Paths to previously constructed embeddings. Used to shortcut the "
+            "combine testing process."))
   # Required hypergraph argument
   parser.add_argument(
       "hypergraph",
@@ -138,7 +152,12 @@ def ConfigureLogger(args):
   def get_uniq_log_name():
     day = str(date.today())
     hypergraph_name = Path(args.hypergraph).stem
-    emb_name = args.embedding_method if args.embedding_method is not None else ""
+    emb_name = ""
+    if args.embedding_method is not None:
+      if len(args.embedding_method) == 1:
+        emb_name = args.embedding_method[0]
+      else:
+        emb_name = "_".join(args.embedding_method)
 
     for log_count in range(1, 200):
       name = "{d}.{h}.{e}.{c}.log".format(
@@ -160,6 +179,79 @@ def ConfigureLogger(args):
   handler.setFormatter(formatter)
   log.addHandler(handler)
   log.info("Logging to %s", log_path)
+
+
+def PrepLinkPredictionExperiment(hypergraph, args):
+  """
+  Given data from command line arguments, create a subgraph by removing
+  random node-edge connections, embed that hypergraph, and return a list
+  of node-edge connections consisting of the removed and negative sampled
+  connections. Output is stored in a LinkPredictionData namedtuple
+  """
+  def load_experiment(path):
+    log.info("Recovering information from %s", path)
+    exp = ExperimentalResult()
+    with open(path, 'rb') as proto:
+      exp.ParseFromString(proto.read())
+    log.info("Checking Experimental Result")
+    assert len(exp.metrics) > 0
+    assert len(exp.metrics[0].records) > 0
+    assert exp.HasField("hypergraph")
+
+    new_graph = exp.hypergraph
+    good_links = [
+        (r.node_idx, r.edge_idx) for r in exp.metrics[0].records if r.label
+    ]
+    bad_links = [
+        (r.node_idx, r.edge_idx) for r in exp.metrics[0].records if not r.label
+    ]
+    return (new_graph, good_links, bad_links, exp.embedding)
+
+  method_name2embedding = {}
+
+  if args.experiment_shortcut is not None:
+    log.info("Checking that all shortcuts come from the same experiment")
+    new_graph, good_links, bad_links, embedding = load_experiment(args.experiment_shortcut[0])
+    method_name2embedding[embedding.method_name] = embedding
+
+    for path in args.experiment_shortcut[1:]:
+      tmp_graph, tmp_good_links, tmp_bad_links, embedding = load_experiment(path)
+      assert tmp_graph == new_graph
+      assert tmp_good_links == good_links
+      assert tmp_bad_links == bad_links
+      assert embedding.method_name not in method_name2embedding
+      method_name2embedding[embedding.method_name] = embedding
+
+    log.info("Loaded shortcuts for:")
+    for method in method_name2embedding:
+      log.info("\t>\t%s", method)
+
+  elif args.experiment_rerun is not None:
+    new_graph, good_links, bad_links, _ = load_experiment(args.experiment_rerun)
+
+  else:
+    log.info("Checking that --experiment-lp-probabilty is between 0 and 1")
+    assert args.experiment_lp_probability >= 0
+    assert args.experiment_lp_probability <= 1
+
+    log.info("Creating subgraph with removal prob. %f",
+             args.experiment_lp_probability)
+    new_graph, good_links = RemoveRandomConnections(
+        hypergraph, args.experiment_lp_probability)
+    log.info("Removed %i links", len(good_links))
+
+    log.info("Sampling missing links for evaluation")
+    bad_links = SampleMissingConnections(hypergraph, len(good_links))
+    log.info("Sampled %i links", len(bad_links))
+
+  log.info("Embedding new hypergraph")
+  embedding = Embed(args, new_graph, method_name2embedding)
+
+  return LinkPredictionData(
+      hypergraph=new_graph,
+      embedding=embedding,
+      good_links=good_links,
+      bad_links=bad_links)
 
 
 if __name__ == "__main__":
@@ -194,20 +286,30 @@ if __name__ == "__main__":
   if args.embedding:
     log.info("Performing checks for writing embedding")
     embedding_path = Path(args.embedding)
-    log.info("Checking for valid embedding-method")
-    assert args.embedding_method in EMBEDDING_OPTIONS
+    log.info("Checking for valid embedding-method, and no duplicates")
+    assert len(args.embedding_method) >= 1
+    seen_methods = set()
+    for method in args.embedding_method:
+      assert method in EMBEDDING_OPTIONS
+      assert method not in seen_methods
+      seen_methods.add(method)
     log.info("Checking for positive dimension")
     assert args.embedding_dimension > 0
     log.info("Checking its safe to write embedding")
     assert not embedding_path.exists()
     assert embedding_path.parent.is_dir()
 
+  log.info("Checking for legal combination strategy")
+  assert args.embedding_combination_strategy in COMBINATION_OPTIONS
+
   log.info("Checking that experimental flags are appropriate")
   log.info("Checking that if experiment is set, experiment-result is too")
   assert bool(args.experiment) == bool(args.experiment_result)
   if args.experiment is not None:
     log.info("Checking that embedding is also specified")
-    assert args.embedding_method
+    assert len(args.embedding_method) >= 1
+    for method in args.embedding_method:
+      assert method in EMBEDDING_OPTIONS
     log.info("Checking for --experiment-result")
     experiment_result_path = Path(args.experiment_result)
     assert not experiment_result_path.exists()
@@ -219,6 +321,10 @@ if __name__ == "__main__":
       log.info("Checking that rerun path is valid.")
       rerun_path = Path(args.experiment_rerun)
       assert rerun_path.is_file()
+    if args.experiment_shortcut is not None:
+      log.info("Checking shortcuts")
+      for shortcut_path in [Path(p) for p in args.experiment_shortcut]:
+        assert shortcut_path.is_file()
 
   if args.embedding_debug_summary:
     log.info("--embedding_debug_summary set, checking for appropriate method")
