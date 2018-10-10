@@ -188,6 +188,7 @@ def PrepLinkPredictionExperiment(hypergraph, args):
   of node-edge connections consisting of the removed and negative sampled
   connections. Output is stored in a LinkPredictionData namedtuple
   """
+
   def load_experiment(path):
     log.info("Recovering information from %s", path)
     exp = ExperimentalResult()
@@ -211,11 +212,13 @@ def PrepLinkPredictionExperiment(hypergraph, args):
 
   if args.experiment_shortcut is not None:
     log.info("Checking that all shortcuts come from the same experiment")
-    new_graph, good_links, bad_links, embedding = load_experiment(args.experiment_shortcut[0])
+    new_graph, good_links, bad_links, embedding = load_experiment(
+        args.experiment_shortcut[0])
     method_name2embedding[embedding.method_name] = embedding
 
     for path in args.experiment_shortcut[1:]:
-      tmp_graph, tmp_good_links, tmp_bad_links, embedding = load_experiment(path)
+      tmp_graph, tmp_good_links, tmp_bad_links, embedding = load_experiment(
+          path)
       assert tmp_graph == new_graph
       assert tmp_good_links == good_links
       assert tmp_bad_links == bad_links

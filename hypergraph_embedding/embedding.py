@@ -42,10 +42,11 @@ global DEBUG_SUMMARY_OPTIONS
 global COMBINATION_OPTIONS
 
 COMBINATION_OPTIONS = [
-    "N_E_SUPERVISED", # default @ 0
+    "N_E_SUPERVISED",  # default @ 0
     "N_E_SEMI_SUPERVISED",
     "CONCATENATE",
 ]
+
 
 def CombineEmbeddings(args, hypergraph, embeddings, disable_pbar=False):
   assert len(embeddings) >= 1
@@ -58,14 +59,21 @@ def CombineEmbeddings(args, hypergraph, embeddings, disable_pbar=False):
       args.embedding_dimension = comb_emb.dim
     elif args.embedding_combination_strategy == "N_E_SUPERVISED":
       comb_emb = CombineEmbeddingsViaNodeEdgeClassifier(
-        hypergraph, embeddings, args.embedding_dimension,
-        with_auto_encoder=False, disable_pbar=disable_pbar)
+          hypergraph,
+          embeddings,
+          args.embedding_dimension,
+          with_auto_encoder=False,
+          disable_pbar=disable_pbar)
     elif args.embedding_combination_strategy == "N_E_SEMI_SUPERVISED":
       comb_emb = CombineEmbeddingsViaNodeEdgeClassifier(
-        hypergraph, embeddings, args.embedding_dimension,
-        with_auto_encoder=True, disable_pbar=disable_pbar)
+          hypergraph,
+          embeddings,
+          args.embedding_dimension,
+          with_auto_encoder=True,
+          disable_pbar=disable_pbar)
     else:
-      raise ValueError("Args contains an illegal embedding-combination-strategy")
+      raise ValueError(
+          "Args contains an illegal embedding-combination-strategy")
     comb_emb.method_name = "_".join(args.embedding_method)
     return comb_emb
 

@@ -29,18 +29,22 @@ def CombineEmbeddingsViaConcatenation(hypergraph, embeddings):
   embedding = HypergraphEmbedding()
   embedding.dim = emb_size
 
-  node2cat_emb = _concatenate_embeddings(hypergraph.node, [emb.node for emb in embeddings])
+  node2cat_emb = _concatenate_embeddings(hypergraph.node,
+                                         [emb.node for emb in embeddings])
   for node_idx in hypergraph.node:
     embedding.node[node_idx].values.extend(node2cat_emb[node_idx])
 
-  edge2cat_emb = _concatenate_embeddings(hypergraph.edge, [emb.edge for emb in embeddings])
+  edge2cat_emb = _concatenate_embeddings(hypergraph.edge,
+                                         [emb.edge for emb in embeddings])
   for edge_idx in hypergraph.edge:
     embedding.edge[edge_idx].values.extend(edge2cat_emb[edge_idx])
   return embedding
 
+
 ################################################################################
 # CombineEmbeddingsViaNodeEdgeClassifier                                       #
 ################################################################################
+
 
 def _sample_hypergraph(hypergraph, node2emb, edge2emb):
   log.info("Collecting positive samples")
@@ -56,12 +60,13 @@ def _sample_hypergraph(hypergraph, node2emb, edge2emb):
 
   log.info("Collecting negative samples")
   for node_idx, edge_idx in SampleMissingConnections(hypergraph,
-                                                     5*num_pos_samples):
+                                                     5 * num_pos_samples):
     node_samples.append(node2emb[node_idx])
     edge_samples.append(edge2emb[edge_idx])
     labels.append(0)
 
   return node_samples, edge_samples, labels
+
 
 def _interpret_model(indices, idx2cat_emb, predictor, half_emb):
   vecs = np.array([idx2cat_emb[idx] for idx in indices])
@@ -70,25 +75,30 @@ def _interpret_model(indices, idx2cat_emb, predictor, half_emb):
     half_emb[idx].values.extend(embeddings[row_idx, :])
 
 
-def CombineEmbeddingsViaNodeEdgeClassifier(hypergraph, embeddings,
-                                                desired_dim, with_auto_encoder, disable_pbar):
+def CombineEmbeddingsViaNodeEdgeClassifier(hypergraph, embeddings, desired_dim,
+                                           with_auto_encoder, disable_pbar):
   assert desired_dim > 0
 
   log.info("Concatenating node embedding")
-  node2cat_emb = _concatenate_embeddings(hypergraph.node, [emb.node for emb in embeddings])
+  node2cat_emb = _concatenate_embeddings(hypergraph.node,
+                                         [emb.node for emb in embeddings])
   log.info("Concatenating edge embedding")
-  edge2cat_emb = _concatenate_embeddings(hypergraph.edge, [emb.edge for emb in embeddings])
-  node_samples, edge_samples, labels = _sample_hypergraph(hypergraph, node2cat_emb, edge2cat_emb)
+  edge2cat_emb = _concatenate_embeddings(hypergraph.edge,
+                                         [emb.edge for emb in embeddings])
+  node_samples, edge_samples, labels = _sample_hypergraph(
+      hypergraph, node2cat_emb, edge2cat_emb)
   input_size = sum([emb.dim for emb in embeddings])
-  auto_enc_hidden_size = int((input_size + desired_dim)/2)
+  auto_enc_hidden_size = int((input_size + desired_dim) / 2)
 
   ## Constructing Model
   log.info("Constucting model")
 
-  concatenated_node = Input(
-      (input_size,), dtype=np.float32, name="ConcatinatedNode")
-  concatenated_edge = Input(
-      (input_size,), dtype=np.float32, name="ConcatinatedEdge")
+  concatenated_node = Input((input_size,),
+                            dtype=np.float32,
+                            name="ConcatinatedNode")
+  concatenated_edge = Input((input_size,),
+                            dtype=np.float32,
+                            name="ConcatinatedEdge")
   dropped_node = Dropout(0.5)(concatenated_node)
   dropped_edge = Dropout(0.5)(concatenated_edge)
 
@@ -103,29 +113,36 @@ def CombineEmbeddingsViaNodeEdgeClassifier(hypergraph, embeddings,
           hidden_pre_edge)
 
   if with_auto_encoder:
-    hidden_post_node = Dense(auto_enc_hidden_size, activation="relu")(joint_node)
-    hidden_post_edge = Dense(auto_enc_hidden_size, activation="relu")(joint_edge)
-    recovered_node = Dense(input_size, activation="relu", name="RecoveredNode")(hidden_post_node)
-    recovered_edge = Dense(input_size, activation="relu", name="RecoveredEdge")(hidden_post_edge)
+    hidden_post_node = Dense(
+        auto_enc_hidden_size, activation="relu")(
+            joint_node)
+    hidden_post_edge = Dense(
+        auto_enc_hidden_size, activation="relu")(
+            joint_edge)
+    recovered_node = Dense(
+        input_size, activation="relu", name="RecoveredNode")(
+            hidden_post_node)
+    recovered_edge = Dense(
+        input_size, activation="relu", name="RecoveredEdge")(
+            hidden_post_edge)
 
   merged = Concatenate(axis=1)([joint_node, joint_edge])
   hidden = Dense(desired_dim, activation="relu")(merged)
-  predicted_label = Dense(1, activation="sigmoid", name="PredictedLabel")(hidden)
+  predicted_label = Dense(
+      1, activation="sigmoid", name="PredictedLabel")(
+          hidden)
 
   stopper = EarlyStopping(monitor="loss")
   if with_auto_encoder:
     emb_trainer = Model(
-        inputs=[concatenated_node,
-                concatenated_edge],
-        outputs=[predicted_label,
-                 recovered_node,
-                 recovered_edge])
-    emb_trainer.compile(optimizer="adagrad", loss="mean_squared_error", loss_weights=[4, 1, 1])
+        inputs=[concatenated_node, concatenated_edge],
+        outputs=[predicted_label, recovered_node, recovered_edge])
+    emb_trainer.compile(
+        optimizer="adagrad", loss="mean_squared_error", loss_weights=[4, 1, 1])
     outs = [labels, node_samples, edge_samples]
   else:
     emb_trainer = Model(
-        inputs=[concatenated_node,
-                concatenated_edge],
+        inputs=[concatenated_node, concatenated_edge],
         outputs=[predicted_label])
     emb_trainer.compile(optimizer="adagrad", loss="mean_squared_error")
     outs = [labels]
@@ -146,10 +163,12 @@ def CombineEmbeddingsViaNodeEdgeClassifier(hypergraph, embeddings,
 
   log.info("Interpreting model for compressed node embeddings")
   node_predictor = Model(inputs=[concatenated_node], outputs=[joint_node])
-  _interpret_model(hypergraph.node, node2cat_emb, node_predictor, embedding.node)
+  _interpret_model(hypergraph.node, node2cat_emb, node_predictor,
+                   embedding.node)
 
   log.info("Interpreting model for compressed edge embeddings")
   edge_predictor = Model(inputs=[concatenated_edge], outputs=[joint_edge])
-  _interpret_model(hypergraph.edge, edge2cat_emb, edge_predictor, embedding.edge)
+  _interpret_model(hypergraph.edge, edge2cat_emb, edge_predictor,
+                   embedding.edge)
 
   return embedding

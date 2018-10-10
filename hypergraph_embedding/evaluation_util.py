@@ -75,7 +75,7 @@ def LinkPredictionDataToResultProto(lp_data):
   log.info("Storing data into Experimental Result proto")
   (hypergraph, embedding, _, _, removal_prob) = lp_data
   res = ExperimentalResult()
-  res.removal_probability =  removal_prob
+  res.removal_probability = removal_prob
   res.hypergraph.ParseFromString(hypergraph.SerializeToString())
   res.embedding.ParseFromString(embedding.SerializeToString())
   return res

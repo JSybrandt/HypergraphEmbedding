@@ -113,8 +113,7 @@ def PrintResult(result, metric, path):
           nodes=len(result.hypergraph.node),
           edges=len(result.hypergraph.edge),
           removal=(result.removal_probability
-                   if result.HasField("removal_probability")
-                   else "N/A"),
+                   if result.HasField("removal_probability") else "N/A"),
           method=result.embedding.method_name,
           dim=result.embedding.dim,
           e_name=metric.experiment_name,
