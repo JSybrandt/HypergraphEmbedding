@@ -88,40 +88,55 @@ def ConfigureLogger(args):
   log.addHandler(handler)
 
 
-def PrintResult(result, metric):
+def PrintResult(result, metric, path):
   result_text = dedent("""\
-  --------------------
+  Path:             {path}
   Hypergraph:       {hypergraph}
   Number of Nodes:  {nodes}
   Number of Edges:  {edges}
+  Removal Prob:     {removal}
   --------------------
   Embedding Method: {method}
   Embedding Dim:    {dim}
   --------------------
-  {metrics}
-  --------------------""")
+  Experiment Name:  {e_name}
+  Acc:              {e_acc}
+  Prec:             {e_pre}
+  Recall:           {e_rec}
+  F1:               {e_f1}
+
+  """)
   print(
       result_text.format(
+          path=str(path),
           hypergraph=result.hypergraph.name,
           nodes=len(result.hypergraph.node),
           edges=len(result.hypergraph.edge),
+          removal=(result.removal_probability
+                   if result.HasField("removal_probability")
+                   else "N/A"),
           method=result.embedding.method_name,
           dim=result.embedding.dim,
-          metrics=metric))
+          e_name=metric.experiment_name,
+          e_acc=metric.accuracy,
+          e_pre=metric.precision,
+          e_rec=metric.recall,
+          e_f1=metric.f1))
 
 
 def ExperimentKey(result, metric):
-  return "{graph} {experiment} {method}:{dim}".format(
+  return "{graph} {experiment} {prob} {method}:{dim}".format(
       graph=result.hypergraph.name,
       experiment=metric.experiment_name,
+      prob=result.removal_probability,
       method=result.embedding.method_name,
       dim=result.embedding.dim)
 
 
 def KeyToMethod(key):
   toks = key.split()
-  assert len(toks) >= 3
-  method_colon_dim = " ".join(toks[2:])
+  assert len(toks) >= 4
+  method_colon_dim = " ".join(toks[3:])
   toks = method_colon_dim.split(":")
   assert len(toks) == 2
   return toks[0]
@@ -287,7 +302,7 @@ if __name__ == "__main__":
         exit(1)
       for metric in result.metrics:
         if args.individual:
-          PrintResult(result, metric)
+          PrintResult(result, metric, path)
         if args.cumulative:
           key = ExperimentKey(result, metric)
           if key not in experiment2metrics:

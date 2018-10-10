@@ -251,7 +251,8 @@ def PrepLinkPredictionExperiment(hypergraph, args):
       hypergraph=new_graph,
       embedding=embedding,
       good_links=good_links,
-      bad_links=bad_links)
+      bad_links=bad_links,
+      removal_prob=args.experiment_lp_probability)
 
 
 if __name__ == "__main__":

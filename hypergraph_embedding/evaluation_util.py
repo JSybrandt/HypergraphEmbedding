@@ -31,7 +31,7 @@ _shared_data = {}
 
 LinkPredictionData = namedtuple(
     "LinkPredictionData",
-    ("hypergraph", "embedding", "good_links", "bad_links"))
+    ("hypergraph", "embedding", "good_links", "bad_links", "removal_prob"))
 
 
 def AddPredictionRecords(eval_metric, good_links, bad_links, predictions):
@@ -56,7 +56,7 @@ def AddPredictionRecords(eval_metric, good_links, bad_links, predictions):
 def RunLinkPredictionExperiment(link_prediction_data, experiment_name):
   assert experiment_name in EXPERIMENT_OPTIONS
 
-  (hypergraph, embedding, good_links, bad_links) = link_prediction_data
+  (hypergraph, embedding, good_links, bad_links, _) = link_prediction_data
 
   log.info("Predicting links on subset graph")
   predictor = EXPERIMENT_OPTIONS[experiment_name]
@@ -73,8 +73,9 @@ def RunLinkPredictionExperiment(link_prediction_data, experiment_name):
 
 def LinkPredictionDataToResultProto(lp_data):
   log.info("Storing data into Experimental Result proto")
-  (hypergraph, embedding, _, _) = lp_data
+  (hypergraph, embedding, _, _, removal_prob) = lp_data
   res = ExperimentalResult()
+  res.removal_probability =  removal_prob
   res.hypergraph.ParseFromString(hypergraph.SerializeToString())
   res.embedding.ParseFromString(embedding.SerializeToString())
   return res

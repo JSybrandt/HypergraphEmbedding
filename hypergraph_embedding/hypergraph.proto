@@ -61,4 +61,7 @@ message ExperimentalResult {
 	optional HypergraphEmbedding embedding = 2;
   // One set of metrics per experiment
 	repeated EvaluationMetrics metrics = 3;
+	// In a link prediction experiment, this is the probability a node was
+	// removed from a community.
+	optional float removal_probability = 4;
 }
