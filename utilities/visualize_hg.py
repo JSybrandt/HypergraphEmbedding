@@ -12,6 +12,7 @@ from hypergraph_embedding.hypergraph_util import CompressRange
 from hypergraph_embedding.hypergraph_util import ToCsrMatrix
 import cv2
 import numpy as np
+from statistics import median
 
 
 def ParseArgs():
@@ -57,12 +58,26 @@ def PlotDegreeDistributions(hypergraph, path):
   fig.subplots_adjust(top=0.85)
   fig.savefig(path)
 
+def printDetails(hypergraph):
+  print("Name:", hypergraph.name)
+  print("Num Nodes:", len(hypergraph.node))
+  print("Num Edges:", len(hypergraph.edge))
+  node_degs = [len(n.edges) for _, n in hypergraph.node.items()]
+  print("Min Node Degree:", min(node_degs))
+  print("Median Node Degree:", median(node_degs))
+  print("Max Node Degree:", max(node_degs))
+  edge_degs = [len(e.nodes) for _, e in hypergraph.edge.items()]
+  print("Min Edge Degree:", min(edge_degs))
+  print("Median Edge Degree:", median(edge_degs))
+  print("Max Edge Degree:", max(edge_degs))
+
 
 if __name__ == "__main__":
   args = ParseArgs()
   hypergraph = Hypergraph()
   with open(args.hypergraph, "rb") as proto:
     hypergraph.ParseFromString(proto.read())
+  printDetails(hypergraph)
   if args.sort:
     hypergraph, _, _ = ToBlockDiagonal(hypergraph)
   else:
