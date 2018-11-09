@@ -104,6 +104,7 @@ def PrintResult(result, metric, path):
   Prec:             {e_pre}
   Recall:           {e_rec}
   F1:               {e_f1}
+  Test Set Size:    {e_tss}
 
   """)
   print(
@@ -120,7 +121,8 @@ def PrintResult(result, metric, path):
           e_acc=metric.accuracy,
           e_pre=metric.precision,
           e_rec=metric.recall,
-          e_f1=metric.f1))
+          e_f1=metric.f1,
+          e_tss=len(metric.records)))
 
 
 def ExperimentKey(result, metric):
