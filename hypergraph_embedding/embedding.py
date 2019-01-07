@@ -412,6 +412,7 @@ def EmbedHg2vAlgDist(hypergraph,
   embedding.method_name = "HG2V_ALG_DIST"
   return embedding
 
+
 def method_not_supported(hypergraph, dim):
   raise RuntimeError("Method not supported")
 

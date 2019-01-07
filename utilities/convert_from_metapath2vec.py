@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """
 Okay, the previous code at least produces SOMETHING.
 So this code is going to create a hypergraph result that parses out the result
@@ -16,6 +15,7 @@ from tqdm import tqdm
 
 log = logging.getLogger()
 
+
 def ParseArgs():
   parser = argparse.ArgumentParser(
       description="Converts hypergraphs to metapath2vec")
@@ -29,18 +29,16 @@ def ParseArgs():
       "--vector-text",
       type=str,
       help="Path to vector text file (output of metapath2vec)")
-  parser.add_argument(
-      "-o",
-      "--out",
-      type=str,
-      help="Path to result proto")
+  parser.add_argument("-o", "--out", type=str, help="Path to result proto")
 
   parser.add_argument(
       "--log-level",
       type=str,
-      help=("Specifies level of logging verbosity. " "Options: CRITICAL, ERROR, WARNING, INFO, DEBUG, NONE"),
+      help=("Specifies level of logging verbosity. "
+            "Options: CRITICAL, ERROR, WARNING, INFO, DEBUG, NONE"),
       default="INFO")
   return parser.parse_args()
+
 
 def ConfigureLogger(args):
   if args.log_level == "CRITICAL":
@@ -108,7 +106,6 @@ if __name__ == "__main__":
         else:
           result.embedding.dim = len(vector)
 
-
   log.info("Checking result")
   for node_idx in result.hypergraph.node:
     assert node_idx in result.embedding.node
@@ -118,4 +115,3 @@ if __name__ == "__main__":
   log.info("Writing result")
   with output_path.open('wb') as output_file:
     output_file.write(result.SerializeToString())
-

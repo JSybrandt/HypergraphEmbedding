@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """
 The metapath2vec format is atrocious.
 This utility is going to convert a (beautiful) hypergraph proto object
@@ -21,22 +20,18 @@ from pathlib import Path
 import logging
 import logging.handlers
 from hypergraph_embedding import ExperimentalResult
+from hypergraph_embedding import Hypergraph
 
 log = logging.getLogger()
+
 
 def ParseArgs():
   parser = argparse.ArgumentParser(
       description="Converts hypergraphs to metapath2vec")
   parser.add_argument(
-      "-r",
-      "--result",
-      type=str,
-      help="Path to hypergraph result proto")
+      "-p", "--proto", type=str, help="Path to proto (result or hypergraph)")
   parser.add_argument(
-      "-o",
-      "--out-dir",
-      type=str,
-      help="Path to result directory")
+      "-o", "--out-dir", type=str, help="Path to result directory")
   parser.add_argument(
       "--log-level",
       type=str,
@@ -64,6 +59,7 @@ def ConfigureLogger(args):
   handler.setFormatter(formatter)
   log.addHandler(handler)
 
+
 def touch_and_check(path):
   if path.exists():
     log.error("Attempted to create %s, but its already there.", path)
@@ -75,14 +71,35 @@ def touch_and_check(path):
     log.error("Failed to create %s.", path)
     raise RuntimeError("Failed to create " + str(path))
 
+def get_hypergraph(proto_path):
+  hypergraph = None
+  try:
+    tmp = ExperimentalResult()
+    with proto_path.open('rb') as proto:
+      tmp.ParseFromString(proto.read())
+    hypergraph = tmp.hypergraph
+  except:
+    pass
+  if hypergraph is not None:
+    return hypergraph
+  try:
+    tmp = Hypergraph()
+    with proto_path.open('rb') as proto:
+      tmp.ParseFromString(proto.read())
+    hypergraph = tmp
+  except:
+    pass
+  if hypergraph is not None:
+    return hypergraph
+  raise ValueError("Input path cannot be parsed as a hypergraph")
 
 if __name__ == "__main__":
   args = ParseArgs()
   ConfigureLogger(args)
 
   log.info("Checking input path")
-  result_proto_path = Path(args.result)
-  assert result_proto_path.is_file()
+  proto_path = Path(args.proto)
+  assert proto_path.is_file()
 
   out_dir_path = Path(args.out_dir)
   log.info("Checking that output path does NOT exists")
@@ -90,16 +107,8 @@ if __name__ == "__main__":
   log.info("Checking that output path is writable")
   assert out_dir_path.parent.is_dir()
 
-
   log.info("Attempting to read hypergraph")
-  result = ExperimentalResult()
-  try:
-    with result_proto_path.open('rb') as proto:
-      result.ParseFromString(proto.read())
-  except:
-    log.error("Invalid proto file: %s", result_proto_path)
-    exit(1)
-  hypergraph = result.hypergraph
+  hypergraph = get_hypergraph(proto_path)
 
   log.info("Creating dir and files")
   try:
@@ -114,6 +123,7 @@ if __name__ == "__main__":
   # we have to represent each node twice...
   def to_author_idx(node_idx):
     return node_idx
+
   def to_conf_idx(edge_idx):
     return edge_idx + largest_node_idx + 1
 
@@ -161,7 +171,5 @@ if __name__ == "__main__":
         conf_idx = to_conf_idx(edge_idx)
         paper_auth_file.write("{}\t{}\n".format(paper_idx, auth_idx))
         paper_conf_file.write("{}\t{}\n".format(paper_idx, conf_idx))
-        paper_file.write("{}\tLinks {} to {}\n".format(paper_idx,
-                                                     node_idx,
-                                                     edge_idx))
-
+        paper_file.write("{}\tLinks {} to {}\n".format(paper_idx, node_idx,
+                                                       edge_idx))

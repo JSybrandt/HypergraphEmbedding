@@ -58,6 +58,7 @@ def PlotDegreeDistributions(hypergraph, path):
   fig.subplots_adjust(top=0.85)
   fig.savefig(path)
 
+
 def printDetails(hypergraph):
   print("Name:", hypergraph.name)
   print("Num Nodes:", len(hypergraph.node))

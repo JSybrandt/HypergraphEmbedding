@@ -6,6 +6,8 @@ import logging
 import json
 import requests
 from tqdm import tqdm
+from scipy.io import mmread
+from scipy.io import mmwrite
 
 log = logging.getLogger()
 
@@ -167,6 +169,33 @@ def DownloadMadGrades(api_token):
   return result
 
 
+def LoadMTX(path):
+  mtx = mmread(str(path))
+  hypergraph = FromSparseMatrix(mtx.T)
+  return hypergraph
+
+def SaveMTX(hypergraph, path):
+  mtx_mat = ToEdgeCsrMatrix(hypergraph).astype(np.int32)
+  mmwrite(str(path), mtx_mat, comment=hypergraph.name)
+
+def LoadHMetis(path):
+  hypergraph = Hypergraph()
+  with open(path) as hmetis_file:
+    next(hmetis_file)
+    for edge_idx, line in enumerate(hmetis_file):
+      for node_idx in [int(t) for t in line.strip().split()]:
+        AddNodeToEdge(hypergraph, node_idx, edge_idx)
+  return hypergraph
+
+def SaveHMetis(hypergraph, path):
+  with open(path, 'w') as hmetis_file:
+    hmetis_file.write("{} {}\n".format(len(hypergraph.edge),
+                                       len(hypergraph.node)))
+    for _, edge in hypergraph.edge.items():
+      hmetis_file.write(" ".join([str(x) for x in edge.nodes]))
+      hmetis_file.write("\n")
+
+
 PARSING_OPTIONS = {
     "AMINER":
         AMinerToHypergraph,
@@ -176,4 +205,8 @@ PARSING_OPTIONS = {
         lambda source: CleanHypergraph(SnapCommunityToHypergraph(source)),
     "DL_MAD_GRADES":
         DownloadMadGrades,
+    "MTX":
+        LoadMTX,
+    "HMETIS":
+        LoadHMetis,
 }

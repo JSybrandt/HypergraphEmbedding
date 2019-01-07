@@ -7,10 +7,12 @@ message Hypergraph {
   message NodeData {
     repeated int32 edges = 1;
     optional string name = 2;
+    optional float weight = 3 [default = 1];
   }
   message EdgeData {
     repeated int32 nodes = 1;
     optional string name = 2;
+    optional float weight = 3 [default = 1];
   }
 
   // Map from node id to list of edges

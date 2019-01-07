@@ -6,6 +6,7 @@ from hypergraph_embedding import Hypergraph
 from hypergraph_embedding.hypergraph_util import AddNodeToEdge
 from random import random
 
+
 def add_x_edges(num_edges, hypergraph):
   edge_prob = 1.0 / float(num_edges)
   for _ in range(num_edges):
@@ -18,19 +19,15 @@ def add_x_edges(num_edges, hypergraph):
         count += 1
     print("Actual Addition Probability:", count / len(hypergraph.node))
 
+
 def ParseArgs():
   parser = argparse.ArgumentParser()
-  parser.add_argument(
-      "input",
-      type=str,
-      help="Path to the original hypergraph")
-  parser.add_argument(
-      "output",
-      type=str,
-      help="Path to the output hypergraph")
+  parser.add_argument("input", type=str, help="Path to the original hypergraph")
+  parser.add_argument("output", type=str, help="Path to the output hypergraph")
   return parser.parse_args()
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
   args = ParseArgs()
 
   in_path = Path(args.input)
