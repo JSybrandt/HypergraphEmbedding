@@ -60,15 +60,21 @@ def _sample_adj_matrix(matrix,
   Each row represents an object. Its nonzero columns represent connections.
   This function returns a list of (row, col) indices sampled for each row.
   """
+  assert len(samples_per_row) == len(interesting_rows)
+  assert len(samples_per_row) > 0
   res = []
-  for row_idx in tqdm(interesting_rows, disable=disable_pbar):
+  for row_idx, num_samples in tqdm(zip(interesting_rows, samples_per_row),
+                                   total=len(interesting_rows),
+                                   disable=disable_pbar):
     cols = matrix[row_idx, :].nonzero()[1]
-    if replace == False:
-      samples = min(samples_per_row, len(cols))
-    else:
-      samples = samples_per_row
-    for col_idx in np.random.choice(cols, samples, replace=replace):
-      res.append((row_idx, col_idx))
+    # a coarse version of the HG could result in an isolated node or edge
+    if len(cols) > 0:
+      if replace == False:
+        samples = min(num_samples, len(cols))
+      else:
+        samples = num_samples
+      for col_idx in np.random.choice(cols, samples, replace=replace):
+        res.append((row_idx, col_idx))
   return res
 
 
@@ -117,6 +123,11 @@ def BooleanSamples(hypergraph, num_neighbors, num_samples, disable_pbar=False):
   This does not produce any negative samples.
   """
 
+  node_samples = [int(node.weight * num_samples)
+                  for _, node in hypergraph.node.items()]
+  edge_samples = [int(edge.weight * num_samples)
+                  for _, edge in hypergraph.edge.items()]
+
   # return value
   similarity_records = []
 
@@ -127,7 +138,7 @@ def BooleanSamples(hypergraph, num_neighbors, num_samples, disable_pbar=False):
 
   log.info("Sampling node-node probabilities")
   samples = _sample_adj_matrix(node2node_neighbors, hypergraph.node,
-                               num_samples, disable_pbar)
+                               node_samples, disable_pbar)
   for node_i, node_j in tqdm(samples, disable=disable_pbar):
     similarity_records.append(
         SimilarityRecord(
@@ -140,18 +151,18 @@ def BooleanSamples(hypergraph, num_neighbors, num_samples, disable_pbar=False):
 
   log.info("Sampling edge-edge probabilities")
   samples = _sample_adj_matrix(edge2edge_neighbors, hypergraph.edge,
-                               num_samples, disable_pbar)
+                               edge_samples, disable_pbar)
   for edge_i, edge_j in tqdm(samples, disable=disable_pbar):
     similarity_records.append(
         SimilarityRecord(
             left_edge_idx=edge_i, right_edge_idx=edge_j, edge_edge_prob=1))
 
   log.info("Getting node-edge relationships")
-  samples = _sample_adj_matrix(node2edge, hypergraph.node, num_samples,
+  samples = _sample_adj_matrix(node2edge, hypergraph.node, node_samples,
                                disable_pbar)
   log.info("Getting edge-node relationships")
   samples.extend([(n, e) for e, n in _sample_adj_matrix(
-      edge2node, hypergraph.edge, num_samples, disable_pbar)])
+      edge2node, hypergraph.edge, edge_samples, disable_pbar)])
   for node_idx, edge_idx in tqdm(samples, disable=disable_pbar):
     neighbor_edge_indices = _sample_neighbors(node_idx, node2edge,
                                               num_neighbors)
@@ -341,6 +352,11 @@ def WeightedJaccardSamples(hypergraph,
 
   workers = multiprocessing.cpu_count() if run_in_parallel else 1
 
+  node_samples = [int(node.weight * num_samples)
+                  for _, node in hypergraph.node.items()]
+  edge_samples = [int(edge.weight * num_samples)
+                  for _, edge in hypergraph.edge.items()]
+
   # return value
   similarity_records = []
 
@@ -353,7 +369,7 @@ def WeightedJaccardSamples(hypergraph,
 
   log.info("Getting node-node samples")
   samples = _sample_adj_matrix(node2node_neighbors, hypergraph.node,
-                               num_samples, disable_pbar)
+                               node_samples, disable_pbar)
   log.info("Sampling node-node probabilities")
   with Pool(
       workers,
@@ -377,7 +393,7 @@ def WeightedJaccardSamples(hypergraph,
 
   log.info("Getting edge-edge samples")
   samples = _sample_adj_matrix(edge2edge_neighbors, hypergraph.edge,
-                               num_samples, disable_pbar)
+                               edge_samples, disable_pbar)
   log.info("Sampling edge-edge probabilities")
   with Pool(
       workers,
@@ -406,13 +422,13 @@ def WeightedJaccardSamples(hypergraph,
 
   node2second_edge = node2node_neighbors * node2edge
   log.info("Getting node-edge samples")
-  samples = _sample_adj_matrix(node2second_edge, hypergraph.node, num_samples,
+  samples = _sample_adj_matrix(node2second_edge, hypergraph.node, node_samples,
                                disable_pbar)
 
   edge2second_node = edge2edge_neighbors * edge2node
   log.info("Getting edge-node samples")
   edge_samples = _sample_adj_matrix(edge2second_node, hypergraph.edge,
-                                    num_samples, disable_pbar)
+                                    edge_samples, disable_pbar)
   edge_samples = [(n, e) for e, n in edge_samples]
   samples.extend(edge_samples)
 

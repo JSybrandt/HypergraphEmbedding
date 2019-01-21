@@ -1,5 +1,6 @@
 from . import HypergraphEmbedding
 import logging
+import os
 import numpy as np
 import keras
 from keras.callbacks import TensorBoard
@@ -12,8 +13,19 @@ from keras.layers import Flatten
 from keras.layers import Input
 from keras.layers import Multiply
 from keras.models import Model
+from keras.utils.training_utils import multi_gpu_model
 
 log = logging.getLogger()
+
+def check_gpu(model):
+  return model
+  # disabled
+  if "CUDA_VISIBLE_DEVICES" in os.environ:
+    gpu_indices = [int(g) for g in
+                   os.environ.get("CUDA_VISIBLE_DEVICES").split(',')]
+    return multi_gpu_model(model, gpus=gpu_indices, cpu_relocation=True)
+  else:
+    return model
 
 
 def KerasModelToEmbedding(hypergraph,
@@ -108,8 +120,10 @@ def BooleanModel(hypergraph, dimension, num_neighbors):
       outputs=[node_node_prob,
                edge_edge_prob,
                node_edge_prob])
+  model=check_gpu(model)
   model.compile(optimizer="adagrad", loss="kullback_leibler_divergence")
   return model
+
 
 
 def UnweightedFloatModel(hypergraph, dimension, num_neighbors):
@@ -184,5 +198,6 @@ def UnweightedFloatModel(hypergraph, dimension, num_neighbors):
       outputs=[node_node_prob,
                edge_edge_prob,
                node_edge_prob])
+  model=check_gpu(model)
   model.compile(optimizer="adagrad", loss="mean_squared_error")
   return model

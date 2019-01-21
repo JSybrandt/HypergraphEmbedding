@@ -298,7 +298,8 @@ def _hypergraph2vec_skeleton(hypergraph, dimension, num_neighbors, sampler_fn,
       batch_size=fit_batch_size,
       epochs=fit_epochs,
       callbacks=[tensorboard, stopper],
-      verbose=0 if disable_pbar else 1)
+      #verbose=0 if disable_pbar else 1)
+      verbose=1)
 
   log.info("Recording embeddings.")
   return KerasModelToEmbedding(compressed_hg, model, inv_node_map, inv_edge_map)

@@ -211,6 +211,12 @@ def Relabel(original_hg, node_map, edge_map):
       assert edge_idx in edge_map
       AddNodeToEdge(relabed_hg, node_map[node_idx], edge_map[edge_idx])
 
+  # Handle weights
+  for node_idx, node in original_hg.node.items():
+    relabed_hg.node[node_map[node_idx]].weight = node.weight
+  for edge_idx, edge in original_hg.edge.items():
+    relabed_hg.edge[edge_map[edge_idx]].weight = edge.weight
+
   return relabed_hg
 
 
@@ -235,6 +241,12 @@ def CompressRange(original_hg):
       if edge_idx not in edge_map:
         edge_map[edge_idx] = len(edge_map)
       AddNodeToEdge(compressed_hg, node_map[node_idx], edge_map[edge_idx])
+
+  # Handle weights
+  for node_idx, node in original_hg.node.items():
+    compressed_hg.node[node_map[node_idx]].weight = node.weight
+  for edge_idx, edge in original_hg.edge.items():
+    compressed_hg.edge[edge_map[edge_idx]].weight = edge.weight
 
   inv_node_map = {y: x for x, y in node_map.items()}
   inv_edge_map = {y: x for x, y in edge_map.items()}

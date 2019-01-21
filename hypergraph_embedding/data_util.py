@@ -183,18 +183,27 @@ def LoadHMetis(path):
   with open(path) as hmetis_file:
     next(hmetis_file)
     for edge_idx, line in enumerate(hmetis_file):
-      for node_idx in [int(t) for t in line.strip().split()]:
+      for node_idx in [int(t)-1 for t in line.strip().split()]:
         AddNodeToEdge(hypergraph, node_idx, edge_idx)
   return hypergraph
 
 def SaveHMetis(hypergraph, path):
+  # Read: http://glaros.dtc.umn.edu/gkhome/fetch/sw/hmetis/manual.pdf
+  # hmetis requires indices in order
   with open(path, 'w') as hmetis_file:
-    hmetis_file.write("{} {}\n".format(len(hypergraph.edge),
-                                       len(hypergraph.node)))
-    for _, edge in hypergraph.edge.items():
-      hmetis_file.write(" ".join([str(x) for x in edge.nodes]))
+    # 11 refers to both weighted nodes and hyperedges
+    hmetis_file.write("{} {} 11\n".format(len(hypergraph.edge),
+                                          len(hypergraph.node)))
+    for edge_idx in range(len(hypergraph.edge)):
+      hmetis_file.write(str(int(hypergraph.edge[edge_idx].weight)))
+      for node_idx in hypergraph.edge[edge_idx].nodes:
+        hmetis_file.write(" ")
+        # indices are all positive
+        hmetis_file.write(str(node_idx + 1))
       hmetis_file.write("\n")
-
+    for node_idx in range(len(hypergraph.node)):
+      hmetis_file.write(str(int(hypergraph.node[node_idx].weight)))
+      hmetis_file.write("\n")
 
 PARSING_OPTIONS = {
     "AMINER":
