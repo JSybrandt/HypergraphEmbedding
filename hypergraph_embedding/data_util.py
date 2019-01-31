@@ -205,6 +205,73 @@ def SaveHMetis(hypergraph, path):
       hmetis_file.write(str(int(hypergraph.node[node_idx].weight)))
       hmetis_file.write("\n")
 
+def SaveEdgeList(hypergraph, data_path, metadata_path, is_weighted=False,
+    only_one_side=False):
+  hypergraph, node2original, edge2original = CompressRange(hypergraph)
+  node2inc = {node_idx: node_idx+1 for node_idx in hypergraph.node}
+  max_node_idx = max(hypergraph.node)+1
+  edge2inc = {edge_idx: edge_idx+max_node_idx+1 for edge_idx in hypergraph.edge}
+  # Now the indices range from 1-(n+m)
+  hypergraph = Relabel(hypergraph, node2inc, edge2inc)
+  node2original = {node2inc[curr]: original for curr, original in node2original.items()}
+  edge2original = {edge2inc[curr]: original for curr, original in edge2original.items()}
+
+  with open(data_path, 'w') as data_file:
+    for node_idx, node in hypergraph.node.items():
+      for edge_idx in node.edges:
+        data_file.write("{} {} {}\n".format(
+          node_idx, edge_idx, 1 if is_weighted else ""
+        ))
+        if not only_one_side:
+          data_file.write("{} {} {}\n".format(
+            edge_idx, node_idx, 1 if is_weighted else ""
+          ))
+  with open(metadata_path, 'w') as meta_file:
+    for node, original in node2original.items():
+      meta_file.write("Replace {} with node_idx {}\n".format(node, original))
+    for edge, original in edge2original.items():
+      meta_file.write("Replace {} with edge_idx {}\n".format(edge, original))
+
+
+
+def LoadMetadataMaps(metadata_path):
+  node_map = {}
+  edge_map = {}
+  with open(metadata_path) as file:
+    for line in file:
+      tokens = line.split()
+      assert len(tokens) == 5
+      written_idx = int(tokens[1])
+      original_idx = int(tokens[4])
+      node_edge_switch = tokens[3]
+      if node_edge_switch == 'node_idx':
+        node_map[written_idx] = original_idx
+      elif node_edge_switch == 'edge_idx':
+        edge_map[written_idx] = original_idx
+      else:
+        raise ValueError("Metadata file is invalid")
+  return node_map, edge_map
+
+def LoadEdgeList(data_path, metadata_path):
+  node_map, edge_map = LoadMetadataMaps(metadata_path)
+  hypergraph = Hypergraph()
+  with open(data_path) as file:
+    for line in file:
+      tokens = line.split()
+      assert len(tokens) == 2 or len(tokens) == 3
+      left_idx = int(tokens[0])
+      right_idx = int(tokens[1])
+      if left_idx in node_map:
+        assert right_idx in edge_map
+        AddNodeToEdge(hypergraph, node_map[left_idx], edge_map[right_idx])
+      elif left_idx in edge_map:
+        assert right_idx in node_map
+        AddNodeToEdge(hypergraph, node_map[right_idx], edge_map[left_idx])
+      else:
+        raise ValueError("Hypergraph file is invalid. Idx {} not found.".format(left_idx))
+  return hypergraph
+
+
 PARSING_OPTIONS = {
     "AMINER":
         AMinerToHypergraph,

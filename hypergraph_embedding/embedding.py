@@ -415,7 +415,7 @@ def EmbedHg2vAlgDist(hypergraph,
 
 
 def method_not_supported(hypergraph, dim):
-  raise RuntimeError("Method not supported")
+  raise RuntimeError("Method not supported. Try making the embedding on your own.")
 
 
 EMBEDDING_OPTIONS = {
@@ -434,7 +434,10 @@ EMBEDDING_OPTIONS = {
     "HG2V_ADJ_JAC": EmbedHg2vAdjJaccard,
     "HG2V_NEIGH_JAC": EmbedHg2vNeighborhoodWeightedJaccard,
     "HG2V_ALG_DIST": EmbedHg2vAlgDist,
-    "metapath2vec++": method_not_supported
+    "metapath2vec++": method_not_supported,
+    "deepwalk": method_not_supported,
+    "LINE": method_not_supported,
+    "BiNE": method_not_supported
 }
 
 # Only include here if the embedding function supports the keyword argument
