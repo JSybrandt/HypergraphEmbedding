@@ -60,6 +60,8 @@ def _sample_adj_matrix(matrix,
   Each row represents an object. Its nonzero columns represent connections.
   This function returns a list of (row, col) indices sampled for each row.
   """
+  if type(samples_per_row) == int:
+    samples_per_row = [samples_per_row for _ in interesting_rows]
   assert len(samples_per_row) == len(interesting_rows)
   assert len(samples_per_row) > 0
   res = []
@@ -114,7 +116,11 @@ def _init_diff_type_sample(node2edge, edge2node, num_neighbors, node2features,
 ################################################################################
 
 
-def BooleanSamples(hypergraph, num_neighbors, num_samples, disable_pbar=False):
+def BooleanSamples(hypergraph,
+                   num_neighbors,
+                   num_samples,
+                   disable_pbar=False,
+                   negative_samples_per_node=0):
   """
   This function samples num_samples times (at most) for each node-node,
   node-edge, edge-node, and edge-edge connection.

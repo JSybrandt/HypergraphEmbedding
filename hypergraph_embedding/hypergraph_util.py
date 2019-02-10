@@ -227,26 +227,16 @@ def CompressRange(original_hg):
   the original.
   """
 
-  compressed_hg = Hypergraph()
-  if original_hg.HasField("name"):
-    compressed_hg.name = original_hg.name
+  node_indices = [node_idx for node_idx in original_hg.node]
+  edge_indices = [edge_idx for edge_idx in original_hg.edge]
 
-  node_map = {}
-  edge_map = {}
+  node_indices.sort()
+  edge_indices.sort()
 
-  for node_idx, node in original_hg.node.items():
-    if node_idx not in node_map:
-      node_map[node_idx] = len(node_map)
-    for edge_idx in node.edges:
-      if edge_idx not in edge_map:
-        edge_map[edge_idx] = len(edge_map)
-      AddNodeToEdge(compressed_hg, node_map[node_idx], edge_map[edge_idx])
+  node_map = {n:i for i, n in enumerate(node_indices)}
+  edge_map = {e:i for i, e in enumerate(edge_indices)}
 
-  # Handle weights
-  for node_idx, node in original_hg.node.items():
-    compressed_hg.node[node_map[node_idx]].weight = node.weight
-  for edge_idx, edge in original_hg.edge.items():
-    compressed_hg.edge[edge_map[edge_idx]].weight = edge.weight
+  compressed_hg = Relabel(original_hg, node_map, edge_map)
 
   inv_node_map = {y: x for x, y in node_map.items()}
   inv_edge_map = {y: x for x, y in edge_map.items()}
