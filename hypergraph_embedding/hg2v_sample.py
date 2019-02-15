@@ -50,15 +50,17 @@ def _sample_neighbors(idx, idx2neighbors, num_neighbors):
   return np.random.choice(
       idx2neighbors[idx].nonzero()[1], num_neighbors, replace=True)
 
-
 def _sample_adj_matrix(matrix,
                        interesting_rows,
                        samples_per_row,
                        disable_pbar=False,
-                       replace=False):
+                       replace=False,
+                       negative=False):
   """
   Each row represents an object. Its nonzero columns represent connections.
   This function returns a list of (row, col) indices sampled for each row.
+  If negative is set, we rely on the matrix having no unused rows
+  or cols.
   """
   if type(samples_per_row) == int:
     samples_per_row = [samples_per_row for _ in interesting_rows]
@@ -68,15 +70,19 @@ def _sample_adj_matrix(matrix,
   for row_idx, num_samples in tqdm(zip(interesting_rows, samples_per_row),
                                    total=len(interesting_rows),
                                    disable=disable_pbar):
-    cols = matrix[row_idx, :].nonzero()[1]
-    # a coarse version of the HG could result in an isolated node or edge
-    if len(cols) > 0:
-      if replace == False:
-        samples = min(num_samples, len(cols))
-      else:
-        samples = num_samples
-      for col_idx in np.random.choice(cols, samples, replace=replace):
+    if negative:
+      for col_idx in np.random.randint(matrix.shape[1], size=num_samples):
         res.append((row_idx, col_idx))
+    else:
+      cols = matrix[row_idx, :].nonzero()[1]
+      # a coarse version of the HG could result in an isolated node or edge
+      if len(cols) > 0:
+        if replace == False:
+          samples = min(num_samples, len(cols))
+        else:
+          samples = num_samples
+        for col_idx in np.random.choice(cols, samples, replace=replace):
+          res.append((row_idx, col_idx))
   return res
 
 
@@ -119,8 +125,8 @@ def _init_diff_type_sample(node2edge, edge2node, num_neighbors, node2features,
 def BooleanSamples(hypergraph,
                    num_neighbors,
                    num_samples,
-                   disable_pbar=False,
-                   negative_samples_per_node=0):
+                   neg_samples=0,
+                   disable_pbar=False):
   """
   This function samples num_samples times (at most) for each node-node,
   node-edge, edge-node, and edge-edge connection.
@@ -132,6 +138,11 @@ def BooleanSamples(hypergraph,
   node_samples = [int(node.weight * num_samples)
                   for _, node in hypergraph.node.items()]
   edge_samples = [int(edge.weight * num_samples)
+                  for _, edge in hypergraph.edge.items()]
+
+  neg_node_samples = [int(node.weight * neg_samples)
+                  for _, node in hypergraph.node.items()]
+  neg_edge_samples = [int(edge.weight * neg_samples)
                   for _, edge in hypergraph.edge.items()]
 
   # return value
@@ -181,6 +192,52 @@ def BooleanSamples(hypergraph,
             neighbor_node_indices=neighbor_node_indices,
             neighbor_edge_indices=neighbor_edge_indices,
             node_edge_prob=1))
+
+
+  # NEGATIVE SAMPLING
+  if neg_samples > 0:
+
+    log.info("Node-Node Negatives")
+    samples = _sample_adj_matrix(node2node_neighbors, hypergraph.node,
+                                 neg_node_samples, disable_pbar,
+                                 negative=True)
+    for node_i, node_j in tqdm(samples, disable=disable_pbar):
+      similarity_records.append(SimilarityRecord(left_node_idx=node_i,
+                                                 right_node_idx=node_j))
+
+    log.info("Edge-Edge Negatives")
+    samples = _sample_adj_matrix(edge2edge_neighbors, hypergraph.edge,
+                                 neg_edge_samples, disable_pbar,
+                                 negative=True)
+    for node_i, node_j in tqdm(samples, disable=disable_pbar):
+      similarity_records.append(SimilarityRecord(left_edge_idx=node_i,
+                                                 right_edge_idx=node_j))
+    log.info("Node-Edge Negatives")
+    samples = _sample_adj_matrix(edge2edge_neighbors, hypergraph.edge,
+                                 neg_edge_samples, disable_pbar,
+                                 negative=True)
+    for node_i, node_j in tqdm(samples, disable=disable_pbar):
+      similarity_records.append(SimilarityRecord(left_edge_idx=node_i,
+                                                 right_edge_idx=node_j))
+
+    log.info("Getting node-edge negatives")
+    samples = _sample_adj_matrix(node2edge, hypergraph.node, neg_node_samples,
+                                 disable_pbar, negative=True)
+    log.info("Getting edge-node negatives")
+    samples.extend([(n, e) for e, n in _sample_adj_matrix(
+        edge2node, hypergraph.edge, neg_edge_samples, disable_pbar,
+        negative=True)])
+    for node_idx, edge_idx in tqdm(samples, disable=disable_pbar):
+      neighbor_edge_indices = _sample_neighbors(node_idx, node2edge,
+                                                num_neighbors)
+      neighbor_node_indices = _sample_neighbors(edge_idx, edge2node,
+                                                num_neighbors)
+      similarity_records.append(
+          SimilarityRecord(
+              left_node_idx=node_idx,
+              right_edge_idx=edge_idx,
+              neighbor_node_indices=neighbor_node_indices,
+              neighbor_edge_indices=neighbor_edge_indices))
 
   return similarity_records
 

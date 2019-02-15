@@ -311,11 +311,13 @@ def EmbedHg2vBoolean(hypergraph,
                      num_samples=200,
                      batch_size=256,
                      epochs=10,
+                     neg_samples=0,
                      debug_summary_path=None,
                      disable_pbar=False):
   sampler_fn = lambda hg: BooleanSamples(hg,
                                          num_neighbors=num_neighbors,
                                          num_samples=num_samples,
+                                         neg_samples=neg_samples,
                                          disable_pbar=disable_pbar)
   model_fn = lambda hg: BooleanModel(hg,
                                      dimension=dimension,
@@ -437,7 +439,8 @@ EMBEDDING_OPTIONS = {
     "metapath2vec++": method_not_supported,
     "deepwalk": method_not_supported,
     "LINE": method_not_supported,
-    "BiNE": method_not_supported
+    "BiNE": method_not_supported,
+    "HG2V_BOOLEAN_NS": lambda h, d: EmbedHg2vBoolean(h, d, neg_samples=500)
 }
 
 # Only include here if the embedding function supports the keyword argument
