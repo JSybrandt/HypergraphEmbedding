@@ -1,4 +1,4 @@
-# Hypergraph Embedding
+# Bipartite Embedding
 
 This application implements a number of methods for representing, embedding, and evaluating hypergraphs.
 
